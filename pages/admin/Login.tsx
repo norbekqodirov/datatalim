@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Lock, ShieldAlert, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const ADMIN_PASSWORD = (process.env as any).VITE_ADMIN_PASSWORD || 'admin123';
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'admin123';
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 60; // seconds
 
