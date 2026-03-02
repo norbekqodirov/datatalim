@@ -3,8 +3,8 @@
  * .env.local faylida VITE_TELEGRAM_BOT_TOKEN va VITE_TELEGRAM_CHAT_ID ni to'ldiring.
  */
 
-const BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '';
-const CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID || '';
+const BOT_TOKEN = (process.env as any).VITE_TELEGRAM_BOT_TOKEN || '';
+const CHAT_ID = (process.env as any).VITE_TELEGRAM_CHAT_ID || '';
 
 export interface TelegramResult {
     success: boolean;
