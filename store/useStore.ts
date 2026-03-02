@@ -144,21 +144,21 @@ interface AppState {
   team: TeamMember[];
   siteContent: SiteContent;
   visibility: SectionVisibility;
-  
+
   // Actions
   setCourses: (courses: Course[]) => void;
   addCourse: (course: Course) => void;
   updateCourse: (id: string, course: Partial<Course>) => void;
   deleteCourse: (id: string) => void;
-  
+
   setTeam: (team: TeamMember[]) => void;
   addTeamMember: (member: TeamMember) => void;
   updateTeamMember: (id: string, member: Partial<TeamMember>) => void;
   deleteTeamMember: (id: string) => void;
-  
+
   updateSiteContent: (content: Partial<SiteContent>) => void;
   toggleSectionVisibility: (section: keyof SectionVisibility) => void;
-  
+
   resetToDefaults: () => void;
 }
 
@@ -169,7 +169,7 @@ export const useStore = create<AppState>()(
       team: initialTeam,
       siteContent: initialSiteContent,
       visibility: initialVisibility,
-      
+
       setCourses: (courses) => set({ courses }),
       addCourse: (course) => set((state) => ({ courses: [...state.courses, course] })),
       updateCourse: (id, updatedCourse) => set((state) => ({
@@ -178,7 +178,7 @@ export const useStore = create<AppState>()(
       deleteCourse: (id) => set((state) => ({
         courses: state.courses.filter(c => c.id !== id)
       })),
-      
+
       setTeam: (team) => set({ team }),
       addTeamMember: (member) => set((state) => ({ team: [...state.team, member] })),
       updateTeamMember: (id, updatedMember) => set((state) => ({
@@ -187,15 +187,15 @@ export const useStore = create<AppState>()(
       deleteTeamMember: (id) => set((state) => ({
         team: state.team.filter(m => m.id !== id)
       })),
-      
+
       updateSiteContent: (content) => set((state) => ({
         siteContent: { ...state.siteContent, ...content }
       })),
-      
+
       toggleSectionVisibility: (section) => set((state) => ({
         visibility: { ...state.visibility, [section]: !state.visibility[section] }
       })),
-      
+
       resetToDefaults: () => set({
         courses: initialCourses,
         team: initialTeam,
@@ -205,6 +205,20 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'data-talim-storage',
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 2) {
+          // Reset to defaults if old data format
+          return {
+            ...persistedState,
+            courses: initialCourses,
+            team: initialTeam,
+            siteContent: initialSiteContent,
+            visibility: initialVisibility
+          };
+        }
+        return persistedState as AppState;
+      },
     }
   )
 );

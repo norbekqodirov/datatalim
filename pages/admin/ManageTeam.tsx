@@ -99,7 +99,7 @@ export default function ManageTeam() {
   };
 
   const handleSkillsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const skillsArray = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+    const skillsArray = e.target.value.split(',').map(s => s.trim()).filter(Boolean).map(s => ({ uz: s, ru: s, en: s }));
     setFormData(prev => ({ ...prev, skills: skillsArray }));
   };
 
@@ -184,9 +184,9 @@ export default function ManageTeam() {
               </div>
               <p className={`text-sm line-clamp-3 mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{tField(member.bio)}</p>
               <div className="flex flex-wrap gap-2 mb-6">
-                {member.skills.slice(0, 3).map((skill, idx) => (
+                {member.skills.slice(0, 3).map((skill: any, idx: number) => (
                   <span key={idx} className={`px-2 py-1 border rounded-lg text-xs font-bold ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
-                    {skill}
+                    {tField(skill)}
                   </span>
                 ))}
                 {member.skills.length > 3 && <span className={`px-2 py-1 border rounded-lg text-xs font-bold ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>+{member.skills.length - 3}</span>}
