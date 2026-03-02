@@ -3,6 +3,7 @@ import { X, Loader2, CheckCircle2, User, Phone } from 'lucide-react';
 import { Button } from './Button';
 import { sendToTelegram } from '../utils/telegram';
 import toast from 'react-hot-toast';
+import { submitLeadToAPI } from '../utils/api';
 
 interface EnrollModalProps {
     isOpen: boolean;
@@ -44,6 +45,20 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         text += `\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
 
         const result = await sendToTelegram(text);
+
+        // Save lead to CRM Database
+        const sourceRef = sessionStorage.getItem('marketing_ref') || undefined;
+        try {
+            await submitLeadToAPI({
+                name: formData.name,
+                phone: formData.phone,
+                courseId: courseName || 'consult',
+                sourceRef,
+            });
+        } catch (e) {
+            console.error("Failed to save lead to CRM", e);
+        }
+
         setLoading(false);
 
         if (result.success) {

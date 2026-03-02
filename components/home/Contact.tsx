@@ -4,6 +4,7 @@ import { Button } from '../Button';
 import { useStore } from '../../store/useStore';
 import { sendToTelegram } from '../../utils/telegram';
 import toast from 'react-hot-toast';
+import { submitLeadToAPI } from '../../utils/api';
 import { useTheme } from '../../store/ThemeContext';
 import { useLanguage } from '../../i18n';
 import { PatternBg, Star1, Star2 } from '../BrandElements';
@@ -31,6 +32,20 @@ export const Contact: React.FC = () => {
     const text = `📩 <b>Yangi xabar — DATA Ta'lim Stansiyasi</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${formData.phone}\n💬 <b>Xabar:</b> ${formData.message || '—'}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
 
     const result = await sendToTelegram(text);
+
+    // Save lead to CRM Database
+    const sourceRef = sessionStorage.getItem('marketing_ref') || undefined;
+    try {
+      await submitLeadToAPI({
+        name: formData.name,
+        phone: formData.phone,
+        courseId: 'Contact Form',
+        sourceRef,
+      });
+    } catch (e) {
+      console.error("Failed to save lead to CRM", e);
+    }
+
     setLoading(false);
 
     if (result.success) {

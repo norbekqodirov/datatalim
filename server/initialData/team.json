@@ -1,0 +1,218 @@
+[
+  {
+    "id": "1",
+    "name": {
+      "uz": "Shovvozbek Sattarov",
+      "ru": "Shovvozbek Sattarov",
+      "en": "Shovvozbek Sattarov"
+    },
+    "role": {
+      "uz": "Ijrochi Direktor",
+      "ru": "Ijrochi Direktor",
+      "en": "Ijrochi Direktor"
+    },
+    "image": "https://picsum.photos/seed/shovvoz/400/500",
+    "bio": {
+      "uz": "DATA Ta'lim Stansiyasining kundalik operatsiyalari va strategik rivojlanishiga mas'ul. Ta'lim menejmenti sohasida 5 yildan ortiq tajribaga ega.",
+      "ru": "DATA Ta'lim Stansiyasining kundalik operatsiyalari va strategik rivojlanishiga mas'ul. Ta'lim menejmenti sohasida 5 yildan ortiq tajribaga ega.",
+      "en": "DATA Ta'lim Stansiyasining kundalik operatsiyalari va strategik rivojlanishiga mas'ul. Ta'lim menejmenti sohasida 5 yildan ortiq tajribaga ega."
+    },
+    "skills": [
+      {
+        "uz": "Menejment",
+        "ru": "Menejment",
+        "en": "Menejment"
+      },
+      {
+        "uz": "Strategiya",
+        "ru": "Strategiya",
+        "en": "Strategiya"
+      },
+      {
+        "uz": "Liderlik",
+        "ru": "Liderlik",
+        "en": "Liderlik"
+      }
+    ]
+  },
+  {
+    "id": "2",
+    "name": {
+      "uz": "Shahruza Sultonova",
+      "ru": "Shahruza Sultonova",
+      "en": "Shahruza Sultonova"
+    },
+    "role": {
+      "uz": "DATA Languages Rahbari",
+      "ru": "DATA Languages Rahbari",
+      "en": "DATA Languages Rahbari"
+    },
+    "image": "https://picsum.photos/seed/shahruza/400/500",
+    "bio": {
+      "uz": "Xorijiy tillar bo'limi rahbari. Zamonaviy til o'rgatish metodikalari va xalqaro sertifikatlar bo'yicha mutaxassis.",
+      "ru": "Xorijiy tillar bo'limi rahbari. Zamonaviy til o'rgatish metodikalari va xalqaro sertifikatlar bo'yicha mutaxassis.",
+      "en": "Xorijiy tillar bo'limi rahbari. Zamonaviy til o'rgatish metodikalari va xalqaro sertifikatlar bo'yicha mutaxassis."
+    },
+    "skills": [
+      {
+        "uz": "IELTS",
+        "ru": "IELTS",
+        "en": "IELTS"
+      },
+      {
+        "uz": "Metodika",
+        "ru": "Metodika",
+        "en": "Metodika"
+      },
+      {
+        "uz": "Jamoa boshqaruvi",
+        "ru": "Jamoa boshqaruvi",
+        "en": "Jamoa boshqaruvi"
+      }
+    ]
+  },
+  {
+    "id": "3",
+    "name": {
+      "uz": "Boymirza Qalandarov",
+      "ru": "Boymirza Qalandarov",
+      "en": "Boymirza Qalandarov"
+    },
+    "role": {
+      "uz": "Moliya Bo'limi Rahbari",
+      "ru": "Moliya Bo'limi Rahbari",
+      "en": "Moliya Bo'limi Rahbari"
+    },
+    "image": "https://picsum.photos/seed/boymirza/400/500",
+    "bio": {
+      "uz": "Kompaniyaning moliyaviy barqarorligi va investitsiya loyihalari uchun javobgar. Moliyaviy tahlil va rejalashtirish bo'yicha ekspert.",
+      "ru": "Kompaniyaning moliyaviy barqarorligi va investitsiya loyihalari uchun javobgar. Moliyaviy tahlil va rejalashtirish bo'yicha ekspert.",
+      "en": "Kompaniyaning moliyaviy barqarorligi va investitsiya loyihalari uchun javobgar. Moliyaviy tahlil va rejalashtirish bo'yicha ekspert."
+    },
+    "skills": [
+      {
+        "uz": "Moliya",
+        "ru": "Moliya",
+        "en": "Moliya"
+      },
+      {
+        "uz": "Tahlil",
+        "ru": "Tahlil",
+        "en": "Tahlil"
+      },
+      {
+        "uz": "Buxgalteriya",
+        "ru": "Buxgalteriya",
+        "en": "Buxgalteriya"
+      }
+    ]
+  },
+  {
+    "id": "4",
+    "name": {
+      "uz": "Shonazar Xudoyberganov",
+      "ru": "Shonazar Xudoyberganov",
+      "en": "Shonazar Xudoyberganov"
+    },
+    "role": {
+      "uz": "Ta'lim Bo'limi Rahbari",
+      "ru": "Ta'lim Bo'limi Rahbari",
+      "en": "Ta'lim Bo'limi Rahbari"
+    },
+    "image": "https://picsum.photos/seed/shonazar/400/500",
+    "bio": {
+      "uz": "O'quv dasturlarini ishlab chiqish va sifat nazorati bo'yicha rahbar. IT ta'limida innovatsion yondashuvlar tarafdori.",
+      "ru": "O'quv dasturlarini ishlab chiqish va sifat nazorati bo'yicha rahbar. IT ta'limida innovatsion yondashuvlar tarafdori.",
+      "en": "O'quv dasturlarini ishlab chiqish va sifat nazorati bo'yicha rahbar. IT ta'limida innovatsion yondashuvlar tarafdori."
+    },
+    "skills": [
+      {
+        "uz": "Ta'lim sifati",
+        "ru": "Ta'lim sifati",
+        "en": "Ta'lim sifati"
+      },
+      {
+        "uz": "O'quv dasturlari",
+        "ru": "O'quv dasturlari",
+        "en": "O'quv dasturlari"
+      },
+      {
+        "uz": "IT",
+        "ru": "IT",
+        "en": "IT"
+      }
+    ]
+  },
+  {
+    "id": "5",
+    "name": {
+      "uz": "Azizbek Bekturdiyev",
+      "ru": "Azizbek Bekturdiyev",
+      "en": "Azizbek Bekturdiyev"
+    },
+    "role": {
+      "uz": "Katta Dasturlash Ustoz",
+      "ru": "Katta Dasturlash Ustoz",
+      "en": "Katta Dasturlash Ustoz"
+    },
+    "image": "https://picsum.photos/seed/azizbek/400/500",
+    "bio": {
+      "uz": "Full-stack dasturchi va tajribali ustoz. O'nlarcha muvaffaqiyatli loyihalar muallifi va yuzlab shogirdlar ustozi.",
+      "ru": "Full-stack dasturchi va tajribali ustoz. O'nlarcha muvaffaqiyatli loyihalar muallifi va yuzlab shogirdlar ustozi.",
+      "en": "Full-stack dasturchi va tajribali ustoz. O'nlarcha muvaffaqiyatli loyihalar muallifi va yuzlab shogirdlar ustozi."
+    },
+    "skills": [
+      {
+        "uz": "React",
+        "ru": "React",
+        "en": "React"
+      },
+      {
+        "uz": "Node.js",
+        "ru": "Node.js",
+        "en": "Node.js"
+      },
+      {
+        "uz": "Python",
+        "ru": "Python",
+        "en": "Python"
+      }
+    ]
+  },
+  {
+    "id": "6",
+    "name": {
+      "uz": "Malika Karimova",
+      "ru": "Malika Karimova",
+      "en": "Malika Karimova"
+    },
+    "role": {
+      "uz": "Katta Dizayn Ustoz",
+      "ru": "Katta Dizayn Ustoz",
+      "en": "Katta Dizayn Ustoz"
+    },
+    "image": "https://picsum.photos/seed/malika/400/500",
+    "bio": {
+      "uz": "UI/UX va Grafik dizayn bo'yicha yetakchi mutaxassis. Kreativ fikrlash va zamonaviy dizayn trendlari bo'yicha ekspert.",
+      "ru": "UI/UX va Grafik dizayn bo'yicha yetakchi mutaxassis. Kreativ fikrlash va zamonaviy dizayn trendlari bo'yicha ekspert.",
+      "en": "UI/UX va Grafik dizayn bo'yicha yetakchi mutaxassis. Kreativ fikrlash va zamonaviy dizayn trendlari bo'yicha ekspert."
+    },
+    "skills": [
+      {
+        "uz": "Figma",
+        "ru": "Figma",
+        "en": "Figma"
+      },
+      {
+        "uz": "Adobe CC",
+        "ru": "Adobe CC",
+        "en": "Adobe CC"
+      },
+      {
+        "uz": "UI/UX",
+        "ru": "UI/UX",
+        "en": "UI/UX"
+      }
+    ]
+  }
+]

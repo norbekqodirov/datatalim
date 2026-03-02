@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Home from './pages/Home';
@@ -7,11 +7,14 @@ import Courses from './pages/Courses';
 import CourseDetail from './pages/CourseDetail';
 import About from './pages/About';
 import Team from './pages/Team';
+import ApplyForm from './pages/ApplyForm';
 
 // Layout
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { useTheme } from './store/ThemeContext';
+import { useStore } from './store/useStore';
+import { useTracking } from './hooks/useTracking';
 
 // Admin
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -21,6 +24,8 @@ import ManageCourses from './pages/admin/ManageCourses';
 import ManageTeam from './pages/admin/ManageTeam';
 import ManageVisibility from './pages/admin/ManageVisibility';
 import ManageMedia from './pages/admin/ManageMedia';
+import ManageMarketing from './pages/admin/ManageMarketing';
+import ManageLeads from './pages/admin/ManageLeads';
 
 // Protected Route Wrapper with Session Timeout
 const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2 soat
@@ -48,6 +53,16 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 // Public Layout — Navbar va Footer faqat 1 marta mount bo'ladi
 const PublicLayout = () => {
   const { isDark } = useTheme();
+  const { isChecking } = useTracking(); // Initialize marketing link tracking
+
+  if (isChecking) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-[#0f172a]' : 'bg-slate-50'}`}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0061ff]"></div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="min-h-screen flex flex-col font-sans text-slate-900"
@@ -67,6 +82,12 @@ const PublicLayout = () => {
 };
 
 function App() {
+  const initializeStore = useStore(state => state.initializeStore);
+
+  useEffect(() => {
+    initializeStore();
+  }, [initializeStore]);
+
   return (
     <Router>
       <Toaster position="top-right" />
@@ -80,6 +101,9 @@ function App() {
           <Route path="/courses/:id" element={<CourseDetail />} />
           <Route path="/career-test" element={<CareerTest />} />
         </Route>
+
+        {/* Standalone Landing Page for Marketing Links */}
+        <Route path="/apply" element={<ApplyForm />} />
 
         {/* Admin Routes */}
         <Route path="/paneladmindata/login" element={<Login />} />
@@ -96,6 +120,8 @@ function App() {
           <Route path="team" element={<ManageTeam />} />
           <Route path="visibility" element={<ManageVisibility />} />
           <Route path="media" element={<ManageMedia />} />
+          <Route path="marketing" element={<ManageMarketing />} />
+          <Route path="leads" element={<ManageLeads />} />
         </Route>
       </Routes>
     </Router>

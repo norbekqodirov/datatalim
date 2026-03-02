@@ -1,0 +1,13 @@
+{
+  "hero": true,
+  "about": true,
+  "tourVideo": true,
+  "courses": true,
+  "testimonials": true,
+  "careerTest": true,
+  "facilities": true,
+  "team": true,
+  "faq": true,
+  "gallery": true,
+  "contact": true
+}

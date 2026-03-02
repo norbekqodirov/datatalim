@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, BookOpen, Settings, LogOut, Eye, Video, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, Settings, LogOut, Eye, Video, Sun, Moon, Target, UserPlus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../../store/ThemeContext';
 
@@ -19,7 +19,8 @@ export const AdminLayout: React.FC = () => {
     { path: '/paneladmindata/courses', icon: BookOpen, label: 'Kurslar' },
     { path: '/paneladmindata/team', icon: Users, label: 'Jamoa' },
     { path: '/paneladmindata/media', icon: Video, label: 'Media & Matnlar' },
-    { path: '/paneladmindata/visibility', icon: Eye, label: "Bo'limlar" },
+    { path: '/paneladmindata/marketing', icon: Target, label: 'Marketing' },
+    { path: '/paneladmindata/leads', icon: UserPlus, label: 'Arizalar' },
   ];
 
   return (
@@ -44,8 +45,8 @@ export const AdminLayout: React.FC = () => {
                 key={item.path}
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-bold transition-all ${isActive
-                    ? isDark ? 'bg-[#0061ff]/20 text-[#60efff]' : 'bg-blue-50 text-[#0061ff]'
-                    : isDark ? 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? isDark ? 'bg-[#0061ff]/20 text-[#60efff]' : 'bg-blue-50 text-[#0061ff]'
+                  : isDark ? 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
               >
                 <item.icon size={20} />

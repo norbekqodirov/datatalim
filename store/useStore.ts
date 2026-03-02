@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { fetchFromAPI, saveToAPI } from '../utils/api';
 import { coursesData as initialCourses, Course } from '../data/courses';
 import { LocalizedString } from '../types';
 
@@ -13,7 +13,7 @@ export interface TeamMember {
   skills: LocalizedString[];
 }
 
-const initialTeam: TeamMember[] = [
+export const initialTeam: TeamMember[] = [
   {
     id: '1',
     name: { uz: "Shovvozbek Sattarov", ru: "Shovvozbek Sattarov", en: "Shovvozbek Sattarov" },
@@ -82,7 +82,7 @@ export interface SiteContent {
   galleryImages: string[];
 }
 
-const initialSiteContent: SiteContent = {
+export const initialSiteContent: SiteContent = {
   heroTitle: { uz: "Zamonaviy kasblarni biz bilan", ru: "Zamonaviy kasblarni biz bilan", en: "Zamonaviy kasblarni biz bilan" },
   heroSubtitle: { uz: "o'rganing.", ru: "o'rganing.", en: "o'rganing." },
   heroDescription: { uz: "DATA Ta'lim Stansiyasi — 7 yoshdan yuqori bo'lgan barcha uchun IT va zamonaviy kasblarni o'rgatuvchi innovatsion markaz.", ru: "DATA Ta'lim Stansiyasi — 7 yoshdan yuqori bo'lgan barcha uchun IT va zamonaviy kasblarni o'rgatuvchi innovatsion markaz.", en: "DATA Ta'lim Stansiyasi — 7 yoshdan yuqori bo'lgan barcha uchun IT va zamonaviy kasblarni o'rgatuvchi innovatsion markaz." },
@@ -125,7 +125,7 @@ export interface SectionVisibility {
   contact: boolean;
 }
 
-const initialVisibility: SectionVisibility = {
+export const initialVisibility: SectionVisibility = {
   hero: true,
   about: true,
   tourVideo: true,
@@ -144,8 +144,10 @@ interface AppState {
   team: TeamMember[];
   siteContent: SiteContent;
   visibility: SectionVisibility;
+  isLoading: boolean;
 
   // Actions
+  initializeStore: () => Promise<void>;
   setCourses: (courses: Course[]) => void;
   addCourse: (course: Course) => void;
   updateCourse: (id: string, course: Partial<Course>) => void;
@@ -162,63 +164,97 @@ interface AppState {
   resetToDefaults: () => void;
 }
 
-export const useStore = create<AppState>()(
-  persist(
-    (set) => ({
+export const useStore = create<AppState>()((set, get) => ({
+  courses: initialCourses,
+  team: initialTeam,
+  siteContent: initialSiteContent,
+  visibility: initialVisibility,
+  isLoading: true,
+
+  initializeStore: async () => {
+    set({ isLoading: true });
+    try {
+      const [coursesRes, teamRes, siteRes, visRes] = await Promise.all([
+        fetchFromAPI('courses'),
+        fetchFromAPI('team'),
+        fetchFromAPI('site_content'),
+        fetchFromAPI('visibility')
+      ]);
+      set({
+        courses: coursesRes || initialCourses,
+        team: teamRes || initialTeam,
+        siteContent: siteRes || initialSiteContent,
+        visibility: visRes || initialVisibility,
+        isLoading: false
+      });
+    } catch (e) {
+      console.error("Failed to load from API", e);
+      set({ isLoading: false });
+    }
+  },
+
+  setCourses: (courses) => {
+    set({ courses });
+    saveToAPI('courses', courses);
+  },
+  addCourse: (course) => {
+    const newCourses = [...get().courses, course];
+    set({ courses: newCourses });
+    saveToAPI('courses', newCourses);
+  },
+  updateCourse: (id, updatedCourse) => {
+    const newCourses = get().courses.map(c => c.id === id ? { ...c, ...updatedCourse } : c);
+    set({ courses: newCourses });
+    saveToAPI('courses', newCourses);
+  },
+  deleteCourse: (id) => {
+    const newCourses = get().courses.filter(c => c.id !== id);
+    set({ courses: newCourses });
+    saveToAPI('courses', newCourses);
+  },
+
+  setTeam: (team) => {
+    set({ team });
+    saveToAPI('team', team);
+  },
+  addTeamMember: (member) => {
+    const newTeam = [...get().team, member];
+    set({ team: newTeam });
+    saveToAPI('team', newTeam);
+  },
+  updateTeamMember: (id, updatedMember) => {
+    const newTeam = get().team.map(m => m.id === id ? { ...m, ...updatedMember } : m);
+    set({ team: newTeam });
+    saveToAPI('team', newTeam);
+  },
+  deleteTeamMember: (id) => {
+    const newTeam = get().team.filter(m => m.id !== id);
+    set({ team: newTeam });
+    saveToAPI('team', newTeam);
+  },
+
+  updateSiteContent: (content) => {
+    const newContent = { ...get().siteContent, ...content };
+    set({ siteContent: newContent });
+    saveToAPI('site_content', newContent);
+  },
+
+  toggleSectionVisibility: (section) => {
+    const newVisibility = { ...get().visibility, [section]: !get().visibility[section] };
+    set({ visibility: newVisibility });
+    saveToAPI('visibility', newVisibility);
+  },
+
+  resetToDefaults: () => {
+    set({
       courses: initialCourses,
       team: initialTeam,
       siteContent: initialSiteContent,
-      visibility: initialVisibility,
-
-      setCourses: (courses) => set({ courses }),
-      addCourse: (course) => set((state) => ({ courses: [...state.courses, course] })),
-      updateCourse: (id, updatedCourse) => set((state) => ({
-        courses: state.courses.map(c => c.id === id ? { ...c, ...updatedCourse } : c)
-      })),
-      deleteCourse: (id) => set((state) => ({
-        courses: state.courses.filter(c => c.id !== id)
-      })),
-
-      setTeam: (team) => set({ team }),
-      addTeamMember: (member) => set((state) => ({ team: [...state.team, member] })),
-      updateTeamMember: (id, updatedMember) => set((state) => ({
-        team: state.team.map(m => m.id === id ? { ...m, ...updatedMember } : m)
-      })),
-      deleteTeamMember: (id) => set((state) => ({
-        team: state.team.filter(m => m.id !== id)
-      })),
-
-      updateSiteContent: (content) => set((state) => ({
-        siteContent: { ...state.siteContent, ...content }
-      })),
-
-      toggleSectionVisibility: (section) => set((state) => ({
-        visibility: { ...state.visibility, [section]: !state.visibility[section] }
-      })),
-
-      resetToDefaults: () => set({
-        courses: initialCourses,
-        team: initialTeam,
-        siteContent: initialSiteContent,
-        visibility: initialVisibility
-      })
-    }),
-    {
-      name: 'data-talim-storage',
-      version: 2,
-      migrate: (persistedState: any, version: number) => {
-        if (version < 2) {
-          // Reset to defaults if old data format
-          return {
-            ...persistedState,
-            courses: initialCourses,
-            team: initialTeam,
-            siteContent: initialSiteContent,
-            visibility: initialVisibility
-          };
-        }
-        return persistedState as AppState;
-      },
-    }
-  )
-);
+      visibility: initialVisibility
+    });
+    saveToAPI('courses', initialCourses);
+    saveToAPI('team', initialTeam);
+    saveToAPI('site_content', initialSiteContent);
+    saveToAPI('visibility', initialVisibility);
+  }
+}));
