@@ -5,11 +5,14 @@ import { Save, Video, Type, Image as ImageIcon, MapPin, Plus, Trash2 } from 'luc
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
 import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
-import { compressImage } from '../../utils/imageCompressor';
+import { compressImageToWebP } from '../../utils/imageCompressor';
 
 export default function ManageMedia() {
   const { siteContent, updateSiteContent } = useStore();
   const { isDark } = useTheme();
+  const [isSaving, setIsSaving] = useState(false);
+  const [aboutSavings, setAboutSavings] = useState<string | null>(null);
+  const [gallerySavings, setGallerySavings] = useState<Record<number, string>>({});
 
   const [formData, setFormData] = useState(() => {
     const normalize = (val: any) => typeof val === 'string' ? { uz: val, ru: val, en: val } : (val || { uz: '', ru: '', en: '' });
@@ -32,8 +35,14 @@ export default function ManageMedia() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressedBase64 = await compressImage(file);
-        setFormData(prev => ({ ...prev, aboutImage: compressedBase64 }));
+        setAboutSavings(null);
+        const result = await compressImageToWebP(file);
+        setFormData(prev => ({ ...prev, aboutImage: result.base64 }));
+        if (result.compressedSize < result.originalSize) {
+          const pct = Math.round((1 - result.compressedSize / result.originalSize) * 100);
+          const fmt = (b: number) => b >= 1024 * 1024 ? (b / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+          setAboutSavings(`${fmt(result.originalSize)} → ${fmt(result.compressedSize)} (${pct}% kichiklashdi)`);
+        }
       } catch (error) {
         toast.error('Rasm yuklashda xatolik yuz berdi');
       }
@@ -44,8 +53,13 @@ export default function ManageMedia() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressedBase64 = await compressImage(file);
-        handleGalleryChange(index, compressedBase64);
+        const result = await compressImageToWebP(file);
+        handleGalleryChange(index, result.base64);
+        if (result.compressedSize < result.originalSize) {
+          const pct = Math.round((1 - result.compressedSize / result.originalSize) * 100);
+          const fmt = (b: number) => b >= 1024 * 1024 ? (b / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+          setGallerySavings(prev => ({ ...prev, [index]: `${fmt(result.originalSize)} → ${fmt(result.compressedSize)} (${pct}% kichiklashdi)` }));
+        }
       } catch (error) {
         toast.error('Rasm yuklashda xatolik yuz berdi');
       }
@@ -89,9 +103,16 @@ export default function ManageMedia() {
     setFormData((prev) => ({ ...prev, galleryImages: newGallery }));
   };
 
-  const handleSave = () => {
-    updateSiteContent(formData);
-    toast.success('O\'zgarishlar saqlandi!');
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await updateSiteContent(formData);
+      toast.success('O\'zgarishlar muvaffaqiyatli saqlandi!');
+    } catch (error) {
+      toast.error('Saqlashda xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const inputClass = `w-full px-4 py-3 rounded-2xl border outline-none transition-all font-medium ${isDark ? 'bg-slate-800 border-slate-700 text-white focus:border-[#60efff]' : 'bg-white border-slate-200 focus:border-[#0061ff] focus:ring-2 focus:ring-blue-100'}`;
@@ -159,9 +180,13 @@ export default function ManageMedia() {
             <div>
               <label className={labelClass}>Biz haqimizda Rasmi (Yuklash)</label>
               <div className="flex gap-4 items-center">
-                {formData.aboutImage && <img src={formData.aboutImage} className={`w-16 h-16 rounded-xl object-cover shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />}
+                {formData.aboutImage && <img src={formData.aboutImage} loading="lazy" decoding="async" className={`w-16 h-16 rounded-xl object-cover shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />}
                 <div className="flex-1">
                   <input type="file" accept="image/*" onChange={handleAboutImageUpload} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-emerald-500">✅ WebP avtomatik</span>
+                    {aboutSavings && <span className="text-xs font-semibold text-blue-500">{aboutSavings}</span>}
+                  </div>
                 </div>
               </div>
             </div>
@@ -246,11 +271,15 @@ export default function ManageMedia() {
               <div key={idx} className={`flex items-center gap-4 p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                 {url && (
                   <div className={`w-16 h-16 rounded-xl overflow-hidden shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <img src={url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   </div>
                 )}
                 <div className="flex-1">
                   <input type="file" accept="image/*" onChange={(e) => handleGalleryUpload(idx, e)} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-emerald-500">✅ WebP avtomatik</span>
+                    {gallerySavings[idx] && <span className="text-xs font-semibold text-blue-500">{gallerySavings[idx]}</span>}
+                  </div>
                 </div>
                 <button onClick={() => removeGalleryImage(idx)} className={`p-3 rounded-xl transition-colors shrink-0 ${isDark ? 'text-slate-500 hover:text-red-400 hover:bg-slate-800' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}>
                   <Trash2 size={20} />
@@ -261,9 +290,9 @@ export default function ManageMedia() {
         </div>
 
         <div className="pt-6 flex justify-end sticky bottom-8 z-20">
-          <button onClick={handleSave} className="bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2">
-            <Save size={20} />
-            Saqlash
+          <button onClick={handleSave} disabled={isSaving} className={`bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2 ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}>
+            {isSaving ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Save size={20} />}
+            {isSaving ? 'Saqlanmoqda...' : 'Saqlash'}
           </button>
         </div>
       </div>

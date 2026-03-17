@@ -28,6 +28,7 @@ export function initDB() {
     name TEXT NOT NULL,
     ref_code TEXT UNIQUE NOT NULL,
     target_url TEXT NOT NULL,
+    category TEXT DEFAULT 'IT',
     clicks INTEGER DEFAULT 0,
     leads_count INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -39,7 +40,13 @@ export function initDB() {
     phone TEXT NOT NULL,
     course_id TEXT,
     source_ref TEXT,
-    status TEXT DEFAULT 'new',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+    CREATE TABLE IF NOT EXISTS admin_users(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
   `);

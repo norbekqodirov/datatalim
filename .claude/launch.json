@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Backend (Express + SQLite)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server/index.js"],
+      "port": 4000
+    },
+    {
+      "name": "Frontend (Vite + React)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["D:/Project/data-talim/node_modules/vite/bin/vite.js", "--port", "3000", "--host"],
+      "port": 3000
+    }
+  ]
+}

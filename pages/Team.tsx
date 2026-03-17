@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Users, Award, Star, Briefcase, GraduationCap, ChevronRight } from 'lucide-react';
 import { useTheme } from '../store/ThemeContext';
 import { PatternBg, FloatingStars, Star1, Star2 } from '../components/BrandElements';
+import { SEO } from '../components/SEO';
 
 import { useStore } from '../store/useStore';
 import { useLanguage } from '../i18n';
@@ -36,6 +37,7 @@ export default function Team() {
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: isDark ? '#000' : '#f8fafc' }}>
+      <SEO title="Jamoa" description="DATA Ta'lim Stansiyasining professional jamoasi va tajribali ustozlari bilan tanishing." />
       <PatternBg color={isDark ? '#60efff' : '#0061ff'} opacity={isDark ? 0.02 : 0.03} />
       <FloatingStars color1="#0061ff" color2="#60efff" className="opacity-40" />
 
@@ -116,6 +118,8 @@ export default function Team() {
                     src={member.image}
                     alt={tField(member.name)}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 relative z-0"
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div className="absolute bottom-6 left-8 right-8 z-30">
                     <h3 className={`text-3xl font-black mb-2 leading-tight ${isDark ? 'text-white' : 'text-slate-900 group-hover:text-[#0061ff] transition-colors'}`}>{tField(member.name)}</h3>

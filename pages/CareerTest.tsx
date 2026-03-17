@@ -12,6 +12,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { CourseResult } from '../types';
 import { useTheme } from '../store/ThemeContext';
 import { PatternBg, SymbolMark, Star1, Star2, FloatingStars, getCourseGradient, getCourseColors } from '../components/BrandElements';
+import { SEO } from '../components/SEO';
 
 // Constants
 const QUESTIONS_PER_TEST = 36;
@@ -53,8 +54,8 @@ const ResultCard: React.FC<{ result: CourseResult; rank: number; onEnroll: (cour
 
   return (
     <div className={`rounded-3xl p-8 mb-6 transition-all border-2 relative overflow-hidden group ${rank === 1
-        ? isDark ? 'bg-slate-900 border-white/20 shadow-2xl' : `bg-white border-[${colors.primary}] shadow-xl`
-        : isDark ? 'bg-slate-800/50 border-white/5' : 'bg-slate-50 border-slate-200'
+      ? isDark ? 'bg-slate-900 border-white/20 shadow-2xl' : `bg-white border-[${colors.primary}] shadow-xl`
+      : isDark ? 'bg-slate-800/50 border-white/5' : 'bg-slate-50 border-slate-200'
       }`}>
       {/* Background elements */}
       <div className="absolute top-0 right-0 w-32 h-32 rounded-bl-full opacity-10 pointer-events-none transition-transform group-hover:scale-110" style={{ background: gradient }}></div>
@@ -63,8 +64,8 @@ const ResultCard: React.FC<{ result: CourseResult; rank: number; onEnroll: (cour
       <div className="flex justify-between items-start mb-6 relative z-10">
         <div>
           <span className={`inline-block px-4 py-1.5 rounded-full text-xs font-bold mb-4 tracking-wider uppercase font-sans ${rank === 1
-              ? isDark ? 'bg-white/10 text-white border border-white/20' : 'bg-transparent text-white'
-              : isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700'
+            ? isDark ? 'bg-white/10 text-white border border-white/20' : 'bg-transparent text-white'
+            : isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700'
             }`}
             style={rank === 1 && !isDark ? { background: gradient } : {}}
           >
@@ -211,6 +212,7 @@ export default function CareerTest() {
   if (view === 'intro') {
     return (
       <div className={`flex flex-col min-h-[70vh] relative overflow-hidden ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+        <SEO title="Karyera Testi" description="Bepul psixologik test orqali o'zingizga mos IT yo'nalishni aniqlang. 36 ta savol, 5 daqiqa, natijaviy tavsiyalar." />
         <PatternBg color={isDark ? '#ffffff' : '#0061ff'} opacity={isDark ? 0.03 : 0.04} />
         <FloatingStars color1={isDark ? '#60efff' : '#0061ff'} color2={isDark ? '#82f4b1' : '#ee2a7b'} />
 

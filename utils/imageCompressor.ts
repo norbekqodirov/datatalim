@@ -1,44 +1,57 @@
-export const compressImage = (file: File): Promise<string> => {
+/**
+ * Client-side image compression utility.
+ * Compresses images to WebP format before saving as base64.
+ * Used in admin pages (ManageTeam, ManageMedia, ManageCourses).
+ */
+
+export interface CompressResult {
+    base64: string;
+    originalSize: number;   // bytes
+    compressedSize: number; // bytes
+}
+
+export const compressImage = (file: File, maxWidth = 1920, quality = 0.85): Promise<string> => {
+    return compressImageToWebP(file, maxWidth, quality).then(r => r.base64);
+};
+
+export const compressImageToWebP = (file: File, maxWidth = 1920, quality = 0.85): Promise<CompressResult> => {
     return new Promise((resolve, reject) => {
+        const originalSize = file.size;
         const reader = new FileReader();
-        reader.readAsDataURL(file);
         reader.onload = (event) => {
             const img = new Image();
-            img.src = event.target?.result as string;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 800;
-                const MAX_HEIGHT = 800;
                 let width = img.width;
                 let height = img.height;
 
-                if (width > height) {
-                    if (width > MAX_WIDTH) {
-                        height *= MAX_WIDTH / width;
-                        width = MAX_WIDTH;
-                    }
-                } else {
-                    if (height > MAX_HEIGHT) {
-                        width *= MAX_HEIGHT / height;
-                        height = MAX_HEIGHT;
-                    }
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
                 }
 
                 canvas.width = width;
                 canvas.height = height;
+
                 const ctx = canvas.getContext('2d');
                 if (!ctx) {
-                    reject(new Error("Failed to get canvas context"));
+                    reject(new Error('Canvas context not available'));
                     return;
                 }
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // compress to 70% quality JPEG
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                resolve(dataUrl);
+                const base64 = canvas.toDataURL('image/webp', quality);
+
+                // Calculate approximate compressed size from base64 length
+                const compressedSize = Math.round((base64.length - (base64.indexOf(',') + 1)) * 0.75);
+
+                resolve({ base64, originalSize, compressedSize });
             };
-            img.onerror = (err) => reject(err);
+            img.onerror = () => reject(new Error('Image loading failed'));
+            img.src = event.target?.result as string;
         };
-        reader.onerror = (err) => reject(err);
+        reader.onerror = () => reject(new Error('File reading failed'));
+        reader.readAsDataURL(file);
     });
 };
+

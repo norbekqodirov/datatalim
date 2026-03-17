@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Database and archives (don't commit to git)
+server/data.db
+*.tar.gz
+*.tmp

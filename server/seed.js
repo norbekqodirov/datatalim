@@ -13,6 +13,8 @@ const initialVisibility = fs.readFileSync(path.join(__dirname, 'initialData', 'v
 
 initDB();
 
+import bcrypt from 'bcrypt';
+
 const db = getDB();
 
 const upsert = db.prepare(`
@@ -26,6 +28,21 @@ const seed = db.transaction(() => {
   upsert.run('team', initialTeam);
   upsert.run('site_content', initialSiteContent);
   upsert.run('visibility', initialVisibility);
+
+  // Seed default admin user if none exists
+  const existingAdmins = db.prepare('SELECT COUNT(*) as count FROM admin_users').get().count;
+  if (existingAdmins === 0) {
+    const defaultPassword = 'admin'; // We will use 'admin' for simplicity in this demo, user can change later if needed
+    const saltRounds = 10;
+    const passwordHash = bcrypt.hashSync(defaultPassword, saltRounds);
+
+    const insertAdmin = db.prepare(`
+      INSERT INTO admin_users (username, password_hash)
+      VALUES (?, ?)
+    `);
+    insertAdmin.run('admin', passwordHash);
+    console.log('👤 Default admin user created (Username: admin, Password: admin)');
+  }
 });
 
 seed();

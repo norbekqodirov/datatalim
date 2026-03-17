@@ -11,6 +11,7 @@ export const translations: Record<Language, Record<string, string>> = {
         'nav.team': 'Jamoa',
         'nav.contact': 'Aloqa',
         'nav.careerTest': 'Karyera Testi',
+        'nav.languages': 'Til kurslari',
 
         // Hero
         'hero.cta.test': 'Kasbni aniqlash',
@@ -49,6 +50,7 @@ export const translations: Record<Language, Record<string, string>> = {
         'nav.team': 'Команда',
         'nav.contact': 'Контакт',
         'nav.careerTest': 'Тест Карьеры',
+        'nav.languages': 'Языковые курсы',
 
         // Hero
         'hero.cta.test': 'Определить профессию',
@@ -87,6 +89,7 @@ export const translations: Record<Language, Record<string, string>> = {
         'nav.team': 'Team',
         'nav.contact': 'Contact',
         'nav.careerTest': 'Career Test',
+        'nav.languages': 'Languages',
 
         // Hero
         'hero.cta.test': 'Find Your Career',

@@ -2,11 +2,26 @@ import React from 'react';
 import { useStore } from '../../store/useStore';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
+import { useState } from 'react';
 
 export default function ManageVisibility() {
   const { visibility, toggleSectionVisibility } = useStore();
   const { isDark } = useTheme();
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  const handleToggle = async (key: string) => {
+    setSavingKey(key);
+    try {
+      await toggleSectionVisibility(key as keyof typeof visibility);
+      toast.success('Holat o\'zgartirildi!');
+    } catch (error) {
+      toast.error('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+    } finally {
+      setSavingKey(null);
+    }
+  };
 
   const sections = [
     { key: 'hero', label: 'Bosh qism (Hero)' },
@@ -34,13 +49,12 @@ export default function ManageVisibility() {
           {sections.map(({ key, label }) => {
             const isVisible = visibility[key as keyof typeof visibility];
             return (
-              <div 
-                key={key} 
-                className={`flex items-center justify-between p-6 rounded-3xl border-2 transition-all duration-300 ${
-                  isVisible 
-                    ? isDark ? 'border-blue-900/50 bg-blue-900/20' : 'border-blue-100 bg-blue-50/50' 
+              <div
+                key={key}
+                className={`flex items-center justify-between p-6 rounded-3xl border-2 transition-all duration-300 ${isVisible
+                    ? isDark ? 'border-blue-900/50 bg-blue-900/20' : 'border-blue-100 bg-blue-50/50'
                     : isDark ? 'border-white/5 bg-slate-800' : 'border-slate-100 bg-slate-50'
-                }`}
+                  }`}
               >
                 <div>
                   <h3 className={`font-bold text-lg ${isVisible ? (isDark ? 'text-blue-300' : 'text-blue-900') : (isDark ? 'text-slate-400' : 'text-slate-500')}`}>{label}</h3>
@@ -49,18 +63,23 @@ export default function ManageVisibility() {
                   </p>
                 </div>
                 <button
-                  onClick={() => toggleSectionVisibility(key as keyof typeof visibility)}
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-sm ${
-                    isVisible 
-                      ? isDark 
-                        ? 'bg-[#0061ff] text-white hover:bg-blue-600 shadow-blue-900/50' 
+                  onClick={() => handleToggle(key)}
+                  disabled={savingKey === key}
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-sm ${savingKey === key ? 'opacity-70 cursor-not-allowed ' : ''
+                    }${isVisible
+                      ? isDark
+                        ? 'bg-[#0061ff] text-white hover:bg-blue-600 shadow-blue-900/50'
                         : 'bg-[#0061ff] text-white hover:bg-blue-700 shadow-blue-500/30'
-                      : isDark 
-                        ? 'bg-slate-700 text-slate-400 border border-slate-600 hover:bg-slate-600' 
+                      : isDark
+                        ? 'bg-slate-700 text-slate-400 border border-slate-600 hover:bg-slate-600'
                         : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
-                  {isVisible ? <Eye size={24} /> : <EyeOff size={24} />}
+                  {savingKey === key ? (
+                    <div className={`animate-spin rounded-full h-6 w-6 border-b-2 ${isVisible ? 'border-white' : (isDark ? 'border-slate-400' : 'border-[#0061ff]')}`}></div>
+                  ) : (
+                    isVisible ? <Eye size={24} /> : <EyeOff size={24} />
+                  )}
                 </button>
               </div>
             );

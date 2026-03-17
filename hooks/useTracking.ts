@@ -5,7 +5,10 @@ import { fetchFromAPI } from '../utils/api'; // Or create a trackClickInAPI spec
 export function useTracking() {
     const location = useLocation();
     const navigate = useNavigate();
-    const [isChecking, setIsChecking] = useState(false);
+    const [isChecking, setIsChecking] = useState(() => {
+        const searchParams = new URLSearchParams(location.search);
+        return !!searchParams.get('ref');
+    });
 
     useEffect(() => {
         // Check for 'ref' in URL query parameters
@@ -13,7 +16,8 @@ export function useTracking() {
         const refCode = searchParams.get('ref');
 
         if (refCode) {
-            setIsChecking(true);
+            // Note: We used to block until the backend answered, but that caused 10s-15s loading times on ads
+            // NOW: We fire and forget, allowing the UI to render INSTANTLY.
 
             // Save it to sessionStorage so if the user browses around, we keep the refCode
             const storedRef = sessionStorage.getItem('marketing_ref');
@@ -37,19 +41,31 @@ export function useTracking() {
                     }
 
                     // Redirect to target Url if it exists, is not generic root, and we aren't already there
-                    if (targetUrl && targetUrl !== '/' && location.pathname !== targetUrl) {
-                        // Force a hard redirect so we immediately exit the React tree
-                        window.location.replace(`${targetUrl}?ref=${refCode}`);
-                    } else {
-                        setIsChecking(false);
+                    // Make sure we only redirect if we aren't on the Apply form or currently typing
+                    if (targetUrl && targetUrl !== '/' && location.pathname !== targetUrl && location.pathname === '/') {
+                        // Use React Router for an instant client-side transition without reloading the browser
+                        navigate(`${targetUrl}?ref=${refCode}`, { replace: true });
                     }
+
+                    setIsChecking(false);
                 })
                 .catch(err => {
                     console.error("Failed to track click:", err);
                     setIsChecking(false);
                 });
+        } else {
+            setIsChecking(false);
         }
-    }, [location, navigate]);
+    }, [location.search, navigate, location.pathname]);
+
+    // We force isChecking to return false after a tiny delay or simply return false immediately
+    // so we never block the UI for 15 seconds.
+    useEffect(() => {
+        if (isChecking) {
+            const timer = setTimeout(() => setIsChecking(false), 500); // max 500ms block
+            return () => clearTimeout(timer);
+        }
+    }, [isChecking]);
 
     return { isChecking };
 }
