@@ -95,9 +95,11 @@ export const Hero: React.FC = () => {
           >
             <div className="rounded-[2.5rem] overflow-hidden h-[450px] lg:h-[550px] w-full relative z-10 ml-auto lg:w-[90%] border-4 border-white/50 dark:border-white/10 shadow-2xl">
               <img
-                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2671&auto=format&fit=crop"
+                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1200&auto=format&fit=crop"
                 alt="Students learning IT"
                 className="w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
             </div>
@@ -157,7 +159,7 @@ export const Hero: React.FC = () => {
               <div className="flex -space-x-4">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="w-14 h-14 rounded-full border-2 border-slate-800 bg-slate-200 overflow-hidden shadow-sm relative z-0">
-                    <img src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="Student" className="w-full h-full object-cover" />
+                    <img src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="Student" className="w-full h-full object-cover" loading="lazy" />
                   </div>
                 ))}
               </div>

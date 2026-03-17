@@ -39,6 +39,7 @@ export function initDB() {
     phone TEXT NOT NULL,
     course_id TEXT,
     source_ref TEXT,
+    status TEXT DEFAULT 'new',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
   `);

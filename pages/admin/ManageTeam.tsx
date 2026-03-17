@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore, TeamMember } from '../../store/useStore';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
 import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
@@ -17,6 +17,8 @@ export default function ManageTeam() {
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState<Partial<TeamMember>>({});
   const [activeLang, setActiveLang] = useState<Lang>('uz');
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const handleEdit = (member: TeamMember) => {
     setEditingId(member.id);
@@ -45,12 +47,13 @@ export default function ManageTeam() {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name?.uz || !formData.role?.uz) {
       toast.error('O\'zbek tilida Ism va Lavozim kiritilishi shart!');
       return;
     }
-
+    setSaving(true);
+    await new Promise(r => setTimeout(r, 300));
     if (isAdding) {
       addTeamMember(formData as TeamMember);
       toast.success('Yangi xodim qo\'shildi!');
@@ -58,15 +61,19 @@ export default function ManageTeam() {
       updateTeamMember(editingId, formData);
       toast.success('Xodim ma\'lumotlari yangilandi!');
     }
-
+    setSaving(false);
     setEditingId(null);
     setIsAdding(false);
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Rostdan ham bu xodimni o\'chirmoqchimisiz?')) {
+    if (deleteConfirmId === id) {
       deleteTeamMember(id);
       toast.success('Xodim o\'chirildi!');
+      setDeleteConfirmId(null);
+    } else {
+      setDeleteConfirmId(id);
+      setTimeout(() => setDeleteConfirmId(null), 4000);
     }
   };
 
@@ -165,9 +172,9 @@ export default function ManageTeam() {
             <button onClick={() => { setIsAdding(false); setEditingId(null); }} className={`px-6 py-3 rounded-2xl font-bold transition-colors ${isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
               Bekor qilish
             </button>
-            <button onClick={handleSave} className="bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2">
-              <Save size={20} />
-              Saqlash
+            <button onClick={handleSave} disabled={saving} className="bg-[#0061ff] hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2">
+              {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+              {saving ? 'Saqlanmoqda...' : 'Saqlash'}
             </button>
           </div>
         </motion.div>
@@ -195,9 +202,16 @@ export default function ManageTeam() {
                 <button onClick={() => handleEdit(member)} className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-400 hover:text-[#60efff] hover:bg-slate-800' : 'text-slate-400 hover:text-[#0061ff] hover:bg-blue-50'}`}>
                   <Edit size={20} />
                 </button>
-                <button onClick={() => handleDelete(member.id)} className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-400 hover:text-red-400 hover:bg-slate-800' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}>
-                  <Trash2 size={20} />
-                </button>
+                {deleteConfirmId === member.id ? (
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => handleDelete(member.id)} className="text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-xl">O'chirish</button>
+                    <button onClick={() => setDeleteConfirmId(null)} className={`text-xs font-bold px-3 py-1.5 rounded-xl ${isDark ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-100'}`}>Bekor</button>
+                  </div>
+                ) : (
+                  <button onClick={() => handleDelete(member.id)} className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-400 hover:text-red-400 hover:bg-slate-800' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}>
+                    <Trash2 size={20} />
+                  </button>
+                )}
               </div>
             </motion.div>
           ))}
