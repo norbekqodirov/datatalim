@@ -197,7 +197,7 @@ export const Courses: React.FC = () => {
               </div>
 
               <div className="p-2 mt-auto relative z-10">
-                <Link to="/courses" className="block">
+                <Link to="/kurslar" className="block">
                   <div
                     className="w-full py-4 rounded-[1.5rem] text-white font-bold flex items-center justify-center gap-2 opacity-90 group-hover:opacity-100 transition-all shadow-md group-hover:shadow-lg"
                     style={{ background: cat.brandGradient }}
@@ -212,7 +212,7 @@ export const Courses: React.FC = () => {
         </div>
 
         <div className="mt-16 text-center">
-          <Link to="/courses">
+          <Link to="/kurslar">
             <button className={`inline-flex items-center gap-2 font-bold transition-colors ${isDark ? 'text-[#60efff] hover:text-white' : 'text-[#0061ff] hover:text-blue-800'}`}>
               Barcha kurslarni ko'rish <ArrowRight size={20} />
             </button>

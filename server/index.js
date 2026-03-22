@@ -16,7 +16,9 @@ import {
 } from './instagram.js';
 import {
     scorePost, compareContentTypes, getBestPostingTime, diagnoseReachDrop,
-    analyzeTrend, predictFollowerGrowth, getGradeDistribution, generateInsights, avg
+    analyzeTrend, predictFollowerGrowth, getGradeDistribution, generateInsights, avg,
+    calcEMA, detectAnomalies, calcVelocityScores, analyzeCorrelations, calcSeasonalIndex,
+    retentionCoeff, viralCoeff, EDUCATION_BENCHMARKS
 } from './analyticsEngine.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -216,10 +218,41 @@ app.get('/api/next-manager', (req, res) => {
     res.json({ manager: lastAssignedManager });
 });
 
+// --- LEAD SCORING ---
+function scoreLead(lead) {
+    let score = 0;
+    const factors = [];
+
+    if (lead.course_id) { score += 20; factors.push({ label: 'Kurs tanlagan', points: 20 }); }
+    if (lead.source_ref) { score += 15; factors.push({ label: 'Marketing orqali', points: 15 }); }
+    if (/^\+998\d{9}$/.test(lead.phone || '')) { score += 10; factors.push({ label: 'To\'g\'ri telefon formati', points: 10 }); }
+    if (['contacted', 'enrolled'].includes(lead.status)) { score += 20; factors.push({ label: 'Aktiv status', points: 20 }); }
+    if (lead.notes && lead.notes.trim()) { score += 15; factors.push({ label: 'Eslatma mavjud', points: 15 }); }
+
+    // Time-based scoring
+    const created = new Date(lead.created_at || Date.now());
+    const hour = created.getHours();
+    const day = created.getDay();
+    if (hour >= 9 && hour <= 18) { score += 10; factors.push({ label: 'Ish vaqtida ariza', points: 10 }); }
+    if (day >= 1 && day <= 5) { score += 10; factors.push({ label: 'Ish kunida ariza', points: 10 }); }
+
+    let grade = 'Unqualified';
+    if (score >= 70) grade = 'Hot';
+    else if (score >= 50) grade = 'Warm';
+    else if (score >= 30) grade = 'Cold';
+
+    return { score, grade, factors };
+}
+
 // --- LEADS API ---
 app.get('/api/leads', authenticateToken, (req, res) => {
     try {
-        const rows = db.prepare('SELECT * FROM leads ORDER BY created_at DESC').all();
+        const rows = db.prepare(`
+            SELECT l.*, ls.score, ls.grade, ls.factors
+            FROM leads l
+            LEFT JOIN lead_scores ls ON l.id = ls.lead_id
+            ORDER BY l.created_at DESC
+        `).all();
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -251,7 +284,16 @@ app.post('/api/leads', leadsLimiter, (req, res) => {
         const info = db.prepare('INSERT INTO leads (name, phone, course_id, source_ref) VALUES (?, ?, ?, ?)').run(name, phone, courseId || null, actualSourceRef);
         const newLead = db.prepare('SELECT * FROM leads WHERE id = ?').get(info.lastInsertRowid);
 
-        return { lead: newLead, actualSourceRef };
+        // Auto-score lead
+        const { score, grade, factors } = scoreLead(newLead);
+        db.prepare('INSERT OR REPLACE INTO lead_scores (lead_id, score, grade, factors, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)')
+            .run(newLead.id, score, grade, JSON.stringify(factors));
+
+        // Log activity
+        db.prepare('INSERT INTO lead_activities (lead_id, action, detail) VALUES (?, ?, ?)')
+            .run(newLead.id, 'created', `${name} - ${phone}`);
+
+        return { lead: { ...newLead, score, grade, factors: JSON.stringify(factors) }, actualSourceRef };
     });
 
     try {
@@ -335,6 +377,20 @@ app.get('/api/stats', authenticateToken, (req, res) => {
             LIMIT 5
         `).all();
 
+        // Pipeline stats
+        const pipeline = db.prepare(`SELECT status, COUNT(*) as count FROM leads GROUP BY status`).all();
+        const sourceAttribution = db.prepare(`
+            SELECT source_ref, COUNT(*) as count FROM leads
+            WHERE source_ref IS NOT NULL GROUP BY source_ref ORDER BY count DESC LIMIT 8
+        `).all();
+        const daily7 = db.prepare(`
+            SELECT date(created_at) as date, COUNT(*) as count FROM leads
+            WHERE created_at >= date('now', '-7 days')
+            GROUP BY date(created_at) ORDER BY date ASC
+        `).all();
+        const hotLeads = db.prepare(`SELECT COUNT(*) as count FROM lead_scores WHERE grade = 'Hot'`).get();
+        const pipelineValue = db.prepare(`SELECT COALESCE(SUM(payment_amount), 0) as total FROM enrollments`).get();
+
         res.json({
             totalLeads: totalLeads.count,
             todayLeads: todayLeads.count,
@@ -348,6 +404,11 @@ app.get('/api/stats', authenticateToken, (req, res) => {
             leadsPerDay,
             leadsByCourse,
             topLinks,
+            pipeline,
+            sourceAttribution,
+            daily7,
+            hotLeads: hotLeads.count,
+            pipelineValue: pipelineValue.total,
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -359,16 +420,140 @@ app.patch('/api/leads/:id', authenticateToken, (req, res) => {
     try {
         const { id } = req.params;
         const { status, notes } = req.body;
+        const oldLead = db.prepare('SELECT * FROM leads WHERE id = ?').get(id);
+        if (!oldLead) return res.status(404).json({ error: 'Lead not found' });
+
         const updates = [];
         const params = [];
         if (status !== undefined) { updates.push('status = ?'); params.push(status); }
         if (notes !== undefined) { updates.push('notes = ?'); params.push(notes); }
         if (updates.length === 0) return res.status(400).json({ error: 'Nothing to update' });
         params.push(id);
-        const result = db.prepare(`UPDATE leads SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-        if (result.changes === 0) return res.status(404).json({ error: 'Lead not found' });
+        db.prepare(`UPDATE leads SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+
         const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(id);
-        res.json(lead);
+
+        // Log activities
+        if (status !== undefined && status !== oldLead.status) {
+            db.prepare('INSERT INTO lead_activities (lead_id, action, detail, old_value, new_value) VALUES (?, ?, ?, ?, ?)')
+                .run(id, 'status_changed', `Status o'zgardi`, oldLead.status || 'new', status);
+        }
+        if (notes !== undefined && notes !== oldLead.notes) {
+            db.prepare('INSERT INTO lead_activities (lead_id, action, detail) VALUES (?, ?, ?)')
+                .run(id, 'note_added', notes.substring(0, 200));
+        }
+
+        // Re-score lead
+        const { score, grade, factors } = scoreLead(lead);
+        db.prepare('INSERT OR REPLACE INTO lead_scores (lead_id, score, grade, factors, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)')
+            .run(id, score, grade, JSON.stringify(factors));
+
+        res.json({ ...lead, score, grade, factors: JSON.stringify(factors) });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- LEAD ACTIVITIES ---
+app.get('/api/leads/:id/activities', authenticateToken, (req, res) => {
+    try {
+        const rows = db.prepare('SELECT * FROM lead_activities WHERE lead_id = ? ORDER BY created_at DESC').all(req.params.id);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/leads/:id/activities', authenticateToken, (req, res) => {
+    try {
+        const { action, detail } = req.body;
+        if (!action) return res.status(400).json({ error: 'action required' });
+        const info = db.prepare('INSERT INTO lead_activities (lead_id, action, detail) VALUES (?, ?, ?)')
+            .run(req.params.id, action, detail || '');
+        res.json({ id: info.lastInsertRowid, lead_id: req.params.id, action, detail: detail || '' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- ENROLLMENTS API ---
+app.get('/api/enrollments', authenticateToken, (req, res) => {
+    try {
+        const { course_id, payment_status } = req.query;
+        let sql = `SELECT e.*, l.name as lead_name, l.phone as lead_phone FROM enrollments e JOIN leads l ON e.lead_id = l.id WHERE 1=1`;
+        const params = [];
+        if (course_id) { sql += ' AND e.course_id = ?'; params.push(course_id); }
+        if (payment_status) { sql += ' AND e.payment_status = ?'; params.push(payment_status); }
+        sql += ' ORDER BY e.enrolled_at DESC';
+        const rows = db.prepare(sql).all(...params);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/enrollments', authenticateToken, (req, res) => {
+    try {
+        const { lead_id, course_id, payment_status, payment_amount, notes } = req.body;
+        if (!lead_id || !course_id) return res.status(400).json({ error: 'lead_id and course_id required' });
+        const info = db.prepare('INSERT INTO enrollments (lead_id, course_id, payment_status, payment_amount, notes) VALUES (?, ?, ?, ?, ?)')
+            .run(lead_id, course_id, payment_status || 'unpaid', payment_amount || 0, notes || '');
+        // Update lead status to enrolled
+        db.prepare("UPDATE leads SET status = 'enrolled' WHERE id = ?").run(lead_id);
+        db.prepare('INSERT INTO lead_activities (lead_id, action, detail) VALUES (?, ?, ?)')
+            .run(lead_id, 'enrolled', `${course_id} kursiga yozildi`);
+        const enrollment = db.prepare('SELECT * FROM enrollments WHERE id = ?').get(info.lastInsertRowid);
+        res.json(enrollment);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/enrollments/:id', authenticateToken, (req, res) => {
+    try {
+        const { payment_status, payment_amount, notes } = req.body;
+        db.prepare('UPDATE enrollments SET payment_status=?, payment_amount=?, notes=? WHERE id=?')
+            .run(payment_status || 'unpaid', payment_amount || 0, notes || '', req.params.id);
+        const enrollment = db.prepare('SELECT * FROM enrollments WHERE id = ?').get(req.params.id);
+        res.json(enrollment);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- PIPELINE STATS ---
+app.get('/api/pipeline/stats', authenticateToken, (req, res) => {
+    try {
+        const funnel = db.prepare(`
+            SELECT status, COUNT(*) as count FROM leads GROUP BY status
+        `).all();
+
+        const bySource = db.prepare(`
+            SELECT l.source_ref, COUNT(*) as leads, COUNT(e.id) as enrolled
+            FROM leads l
+            LEFT JOIN enrollments e ON l.id = e.lead_id
+            WHERE l.source_ref IS NOT NULL
+            GROUP BY l.source_ref
+            ORDER BY enrolled DESC
+            LIMIT 10
+        `).all();
+
+        const pipelineValue = db.prepare(`
+            SELECT COALESCE(SUM(payment_amount), 0) as total FROM enrollments
+        `).get();
+
+        const hotLeads = db.prepare(`
+            SELECT COUNT(*) as count FROM lead_scores WHERE grade = 'Hot'
+        `).get();
+
+        const weeklyStats = db.prepare(`
+            SELECT strftime('%W', created_at) as week, COUNT(*) as total,
+                   SUM(CASE WHEN status != 'new' THEN 1 ELSE 0 END) as contacted
+            FROM leads WHERE created_at >= date('now', '-8 weeks')
+            GROUP BY week ORDER BY week ASC
+        `).all();
+
+        res.json({ funnel, bySource, pipelineValue: pipelineValue.total, hotLeads: hotLeads.count, weeklyStats });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -888,7 +1073,25 @@ app.get('/api/ig/media', authenticateToken, async (req, res) => {
         const timing = getBestPostingTime(media);
         const trend = analyzeTrend(media);
 
-        res.json({ posts: graded, gradeStats, contentTypes, timing, trend, total: media.length });
+        // Advanced analytics
+        const reachValues = media.map(p => p.reach || 0);
+        const emaValues = calcEMA(reachValues);
+        const anomalies = detectAnomalies(reachValues);
+        const velocities = calcVelocityScores(media);
+        const correlations = analyzeCorrelations(media);
+        const seasonal = calcSeasonalIndex(media);
+
+        // Enrich each post
+        const enriched = graded.map((p, i) => ({
+            ...p,
+            emaReach: emaValues[i],
+            anomaly: anomalies.find(a => a.index === i) || null,
+            velocity: velocities.find(v => v.id === p.id) || null,
+            retentionCoeff: retentionCoeff(p),
+            viralCoeff: viralCoeff(p, 0),
+        }));
+
+        res.json({ posts: enriched, gradeStats, contentTypes, timing, trend, total: media.length, ema: emaValues, anomalies, velocities, correlations, seasonal });
     } catch (error) {
         console.error('[IG Media]', error);
         res.status(500).json({ error: error.message });
@@ -938,7 +1141,10 @@ app.get('/api/ig/ai-insights', authenticateToken, async (req, res) => {
             (gradeStats.avgScore > 60 ? 10 : 0)
         )));
 
-        res.json({ insights, trend, drop, contentTypes, timing, followerPrediction, gradeStats, healthScore, avgER: +avgER.toFixed(2), postCount: media.length });
+        const seasonal = calcSeasonalIndex(media);
+        const correlations = analyzeCorrelations(media);
+
+        res.json({ insights, trend, drop, contentTypes, timing, followerPrediction, gradeStats, healthScore, avgER: +avgER.toFixed(2), postCount: media.length, seasonal, correlations, benchmarks: EDUCATION_BENCHMARKS });
     } catch (error) {
         console.error('[IG AI Insights]', error);
         res.status(500).json({ error: error.message });

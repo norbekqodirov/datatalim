@@ -45,7 +45,7 @@ export const TourVideo: React.FC = () => {
           <div className="absolute inset-0 z-10 opacity-30 mix-blend-overlay pointer-events-none" style={{ background: 'linear-gradient(135deg, #0061ff, #60efff)' }}></div>
           <iframe
             className="absolute top-0 left-0 w-full h-full relative z-20"
-            src={siteContent.tourVideoUrl}
+            src={siteContent.tourVideoUrl || undefined}
             title="DATA bilan yaqindan tanishamiz"
             frameBorder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

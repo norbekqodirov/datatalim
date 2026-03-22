@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, BookOpen, Settings, LogOut, Eye, Video, Sun, Moon,
   Target, UserPlus, Menu, X, FileText, Instagram, BarChart2, Brain,
-  ChevronDown, ChevronRight, Zap, Bell, TrendingUp, Globe
+  ChevronDown, ChevronRight, Zap, Bell, TrendingUp, Globe, GraduationCap, GitMerge
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../store/ThemeContext';
@@ -14,6 +14,8 @@ const NAV_GROUPS = [
     items: [
       { path: '/paneladmindata', icon: LayoutDashboard, label: 'Dashboard', exact: true },
       { path: '/paneladmindata/leads', icon: UserPlus, label: 'Arizalar', badge: null },
+      { path: '/paneladmindata/enrollments', icon: GraduationCap, label: 'Yozilganlar' },
+      { path: '/paneladmindata/pipeline', icon: GitMerge, label: 'Pipeline' },
       { path: '/paneladmindata/marketing', icon: Target, label: 'Marketing' },
     ],
   },

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Moon, Sun, Globe } from 'lucide-react';
 import { Button } from '../Button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,6 +15,24 @@ export const Navbar: React.FC = () => {
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
   const { lang, setLang, t } = useLanguage();
+  const navigate = useNavigate();
+
+  const handleNavClick = useCallback((e: React.MouseEvent, path: string) => {
+    if (path === '/#contact') {
+      e.preventDefault();
+      setIsOpen(false);
+      if (location.pathname !== '/') {
+        navigate('/');
+        setTimeout(() => {
+          document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
+      } else {
+        document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else {
+      setIsOpen(false);
+    }
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -26,10 +44,11 @@ export const Navbar: React.FC = () => {
 
   const navLinks = [
     { name: t('nav.home'), path: '/' },
-    { name: t('nav.courses'), path: '/courses' },
-    { name: t('nav.about'), path: '/about' },
-    { name: t('nav.team'), path: '/team' },
-    { name: t('nav.languages') || 'Til kurslari', path: '/languages' },
+    { name: t('nav.courses'), path: '/kurslar' },
+    { name: t('nav.about'), path: '/biz-haqimizda' },
+    { name: t('nav.team'), path: '/jamoa' },
+    { name: t('nav.languages') || 'Til kurslari', path: '/til-kurslari' },
+    { name: t('nav.blog') || 'Blog', path: '/blog' },
     { name: t('nav.contact'), path: '/#contact' },
   ];
 
@@ -83,9 +102,9 @@ export const Navbar: React.FC = () => {
             onMouseLeave={() => setHoveredLink(null)}
           >
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.path}
-                href={link.path}
+                to={link.path === '/#contact' ? '/' : link.path}
                 className="relative px-5 py-2.5 text-sm font-bold rounded-full transition-colors duration-200 z-10"
                 style={{
                   color: glassTarget === link.path
@@ -93,6 +112,7 @@ export const Navbar: React.FC = () => {
                     : (isDark ? '#94a3b8' : '#475569'),
                 }}
                 onMouseEnter={() => setHoveredLink(link.path)}
+                onClick={(e) => handleNavClick(e, link.path)}
               >
                 {/* Glass pill indicator */}
                 {glassTarget === link.path && (
@@ -121,7 +141,7 @@ export const Navbar: React.FC = () => {
                   />
                 )}
                 <span className="relative z-10">{link.name}</span>
-              </a>
+              </Link>
             ))}
           </div>
 
@@ -137,6 +157,7 @@ export const Navbar: React.FC = () => {
                 border: isDark ? '1px solid rgba(255,255,255,0.06)' : 'none',
               }}
               title={isDark ? "Yorug' rejim" : "Qorong'i rejim"}
+              aria-label={isDark ? "Yorug' rejimga o'tish" : "Qorong'i rejimga o'tish"}
             >
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -152,6 +173,9 @@ export const Navbar: React.FC = () => {
                   border: isDark ? '1px solid rgba(255,255,255,0.06)' : 'none',
                 }}
                 title="Tilni tanlash"
+                aria-label="Tilni tanlash"
+                aria-expanded={langMenuOpen}
+                aria-haspopup="true"
               >
                 {lang.toUpperCase()}
               </button>
@@ -181,7 +205,7 @@ export const Navbar: React.FC = () => {
               )}
             </div>
 
-            <Link to="/career-test">
+            <Link to="/karyera-testi">
               <Button className="!px-6 !py-3 !rounded-full bg-gradient-to-r from-[#0061ff] to-[#60efff] text-white shadow-[0_8px_16px_-6px_rgba(0,97,255,0.4)] hover:shadow-[0_12px_20px_-6px_rgba(0,97,255,0.5)] border border-white/20 backdrop-blur-md transition-all duration-300 hover:scale-105">
                 {t('nav.careerTest')}
               </Button>
@@ -233,17 +257,17 @@ export const Navbar: React.FC = () => {
           >
             <div className="px-6 pt-4 pb-8 space-y-2">
               {navLinks.map((link) => (
-                <a
+                <Link
                   key={link.name}
-                  href={link.path}
+                  to={link.path === '/#contact' ? '/' : link.path}
                   className={`block px-6 py-4 text-lg font-bold rounded-2xl transition-all ${isActive(link.path)
                     ? (isDark ? 'bg-blue-500/10 text-[#60efff]' : 'bg-blue-50 text-[#0061ff]')
                     : (isDark ? 'text-slate-400 hover:bg-white/5 hover:text-white' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900')
                     }`}
-                  onClick={() => setIsOpen(false)}
+                  onClick={(e) => handleNavClick(e, link.path)}
                 >
                   {link.name}
-                </a>
+                </Link>
               ))}
 
               {/* Mobile language selector */}
@@ -263,7 +287,7 @@ export const Navbar: React.FC = () => {
               </div>
 
               <div className="pt-6">
-                <Link to="/career-test" onClick={() => setIsOpen(false)}>
+                <Link to="/karyera-testi" onClick={() => setIsOpen(false)}>
                   <Button className="w-full bg-gradient-to-r from-[#0061ff] to-[#60efff] text-white rounded-2xl py-6 text-lg font-bold shadow-lg shadow-blue-500/30 border-0">
                     {t('nav.careerTest')}
                   </Button>

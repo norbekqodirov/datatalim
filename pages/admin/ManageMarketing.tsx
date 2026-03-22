@@ -9,6 +9,7 @@ interface MarketingLink {
     name: string;
     ref_code: string;
     target_url: string;
+    category: string;
     clicks: number;
     leads_count: number;
     created_at: string;
@@ -19,14 +20,14 @@ export default function ManageMarketing() {
     const [links, setLinks] = useState<MarketingLink[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
-    const [newLinkData, setNewLinkData] = useState({ name: '', targetUrl: '/apply' });
+    const [newLinkData, setNewLinkData] = useState({ name: '', targetUrl: '/ariza', category: 'IT' });
     const [copiedId, setCopiedId] = useState<number | null>(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
     const fetchLinks = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/marketing-links');
+            const res = await fetch('/api/marketing-links', { headers: authHeaders() });
             if (!res.ok) throw new Error('API Error');
             const data = await res.json();
             setLinks(Array.isArray(data) ? data : []);
@@ -46,13 +47,13 @@ export default function ManageMarketing() {
         try {
             const res = await fetch('/api/marketing-links', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders(),
                 body: JSON.stringify(newLinkData),
             });
             if (res.ok) {
                 toast.success("Link muvaffaqiyatli yaratildi");
                 setIsAdding(false);
-                setNewLinkData({ name: '', targetUrl: '/apply' });
+                setNewLinkData({ name: '', targetUrl: '/ariza', category: 'IT' });
                 fetchLinks();
             }
         } catch {
@@ -67,7 +68,7 @@ export default function ManageMarketing() {
             return;
         }
         try {
-            const res = await fetch(`/api/marketing-links/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/marketing-links/${id}`, { method: 'DELETE', headers: authHeaders() });
             if (res.ok) {
                 toast.success("Link o'chirildi");
                 setLinks(prev => prev.filter(l => l.id !== id));
@@ -96,6 +97,11 @@ export default function ManageMarketing() {
         const sep = target.includes('?') ? '&' : '?';
         return `${target}${sep}ref=${link.ref_code}`;
     };
+
+    const authHeaders = () => ({
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+    });
 
     const inputCls = `w-full px-4 py-3 rounded-xl border outline-none font-medium transition-all ${isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'}`;
 
@@ -159,16 +165,35 @@ export default function ManageMarketing() {
                                 />
                             </div>
                             <div>
+                                <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Kategoriya</label>
+                                <div className="flex gap-2">
+                                    {['IT', 'Language'].map(cat => (
+                                        <button
+                                            key={cat}
+                                            type="button"
+                                            onClick={() => setNewLinkData({ ...newLinkData, category: cat })}
+                                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                                                newLinkData.category === cat
+                                                    ? 'bg-[#0061ff] text-white'
+                                                    : isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                            }`}
+                                        >
+                                            {cat === 'IT' ? '💻 IT Kurslar' : '🌍 Til Kurslari'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
                                 <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Qayerga yo'naltirish</label>
                                 <input
                                     type="text"
                                     value={newLinkData.targetUrl}
                                     onChange={e => setNewLinkData({ ...newLinkData, targetUrl: e.target.value })}
                                     className={inputCls}
-                                    placeholder="/apply"
+                                    placeholder="/ariza"
                                 />
                                 <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                                    Standart: <code>/apply</code> — qisqa forma. Yoki <code>/</code> — bosh sahifa.
+                                    Standart: <code>/ariza</code> — qisqa forma. Yoki <code>/</code> — bosh sahifa.
                                 </p>
                             </div>
                             <div className="flex justify-end gap-3 mt-6">
@@ -207,7 +232,14 @@ export default function ManageMarketing() {
                                 {/* Title + delete */}
                                 <div className="flex justify-between items-start gap-2">
                                     <div>
-                                        <h3 className={`text-lg font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{link.name}</h3>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className={`text-lg font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{link.name}</h3>
+                                            {link.category && (
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${link.category === 'Language' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-blue-500/15 text-blue-400'}`}>
+                                                    {link.category}
+                                                </span>
+                                            )}
+                                        </div>
                                         <a href={link.target_url.startsWith('http') ? link.target_url : '#'} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-500 hover:underline mt-0.5 font-medium">
                                             <ExternalLink size={11} />
                                             {link.target_url}

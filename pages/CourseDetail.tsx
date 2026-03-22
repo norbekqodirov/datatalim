@@ -28,7 +28,7 @@ export default function CourseDetail() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900">
         <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-4">Kurs topilmadi</h1>
-        <Button onClick={() => navigate('/courses')}>Kurslar ro'yxatiga qaytish</Button>
+        <Button onClick={() => navigate('/kurslar')}>Kurslar ro'yxatiga qaytish</Button>
       </div>
     );
   }
@@ -48,7 +48,7 @@ export default function CourseDetail() {
           <Star2 size={70} color={brandColors.primary} opacity={0.15} className="absolute top-10 right-20 rotate-slow pointer-events-none hidden md:block" />
           <Star1 size={50} color={brandColors.secondary} opacity={0.15} className="absolute bottom-10 left-10 rotate-slow pointer-events-none hidden md:block" />
 
-          <Link to="/courses" className={`inline-flex items-center text-sm font-bold mb-8 transition-colors ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}>
+          <Link to="/kurslar" className={`inline-flex items-center text-sm font-bold mb-8 transition-colors ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}>
             <ArrowLeft size={16} className="mr-2" />
             Barcha kurslarga qaytish
           </Link>
@@ -98,7 +98,7 @@ export default function CourseDetail() {
                 {course.coverImage && (
                   <img src={course.coverImage} alt={tField(course.title)} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                 )}
-                <div className="absolute inset-0 z-20" style={{ background: `linear-gradient(to top, ${isDark ? '#0f172a' : '#000'} 0%, transparent 50%)` }}></div>
+                <div className="absolute inset-0 z-20" style={{ background: `linear-gradient(to top, ${isDark ? '#000000' : '#000'} 0%, transparent 50%)` }}></div>
                 <div className="absolute inset-0 z-30 flex items-end p-12">
                   <div className="text-white w-full">
                     <p className="text-sm font-bold mb-2 opacity-80 uppercase tracking-wider">Jami kurs narxi:</p>
@@ -185,7 +185,11 @@ export default function CourseDetail() {
                   {course.mentors.map((mentor, idx) => (
                     <div key={idx} className={`p-5 rounded-2xl border flex items-center gap-5 transition-transform hover:-translate-y-1 ${isDark ? 'bg-slate-900/80 border-white/5 shadow-lg shadow-black' : 'bg-white border-slate-100 shadow-sm'}`}>
                       <div className={`w-16 h-16 rounded-2xl overflow-hidden shrink-0 border-2`} style={{ borderColor: `${brandColors.primary}30` }}>
-                        <img src={mentor.image} alt={tField(mentor.name)} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                        {mentor.image ? (
+                          <img src={mentor.image} alt={tField(mentor.name)} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                        ) : (
+                          <div className={`w-full h-full flex items-center justify-center text-xl font-bold ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-400'}`}>{tField(mentor.name)?.[0]}</div>
+                        )}
                       </div>
                       <div>
                         <h4 className={`font-black text-lg ${isDark ? 'text-white' : 'text-slate-900'}`}>{tField(mentor.name)}</h4>

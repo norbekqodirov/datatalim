@@ -87,7 +87,7 @@ export const CareerTestSection: React.FC = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
-          <Link to="/career-test" state={{ startNow: true }}>
+          <Link to="/karyera-testi" state={{ startNow: true }}>
             <Button className={`text-lg px-12 py-5 text-white font-bold rounded-2xl shadow-xl group transition-all duration-300 transform w-full sm:w-auto hover:scale-105 active:scale-95`} style={{ background: 'linear-gradient(135deg, #0061ff 0%, #60efff 100%)' }}>
               <span className="flex items-center justify-center gap-2">
                 Testni boshlash

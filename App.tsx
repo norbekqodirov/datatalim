@@ -11,6 +11,8 @@ const About = lazy(() => import('./pages/About'));
 const Team = lazy(() => import('./pages/Team'));
 const ApplyForm = lazy(() => import('./pages/ApplyForm'));
 const Languages = lazy(() => import('./pages/Languages'));
+const Blog = lazy(() => import('./pages/Blog'));
+const BlogPost = lazy(() => import('./pages/BlogPost'));
 
 // Layout
 import { Navbar } from './components/layout/Navbar';
@@ -18,6 +20,8 @@ import { Footer } from './components/layout/Footer';
 import { useTheme } from './store/ThemeContext';
 import { useStore } from './store/useStore';
 import { useTracking } from './hooks/useTracking';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { TelegramButton } from './components/TelegramButton';
 
 // Admin
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -29,6 +33,14 @@ const ManageVisibility = lazy(() => import('./pages/admin/ManageVisibility'));
 const ManageMedia = lazy(() => import('./pages/admin/ManageMedia'));
 const ManageMarketing = lazy(() => import('./pages/admin/ManageMarketing'));
 const ManageLeads = lazy(() => import('./pages/admin/ManageLeads'));
+const ManageEnrollments = lazy(() => import('./pages/admin/ManageEnrollments'));
+const ManagePipeline = lazy(() => import('./pages/admin/ManagePipeline'));
+const AdminSettings = lazy(() => import('./pages/admin/Settings'));
+const ManagePosts = lazy(() => import('./pages/admin/ManageBlog'));
+const IGOverview = lazy(() => import('./pages/admin/analytics/IGOverview'));
+const IGContent = lazy(() => import('./pages/admin/analytics/IGContent'));
+const IGAIInsights = lazy(() => import("./pages/admin/analytics/IGAIInsights"));
+const IGSettings = lazy(() => import("./pages/admin/analytics/IGSettings"));
 
 // Protected Route Wrapper with Session Timeout
 const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2 soat
@@ -60,7 +72,7 @@ const PublicLayout = () => {
 
   if (isChecking) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-[#0f172a]' : 'bg-slate-50'}`}>
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-[#000000]' : 'bg-slate-50'}`}>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0061ff]"></div>
       </div>
     );
@@ -76,8 +88,10 @@ const PublicLayout = () => {
       }}
     >
       <Navbar />
-      <main className="flex-1 pt-24">
-        <Outlet />
+      <main className="flex-1">
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <Footer />
     </div>
@@ -113,21 +127,24 @@ function App() {
       <Router>
         <PixelTracker />
         <Toaster position="top-right" />
-        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0f172a]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0061ff]"></div></div>}>
+        <TelegramButton />
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#000000]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0061ff]"></div></div>}>
           <Routes>
             {/* Public Routes — Navbar/Footer persist */}
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Home />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/team" element={<Team />} />
-              <Route path="/courses" element={<Courses />} />
-              <Route path="/courses/:id" element={<CourseDetail />} />
-              <Route path="/career-test" element={<CareerTest />} />
-              <Route path="/languages" element={<Languages />} />
+              <Route path="/biz-haqimizda" element={<About />} />
+              <Route path="/jamoa" element={<Team />} />
+              <Route path="/kurslar" element={<Courses />} />
+              <Route path="/kurslar/:id" element={<CourseDetail />} />
+              <Route path="/karyera-testi" element={<CareerTest />} />
+              <Route path="/til-kurslari" element={<Languages />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/blog/:slug" element={<BlogPost />} />
             </Route>
 
             {/* Standalone Landing Page for Marketing Links */}
-            <Route path="/apply" element={<ApplyForm />} />
+            <Route path="/ariza" element={<ApplyForm />} />
 
             {/* Admin Routes */}
             <Route path="/paneladmindata/login" element={<Login />} />
@@ -146,6 +163,15 @@ function App() {
               <Route path="media" element={<ManageMedia />} />
               <Route path="marketing" element={<ManageMarketing />} />
               <Route path="leads" element={<ManageLeads />} />
+              <Route path="enrollments" element={<ManageEnrollments />} />
+              <Route path="pipeline" element={<ManagePipeline />} />
+              <Route path="posts" element={<ManagePosts />} />
+              <Route path="settings" element={<AdminSettings />} />
+              {/* Instagram Analytics */}
+              <Route path="ig/overview" element={<IGOverview />} />
+              <Route path="ig/content" element={<IGContent />} />
+              <Route path="ig/ai" element={<IGAIInsights />} />
+              <Route path="ig/settings" element={<IGSettings />} />
             </Route>
           </Routes>
         </Suspense>

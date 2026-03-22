@@ -4,7 +4,7 @@ import {
     Users, Phone, Calendar, Target, Trash2, Download, Filter, RefreshCw,
     CheckCircle, MessageSquare, XCircle, Clock, Search, ChevronDown,
     CheckSquare, Square, Edit3, Save, X, ChevronLeft, ChevronRight,
-    LayoutList, Columns, Send
+    LayoutList, Columns, Send, Activity, PhoneCall
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -16,6 +16,18 @@ interface Lead {
     source_ref: string;
     status: 'new' | 'contacted' | 'enrolled' | 'rejected';
     notes?: string;
+    created_at: string;
+    score?: number;
+    grade?: string;
+}
+
+interface LeadActivity {
+    id: number;
+    lead_id: number;
+    action: string;
+    detail: string;
+    old_value: string;
+    new_value: string;
     created_at: string;
 }
 
@@ -35,6 +47,22 @@ const authHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem('adminToken')}`,
 });
 
+function ScoreBadge({ score, grade }: { score?: number; grade?: string }) {
+    if (!grade || grade === 'Unqualified') return null;
+    const config: Record<string, { emoji: string; cls: string }> = {
+        Hot: { emoji: '🔥', cls: 'bg-red-100 text-red-700 border-red-200' },
+        Warm: { emoji: '🌡', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+        Cold: { emoji: '❄', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+    };
+    const c = config[grade];
+    if (!c) return null;
+    return (
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-bold border ${c.cls}`}>
+            {c.emoji} {grade} {score}
+        </span>
+    );
+}
+
 export default function ManageLeads() {
     const { isDark } = useTheme();
     const [leads, setLeads] = useState<Lead[]>([]);
@@ -51,6 +79,9 @@ export default function ManageLeads() {
     const [currentPage, setCurrentPage] = useState(1);
     const [perPage, setPerPage] = useState(20);
     const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
+    const [activityLeadId, setActivityLeadId] = useState<number | null>(null);
+    const [activities, setActivities] = useState<LeadActivity[]>([]);
+    const [activitiesLoading, setActivitiesLoading] = useState(false);
 
     const fetchLeads = useCallback(async () => {
         setLoading(true);
@@ -143,6 +174,36 @@ export default function ManageLeads() {
             toast.success('Izoh saqlandi!');
         } catch {
             toast.error('Xatolik yuz berdi');
+        }
+    };
+
+    const openActivityPanel = async (leadId: number) => {
+        setActivityLeadId(leadId);
+        setActivitiesLoading(true);
+        try {
+            const res = await fetch(`/api/leads/${leadId}/activities`, { headers: authHeaders() });
+            const data = await res.json();
+            setActivities(Array.isArray(data) ? data : []);
+        } catch {
+            setActivities([]);
+        } finally {
+            setActivitiesLoading(false);
+        }
+    };
+
+    const logActivity = async (leadId: number, action: string, detail: string) => {
+        try {
+            await fetch(`/api/leads/${leadId}/activities`, {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify({ action, detail }),
+            });
+            if (activityLeadId === leadId) {
+                await openActivityPanel(leadId);
+            }
+            toast.success(action === 'called' ? "Qo'ng'iroq qayd etildi" : 'Xabar qayd etildi');
+        } catch {
+            toast.error('Xatolik');
         }
     };
 
@@ -448,7 +509,8 @@ export default function ManageLeads() {
                                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${isDark ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
                                                     {lead.name.charAt(0).toUpperCase()}
                                                 </div>
-                                                <span className={`font-bold text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{lead.name}</span>
+                                                <span className={`font-bold text-sm truncate flex-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{lead.name}</span>
+                                                <ScoreBadge score={lead.score} grade={lead.grade} />
                                             </div>
 
                                             {/* Phone */}
@@ -486,6 +548,13 @@ export default function ManageLeads() {
                                                     <Send size={11} /> Telegram
                                                 </a>
                                                 {/* Status change buttons */}
+                                                <button
+                                                    onClick={() => openActivityPanel(lead.id)}
+                                                    className={`p-1.5 rounded-lg transition-colors ${isDark ? 'bg-purple-900/30 text-purple-400 hover:bg-purple-900/50' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'}`}
+                                                    title="Faoliyat tarixi"
+                                                >
+                                                    <Activity size={14} />
+                                                </button>
                                                 {status !== 'enrolled' && (
                                                     <button
                                                         onClick={() => handleStatusChange(lead.id, status === 'new' ? 'contacted' : status === 'contacted' ? 'enrolled' : 'enrolled')}
@@ -584,7 +653,10 @@ export default function ManageLeads() {
                                                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black shrink-0 ${isDark ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
                                                         {lead.name.charAt(0).toUpperCase()}
                                                     </div>
-                                                    <span className={isDark ? 'text-white' : 'text-slate-900'}>{lead.name}</span>
+                                                    <div>
+                                                        <span className={isDark ? 'text-white' : 'text-slate-900'}>{lead.name}</span>
+                                                        <div className="mt-0.5"><ScoreBadge score={lead.score} grade={lead.grade} /></div>
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-4 whitespace-nowrap">
@@ -658,12 +730,21 @@ export default function ManageLeads() {
                                                         <button onClick={() => setDeleteConfirmId(null)} className={`text-xs font-bold px-2 py-1 rounded-lg ${isDark ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-100'}`}>Yo'q</button>
                                                     </div>
                                                 ) : (
-                                                    <button
-                                                        onClick={() => setDeleteConfirmId(lead.id)}
-                                                        className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-600 hover:text-red-400 hover:bg-slate-700' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`}
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => openActivityPanel(lead.id)}
+                                                            className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-600 hover:text-purple-400 hover:bg-slate-700' : 'text-slate-300 hover:text-purple-500 hover:bg-purple-50'}`}
+                                                            title="Faoliyat tarixi"
+                                                        >
+                                                            <Activity size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setDeleteConfirmId(lead.id)}
+                                                            className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-600 hover:text-red-400 hover:bg-slate-700' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>
@@ -734,6 +815,89 @@ export default function ManageLeads() {
                         >
                             <ChevronRight size={18} />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Activity Slide-out Panel */}
+            {activityLeadId !== null && (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setActivityLeadId(null)} />
+                    <div className={`relative w-full max-w-md h-full shadow-2xl flex flex-col ${isDark ? 'bg-slate-900 border-l border-white/10' : 'bg-white border-l border-slate-200'}`}>
+                        {/* Header */}
+                        <div className={`flex items-center justify-between p-5 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                            <div>
+                                <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Faoliyat Tarixi</h3>
+                                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    {leads.find(l => l.id === activityLeadId)?.name}
+                                </p>
+                            </div>
+                            <button onClick={() => setActivityLeadId(null)} className={`p-2 rounded-xl ${isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className={`flex gap-2 p-4 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                            <button
+                                onClick={() => logActivity(activityLeadId, 'called', "Qo'ng'iroq qilindi")}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-colors ${isDark ? 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                            >
+                                <PhoneCall size={15} /> Chaqirdim
+                            </button>
+                            <button
+                                onClick={() => logActivity(activityLeadId, 'messaged', 'Telegram xabar yuborildi')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-colors ${isDark ? 'bg-sky-900/30 text-sky-400 hover:bg-sky-900/50' : 'bg-sky-50 text-sky-600 hover:bg-sky-100'}`}
+                            >
+                                <Send size={15} /> Yozildim
+                            </button>
+                        </div>
+
+                        {/* Timeline */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {activitiesLoading ? (
+                                <div className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Yuklanmoqda...</div>
+                            ) : activities.length === 0 ? (
+                                <div className={`text-center py-12 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                                    <Activity size={32} className="mx-auto mb-2 opacity-30" />
+                                    <p className="text-sm">Hali faoliyat yo'q</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {activities.map((act) => {
+                                        const actionLabels: Record<string, { label: string; color: string }> = {
+                                            created: { label: "Ariza yaratildi", color: "bg-green-500" },
+                                            status_changed: { label: "Status o'zgardi", color: "bg-amber-500" },
+                                            note_added: { label: "Izoh qo'shildi", color: "bg-purple-500" },
+                                            called: { label: "Qo'ng'iroq qilindi", color: "bg-blue-500" },
+                                            messaged: { label: "Xabar yuborildi", color: "bg-sky-500" },
+                                            enrolled: { label: "Kursga yozildi", color: "bg-emerald-500" },
+                                        };
+                                        const cfg = actionLabels[act.action] || { label: act.action, color: "bg-slate-500" };
+                                        return (
+                                            <div key={act.id} className="flex gap-3">
+                                                <div className="flex flex-col items-center">
+                                                    <div className={`w-3 h-3 rounded-full mt-1 shrink-0 ${cfg.color}`} />
+                                                    <div className={`w-0.5 flex-1 mt-1 ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                                                </div>
+                                                <div className={`flex-1 pb-3 rounded-xl p-3 text-sm ${isDark ? 'bg-slate-800/60' : 'bg-slate-50'}`}>
+                                                    <p className={`font-bold mb-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>{cfg.label}</p>
+                                                    {act.detail && <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{act.detail}</p>}
+                                                    {act.old_value && act.new_value && (
+                                                        <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                            {act.old_value} → {act.new_value}
+                                                        </p>
+                                                    )}
+                                                    <p className={`text-xs mt-1.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                                                        {new Date(act.created_at).toLocaleString('uz-UZ')}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

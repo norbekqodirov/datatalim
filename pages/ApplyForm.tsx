@@ -72,7 +72,7 @@ export default function ApplyForm() {
 
     if (sent) {
         return (
-            <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-[#0f172a]' : 'bg-slate-50'}`}>
+            <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-[#000000]' : 'bg-slate-50'}`}>
                 <div className={`max-w-md w-full p-8 rounded-3xl text-center shadow-2xl ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
                     <div className="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
                         <CheckCircle2 size={40} />
@@ -95,7 +95,7 @@ export default function ApplyForm() {
     }
 
     return (
-        <div className={`min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden ${isDark ? 'bg-[#0f172a]' : 'bg-slate-50'}`}>
+        <div className={`min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden ${isDark ? 'bg-[#000000]' : 'bg-slate-50'}`}>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[500px] bg-[#0061ff] blur-[150px] opacity-10 rounded-full pointer-events-none" />
 
             <div className={`w-full max-w-md p-8 rounded-3xl shadow-2xl border relative z-10 ${isDark ? 'bg-slate-900/80 border-slate-800 backdrop-blur-xl' : 'bg-white border-slate-100'}`}>

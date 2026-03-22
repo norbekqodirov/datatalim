@@ -258,7 +258,7 @@ export default function About() {
       <div className="py-24 relative overflow-hidden my-10">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-br from-[#3f5efb] to-[#fc466b] opacity-90 mix-blend-multiply"></div>
-          <div className="absolute inset-0 bg-[#0f172a] opacity-80"></div>
+          <div className="absolute inset-0 bg-[#000000] opacity-80"></div>
           <PatternBg color="#fff" opacity={0.05} />
         </div>
 

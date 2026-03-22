@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { UserPlus, TrendingUp, Target, MousePointerClick, RefreshCw, Settings, BarChart3, Link2, PieChart as PieChartIcon, Percent, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { UserPlus, TrendingUp, Target, MousePointerClick, RefreshCw, Settings, BarChart3, Link2, PieChart as PieChartIcon, Percent, ArrowUp, ArrowDown, Minus, Flame, GitMerge } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../store/ThemeContext';
 import {
     LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell
+    PieChart, Pie, Cell, FunnelChart, Funnel, LabelList
 } from 'recharts';
 
 interface StatsData {
@@ -17,6 +17,10 @@ interface StatsData {
     leadsPerDay: { date: string; count: number }[];
     leadsByCourse: { course_id: string; count: number }[];
     topLinks: { name: string; ref_code: string; clicks: number; leads_count: number }[];
+    pipeline?: { status: string; count: number }[];
+    sourceAttribution?: { source_ref: string; count: number }[];
+    hotLeads?: number;
+    pipelineValue?: number;
 }
 
 const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
@@ -57,7 +61,7 @@ export default function Dashboard() {
     const statCards = stats ? [
         { title: 'Jami Arizalar', value: stats.totalLeads, icon: UserPlus, color: 'text-green-500', bg: isDark ? 'bg-green-500/10' : 'bg-green-50', link: '/paneladmindata/leads', sub: null },
         { title: "Bugungi Arizalar", value: stats.todayLeads, icon: TrendingUp, color: 'text-amber-500', bg: isDark ? 'bg-amber-500/10' : 'bg-amber-50', link: '/paneladmindata/leads', sub: { diff: todayDiff, label: `Kecha: ${yesterday}` } },
-        { title: 'Marketing Linklar', value: stats.totalLinks, icon: Target, color: 'text-pink-500', bg: isDark ? 'bg-pink-500/10' : 'bg-pink-50', link: '/paneladmindata/marketing', sub: null },
+        { title: '🔥 Issiq Leadlar', value: stats.hotLeads ?? 0, icon: Flame, color: 'text-orange-500', bg: isDark ? 'bg-orange-500/10' : 'bg-orange-50', link: '/paneladmindata/leads', sub: null },
         { title: 'Jami Kirishlar', value: stats.totalClicks, icon: MousePointerClick, color: 'text-cyan-500', bg: isDark ? 'bg-cyan-500/10' : 'bg-cyan-50', link: '/paneladmindata/marketing', sub: null },
     ] : [];
 
@@ -321,6 +325,82 @@ export default function Dashboard() {
                     </div>
                 )}
             </motion.div>
+
+            {/* Pipeline Funnel + Source Attribution */}
+            {stats && ((stats.pipeline && stats.pipeline.length > 0) || (stats.sourceAttribution && stats.sourceAttribution.length > 0)) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Funnel */}
+                    {stats.pipeline && stats.pipeline.length > 0 && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.47 }}
+                            className={`p-5 sm:p-6 ${cardCls}`}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+                                    <GitMerge size={20} className="text-indigo-500" />
+                                </div>
+                                <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Pipeline Funnel</h2>
+                                {stats.pipelineValue ? (
+                                    <span className={`ml-auto text-sm font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                                        {(stats.pipelineValue).toLocaleString()} so'm
+                                    </span>
+                                ) : null}
+                            </div>
+                            <div className="space-y-2">
+                                {['new', 'contacted', 'enrolled', 'rejected'].map((s, i) => {
+                                    const item = stats.pipeline?.find(p => p.status === s);
+                                    const count = item?.count || 0;
+                                    const total = stats.totalLeads || 1;
+                                    const pct = Math.round((count / total) * 100);
+                                    const labels: Record<string, string> = { new: "Yangi", contacted: "Bog'landi", enrolled: "Yozildi", rejected: "Rad etildi" };
+                                    const colors = ['bg-blue-500', 'bg-amber-500', 'bg-green-500', 'bg-red-500'];
+                                    return (
+                                        <div key={s} className="flex items-center gap-3">
+                                            <span className={`text-sm font-bold w-24 truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{labels[s]}</span>
+                                            <div className={`flex-1 h-3 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                                                <div className={`h-3 rounded-full ${colors[i]} transition-all duration-700`} style={{ width: `${pct}%` }} />
+                                            </div>
+                                            <span className={`text-sm font-black w-8 text-right ${isDark ? 'text-white' : 'text-slate-900'}`}>{count}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Source Attribution Donut */}
+                    {stats.sourceAttribution && stats.sourceAttribution.length > 0 && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.49 }}
+                            className={`p-5 sm:p-6 ${cardCls}`}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
+                                    <PieChartIcon size={20} className="text-pink-500" />
+                                </div>
+                                <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Manba Tahlili</h2>
+                            </div>
+                            <div className="flex gap-4">
+                                <ResponsiveContainer width="50%" height={160}>
+                                    <PieChart>
+                                        <Pie data={stats.sourceAttribution} dataKey="count" nameKey="source_ref" cx="50%" cy="50%" outerRadius={65} innerRadius={35} paddingAngle={3}>
+                                            {stats.sourceAttribution.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                                        </Pie>
+                                        <Tooltip contentStyle={tooltipStyle} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[160px]">
+                                    {stats.sourceAttribution.map((item, i) => (
+                                        <div key={i} className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                                                <span className={`truncate max-w-[80px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.source_ref}</span>
+                                            </div>
+                                            <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.count}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </div>
+            )}
 
             {/* Quick Actions */}
             <div className={`p-6 sm:p-8 ${cardCls}`}>
