@@ -149,10 +149,10 @@ export default function IGContent() {
           {activeTab === 'posts' && (
             <div className="space-y-4">
             {/* Velocity Leaderboard */}
-            {data?.posts?.some((p: any) => p.velocity != null) && (() => {
+            {data?.posts?.some((p: any) => p.velocity?.velocity != null) && (() => {
               const top5 = [...data.posts]
-                .filter((p: any) => p.velocity != null)
-                .sort((a: any, b: any) => (b.velocity || 0) - (a.velocity || 0))
+                .filter((p: any) => p.velocity?.velocity != null)
+                .sort((a: any, b: any) => (b.velocity?.velocity || 0) - (a.velocity?.velocity || 0))
                 .slice(0, 5);
               return (
                 <div className={`rounded-2xl p-5 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
@@ -174,7 +174,7 @@ export default function IGContent() {
                           <p className={`flex-1 text-sm font-medium truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{caption}</p>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <Zap size={12} className="text-amber-400" />
-                            <span className={`text-xs font-black ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{(post.velocity || 0).toFixed(1)}/h</span>
+                            <span className={`text-xs font-black ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{(post.velocity?.velocity || 0).toFixed(1)}/h</span>
                           </div>
                         </div>
                       );

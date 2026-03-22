@@ -168,9 +168,9 @@ function App() {
               <Route path="posts" element={<ManagePosts />} />
               <Route path="settings" element={<AdminSettings />} />
               {/* Instagram Analytics */}
-              <Route path="ig/overview" element={<IGOverview />} />
-              <Route path="ig/content" element={<IGContent />} />
-              <Route path="ig/ai" element={<IGAIInsights />} />
+              <Route path="ig/overview" element={<ErrorBoundary><IGOverview /></ErrorBoundary>} />
+              <Route path="ig/content" element={<ErrorBoundary><IGContent /></ErrorBoundary>} />
+              <Route path="ig/ai" element={<ErrorBoundary><IGAIInsights /></ErrorBoundary>} />
               <Route path="ig/settings" element={<IGSettings />} />
             </Route>
           </Routes>
