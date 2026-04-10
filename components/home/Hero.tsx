@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Star, Sparkles, TrendingUp } from 'lucide-react';
 import { Button } from '../Button';
@@ -9,6 +9,22 @@ import { useTheme } from '../../store/ThemeContext';
 import { useLanguage } from '../../i18n';
 import { PatternBg, Star1, Star2 } from '../BrandElements';
 
+function useCountUp(target: number, duration = 1800, started = false) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!started) return;
+    let start = 0;
+    const step = target / (duration / 16);
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= target) { setCount(target); clearInterval(timer); }
+      else setCount(Math.floor(start));
+    }, 16);
+    return () => clearInterval(timer);
+  }, [started, target, duration]);
+  return count;
+}
+
 const dummyData = [
   { value: 30 }, { value: 45 }, { value: 35 }, { value: 60 }, { value: 50 }, { value: 80 }, { value: 65 }
 ];
@@ -18,8 +34,24 @@ export const Hero: React.FC = () => {
   const { isDark } = useTheme();
   const { tField, t } = useLanguage();
 
+  const statsRef = useRef<HTMLDivElement>(null);
+  const [statsVisible, setStatsVisible] = useState(false);
+  useEffect(() => {
+    const el = statsRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { setStatsVisible(true); obs.disconnect(); }
+    }, { threshold: 0.3 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const count2000 = useCountUp(2000, 1600, statsVisible);
+  const count75 = useCountUp(75, 1400, statsVisible);
+  const count98 = useCountUp(98, 1200, statsVisible);
+
   return (
-    <div className="relative pt-8 pb-12 lg:pt-12 lg:pb-16 overflow-hidden" style={{ background: isDark ? 'transparent' : 'linear-gradient(180deg, #f0f4ff 0%, #f8fafc 40%, #ffffff 100%)' }}>
+    <div className="relative pt-28 pb-12 lg:pt-32 lg:pb-16 overflow-hidden" style={{ background: isDark ? 'transparent' : 'linear-gradient(180deg, #f0f4ff 0%, #f8fafc 40%, #ffffff 100%)' }}>
 
       {/* Brand pattern overlay */}
       <PatternBg color={isDark ? '#ffffff' : '#0061ff'} opacity={isDark ? 0.02 : 0.025} />
@@ -66,13 +98,13 @@ export const Hero: React.FC = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 items-center relative z-20">
-              <Link to="/career-test" className="w-full sm:w-auto">
+              <Link to="/karyera-testi" className="w-full sm:w-auto">
                 <button className="btn-glass-gradient h-14 px-8 text-lg text-white rounded-full w-full sm:w-auto font-bold inline-flex items-center justify-center gap-2 active:scale-95 hover:shadow-[0_0_20px_rgba(0,97,255,0.4)] transition-all">
                   <Sparkles size={20} />
                   {t('hero.cta.test')}
                 </button>
               </Link>
-              <Link to="/courses" className="w-full sm:w-auto">
+              <Link to="/kurslar" className="w-full sm:w-auto">
                 <button className={`btn-glass h-14 px-8 text-lg ${isDark ? 'text-white border-white/10 hover:border-white/20' : 'text-slate-700 bg-white shadow-md hover:bg-slate-50'} rounded-full w-full sm:w-auto font-bold inline-flex items-center justify-center gap-2 active:scale-95 transition-all`}>
                   {t('hero.cta.courses')}
                   <ArrowRight size={18} />
@@ -95,9 +127,11 @@ export const Hero: React.FC = () => {
           >
             <div className="rounded-[2.5rem] overflow-hidden h-[450px] lg:h-[550px] w-full relative z-10 ml-auto lg:w-[90%] border-4 border-white/50 dark:border-white/10 shadow-2xl">
               <img
-                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2671&auto=format&fit=crop"
+                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1200&auto=format&fit=crop"
                 alt="Students learning IT"
                 className="w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
             </div>
@@ -137,7 +171,7 @@ export const Hero: React.FC = () => {
         </div>
 
         {/* Bottom Section: 3 Glass Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 relative z-10">
+        <div ref={statsRef} className="grid grid-cols-1 md:grid-cols-12 gap-6 relative z-10">
 
           {/* Card 1: Dark Glass */}
           <motion.div
@@ -157,12 +191,12 @@ export const Hero: React.FC = () => {
               <div className="flex -space-x-4">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="w-14 h-14 rounded-full border-2 border-slate-800 bg-slate-200 overflow-hidden shadow-sm relative z-0">
-                    <img src={`/images/students/student${i}.webp`} loading="lazy" alt="Student" className="w-full h-full object-cover" decoding="async" />
+                    <img src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="Student" className="w-full h-full object-cover" loading="lazy" />
                   </div>
                 ))}
               </div>
               <div>
-                <h3 className="text-4xl font-black mb-1">2000+</h3>
+                <h3 className="text-4xl font-black mb-1">{statsVisible ? count2000.toLocaleString() : '0'}+</h3>
                 <p className="text-sm text-slate-300 leading-snug">O'quvchi sig'imi va<br />zamonaviy xonalar</p>
               </div>
             </div>
@@ -179,7 +213,7 @@ export const Hero: React.FC = () => {
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 shadow-inner relative z-10" style={{ background: 'linear-gradient(135deg, rgba(0,97,255,0.1) 0%, rgba(96,239,255,0.2) 100%)' }}>
               <TrendingUp size={24} className="text-[#0061ff]" />
             </div>
-            <h3 className="text-4xl lg:text-5xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-br from-[#0061ff] to-[#60efff] z-10">75%</h3>
+            <h3 className="text-4xl lg:text-5xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-br from-[#0061ff] to-[#60efff] z-10">{statsVisible ? count75 : 0}%</h3>
             <p className={`font-medium text-sm z-10 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Ish bilan ta'minlangan</p>
           </motion.div>
 
@@ -204,7 +238,7 @@ export const Hero: React.FC = () => {
             </div>
 
             <div className="relative z-10 mt-8">
-              <h3 className="text-4xl font-black mb-2 drop-shadow-md">98%</h3>
+              <h3 className="text-4xl font-black mb-2 drop-shadow-md">{statsVisible ? count98 : 0}%</h3>
               <p className="text-sm text-emerald-950 font-semibold leading-snug">Mamnun ota-onalar va<br />yuqori sifatli xizmat</p>
             </div>
           </motion.div>

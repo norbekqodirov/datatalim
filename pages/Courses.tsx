@@ -133,7 +133,7 @@ export default function Courses() {
                     </div>
                   </div>
 
-                  <Link to={`/courses/${course.id}`} className="block mt-auto">
+                  <Link to={`/kurslar/${course.id}`} className="block mt-auto">
                     <button className={`w-full py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 group/btn border-2 ${isDark ? 'bg-slate-800 border-slate-700 text-white hover:border-transparent hover:text-white' : 'bg-white border-slate-200 text-slate-900 hover:border-transparent hover:text-white'}`} style={{ '--hover-bg': `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})` } as React.CSSProperties}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})`;

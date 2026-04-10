@@ -53,10 +53,11 @@ export const Footer: React.FC = () => {
             <ul className="space-y-3">
               {[
                 { name: 'Bosh sahifa', to: '/' },
-                { name: 'Kurslar', to: '/courses' },
-                { name: 'Biz haqimizda', to: '/about' },
-                { name: 'Jamoa', to: '/team' },
-                { name: 'Karyera Testi', to: '/career-test' },
+                { name: 'Kurslar', to: '/kurslar' },
+                { name: 'Biz haqimizda', to: '/biz-haqimizda' },
+                { name: 'Jamoa', to: '/jamoa' },
+                { name: 'Karyera Testi', to: '/karyera-testi' },
+                { name: 'Blog', to: '/blog' },
               ].map(link => (
                 <li key={link.to}>
                   <Link to={link.to} className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-1 group">

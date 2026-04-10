@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { motion } from 'framer-motion';
-import { Save, Plus, Trash2, X, Edit } from 'lucide-react';
+import { Save, Plus, Trash2, X, Edit, Loader2 } from 'lucide-react';
 import { Course } from '../../data/courses';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
@@ -21,6 +21,8 @@ export default function ManageCourses() {
   const [mentorWebpSavings, setMentorWebpSavings] = useState<Record<number, string>>({});
   const [formData, setFormData] = useState<Partial<Course>>({});
   const [activeLang, setActiveLang] = useState<Lang>('uz');
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const handleEdit = (course: Course) => {
     setEditingId(course.id);
@@ -76,33 +78,28 @@ export default function ManageCourses() {
       toast.error('O\'zbek tilida Sarlavha kiritilishi shart!');
       return;
     }
-
-    setIsSaving(true);
-    try {
-      if (isAdding) {
-        await addCourse(formData as Course);
-        toast.success('Yangi kurs muvaffaqiyatli qo\'shildi!');
-      } else if (editingId) {
-        await updateCourse(editingId, formData);
-        toast.success('Kurs ma\'lumotlari yangilandi!');
-      }
-      setEditingId(null);
-      setIsAdding(false);
-    } catch (error) {
-      toast.error('Saqlashda xatolik yuz berdi. Qaytadan urinib ko\'ring.');
-    } finally {
-      setIsSaving(false);
+    setSaving(true);
+    await new Promise(r => setTimeout(r, 300)); // give UI time to update
+    if (isAdding) {
+      addCourse(formData as Course);
+      toast.success('Yangi kurs qo\'shildi!');
+    } else if (editingId) {
+      updateCourse(editingId, formData);
+      toast.success('Kurs yangilandi!');
     }
+    setSaving(false);
+    setEditingId(null);
+    setIsAdding(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Rostdan ham bu kursni o\'chirmoqchimisiz? Ushbu amalni ortga qaytarib bo\'lmaydi.')) {
-      try {
-        await deleteCourse(id);
-        toast.success('Kurs o\'chirildi!');
-      } catch (error) {
-        toast.error('O\'chirishda xatolik yuz berdi.');
-      }
+  const handleDelete = (id: string) => {
+    if (deleteConfirmId === id) {
+      deleteCourse(id);
+      toast.success('Kurs o\'chirildi!');
+      setDeleteConfirmId(null);
+    } else {
+      setDeleteConfirmId(id);
+      setTimeout(() => setDeleteConfirmId(null), 4000);
     }
   };
 
@@ -368,9 +365,9 @@ export default function ManageCourses() {
             <button onClick={() => { setIsAdding(false); setEditingId(null); }} className={`px-6 py-3 rounded-2xl font-bold transition-colors ${isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
               Bekor qilish
             </button>
-            <button onClick={handleSave} disabled={isSaving} className={`bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2 ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}>
-              {isSaving ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Save size={20} />}
-              {isSaving ? 'Saqlanmoqda...' : 'Saqlash'}
+            <button onClick={handleSave} disabled={saving} className="bg-[#0061ff] hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2">
+              {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+              {saving ? 'Saqlanmoqda...' : 'Saqlash'}
             </button>
           </div>
         </motion.div>
@@ -393,9 +390,16 @@ export default function ManageCourses() {
                 <button onClick={() => handleEdit(course)} className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-400 hover:text-[#60efff] hover:bg-slate-800' : 'text-slate-400 hover:text-[#0061ff] hover:bg-blue-50'}`}>
                   <Edit size={20} />
                 </button>
-                <button onClick={() => handleDelete(course.id)} className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-400 hover:text-red-400 hover:bg-slate-800' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}>
-                  <Trash2 size={20} />
-                </button>
+                {deleteConfirmId === course.id ? (
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => handleDelete(course.id)} className="text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-xl">O'chirish</button>
+                    <button onClick={() => setDeleteConfirmId(null)} className={`text-xs font-bold px-3 py-1.5 rounded-xl ${isDark ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-100'}`}>Bekor</button>
+                  </div>
+                ) : (
+                  <button onClick={() => handleDelete(course.id)} className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-400 hover:text-red-400 hover:bg-slate-800' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}>
+                    <Trash2 size={20} />
+                  </button>
+                )}
               </div>
             </motion.div>
           ))}

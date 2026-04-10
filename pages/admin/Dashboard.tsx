@@ -1,155 +1,428 @@
-import React, { useState, useEffect } from 'react';
-import { useStore } from '../../store/useStore';
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Users, Eye, Settings, Target, UserPlus, ArrowRight, Activity, Percent, Plus } from 'lucide-react';
+import { UserPlus, TrendingUp, Target, MousePointerClick, RefreshCw, Settings, BarChart3, Link2, PieChart as PieChartIcon, Percent, ArrowUp, ArrowDown, Minus, Flame, GitMerge } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../store/ThemeContext';
-import { fetchFromAPI } from '../../utils/api';
+import {
+    LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, FunnelChart, Funnel, LabelList
+} from 'recharts';
+
+interface StatsData {
+    totalLeads: number;
+    todayLeads: number;
+    yesterdayLeads?: number;
+    totalLinks: number;
+    totalClicks: number;
+    leadsPerDay: { date: string; count: number }[];
+    leadsByCourse: { course_id: string; count: number }[];
+    topLinks: { name: string; ref_code: string; clicks: number; leads_count: number }[];
+    pipeline?: { status: string; count: number }[];
+    sourceAttribution?: { source_ref: string; count: number }[];
+    hotLeads?: number;
+    pipelineValue?: number;
+}
+
+const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
 
 export default function Dashboard() {
-  const { courses, team, visibility } = useStore();
-  const { isDark } = useTheme();
+    const { isDark } = useTheme();
+    const [stats, setStats] = useState<StatsData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const [leads, setLeads] = useState<any[]>([]);
-  const [links, setLinks] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+    const fetchStats = useCallback((silent = false) => {
+        if (!silent) setLoading(true);
+        const token = localStorage.getItem('adminToken');
+        fetch('/api/stats', { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(r => r.json())
+            .then(data => { setStats(data); setLastUpdated(new Date()); })
+            .catch(() => setStats(null))
+            .finally(() => setLoading(false));
+    }, []);
 
-  useEffect(() => {
-    Promise.all([
-      fetchFromAPI('leads'),
-      fetchFromAPI('marketing-links')
-    ]).then(([leadsRes, linksRes]) => {
-      setLeads(leadsRes || []);
-      setLinks(linksRes || []);
-      setIsLoading(false);
-    });
-  }, []);
+    useEffect(() => {
+        fetchStats();
+        const interval = setInterval(() => fetchStats(true), 30000);
+        return () => clearInterval(interval);
+    }, [fetchStats]);
 
-  const totalClicks = links.reduce((sum, link) => sum + (link.clicks || 0), 0);
-  const totalLinkLeads = links.reduce((sum, link) => sum + (link.leads_count || 0), 0);
-  const conversionRate = totalClicks > 0 ? ((totalLinkLeads / totalClicks) * 100).toFixed(1) : '0';
+    const conversionRate = stats && stats.totalClicks > 0
+        ? ((stats.totalLeads / stats.totalClicks) * 100).toFixed(1)
+        : '0';
 
-  const stats = [
-    { title: 'Jami Arizalar', value: leads.length, icon: UserPlus, lightColor: 'bg-orange-50 text-orange-600', darkColor: 'bg-orange-500/20 text-orange-400', link: '/paneladmindata/leads' },
-    { title: 'Target Kirishlar', value: totalClicks, icon: Target, lightColor: 'bg-indigo-50 text-indigo-600', darkColor: 'bg-indigo-500/20 text-indigo-400', link: '/paneladmindata/marketing' },
-    { title: "Konversiya", value: `${conversionRate}%`, icon: Percent, lightColor: 'bg-emerald-50 text-emerald-600', darkColor: 'bg-emerald-500/20 text-[#82f4b1]', link: '/paneladmindata/marketing' },
-    { title: 'Jami Kurslar', value: courses.length, icon: BookOpen, lightColor: 'bg-blue-50 text-blue-600', darkColor: 'bg-blue-500/20 text-[#60efff]', link: '/paneladmindata/courses' },
-  ];
+    const cardCls = isDark
+        ? 'bg-slate-800/60 backdrop-blur-xl border border-white/10 rounded-2xl'
+        : 'bg-white border border-slate-200 rounded-2xl shadow-sm';
 
-  return (
-    <div className="space-y-8 pb-32">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
-        <div>
-          <h1 className={`text-4xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Dashboard</h1>
-          <p className={`font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Tizimning joriy holati va oxirgi arizalar ro'yxati.</p>
-        </div>
-        {isLoading && (
-          <div className="flex items-center gap-2 text-sm font-bold text-blue-500">
-            <div className={`animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500`}></div>
-            Yuklanmoqda...
-          </div>
-        )}
-      </motion.div>
+    const yesterday = stats?.yesterdayLeads ?? 0;
+    const todayDiff = stats ? stats.todayLeads - yesterday : 0;
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, idx) => (
-          <motion.div
-            key={idx}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: idx * 0.1 }}
-          >
-            <Link to={stat.link} className={`block p-6 rounded-[2rem] border shadow-sm hover:shadow-md transition-all group ${isDark ? 'bg-slate-900/50 border-white/5 shadow-black/50 hover:bg-slate-800' : 'bg-white border-slate-100'}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${isDark ? stat.darkColor : stat.lightColor}`}>
-                  <stat.icon size={28} />
+    const statCards = stats ? [
+        { title: 'Jami Arizalar', value: stats.totalLeads, icon: UserPlus, color: 'text-green-500', bg: isDark ? 'bg-green-500/10' : 'bg-green-50', link: '/paneladmindata/leads', sub: null },
+        { title: "Bugungi Arizalar", value: stats.todayLeads, icon: TrendingUp, color: 'text-amber-500', bg: isDark ? 'bg-amber-500/10' : 'bg-amber-50', link: '/paneladmindata/leads', sub: { diff: todayDiff, label: `Kecha: ${yesterday}` } },
+        { title: '🔥 Issiq Leadlar', value: stats.hotLeads ?? 0, icon: Flame, color: 'text-orange-500', bg: isDark ? 'bg-orange-500/10' : 'bg-orange-50', link: '/paneladmindata/leads', sub: null },
+        { title: 'Jami Kirishlar', value: stats.totalClicks, icon: MousePointerClick, color: 'text-cyan-500', bg: isDark ? 'bg-cyan-500/10' : 'bg-cyan-50', link: '/paneladmindata/marketing', sub: null },
+    ] : [];
+
+    const tooltipStyle = {
+        backgroundColor: isDark ? '#1e293b' : '#fff',
+        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+        borderRadius: '12px',
+        color: isDark ? '#e2e8f0' : '#1e293b',
+    };
+
+    return (
+        <div className="space-y-8">
+            {/* Header */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                <div>
+                    <h1 className={`text-3xl sm:text-4xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Dashboard</h1>
+                    <p className={`font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Analitika va statistikalar
+                        {lastUpdated && <span className="ml-2 text-xs opacity-60">· {lastUpdated.toLocaleTimeString('uz-UZ')} da yangilandi</span>}
+                    </p>
                 </div>
-                <div className={`text-4xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{stat.value}</div>
-              </div>
-              <h3 className={`text-lg font-bold transition-colors ${isDark ? 'text-slate-400 group-hover:text-slate-200' : 'text-slate-600 group-hover:text-slate-900'}`}>{stat.title}</h3>
-            </Link>
-          </motion.div>
-        ))}
-      </div>
+                <div className="flex items-center gap-2">
+                    <span className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium ${isDark ? 'bg-green-900/20 text-green-400 border border-green-800' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
+                        30s yangilanadi
+                    </span>
+                    <button onClick={() => fetchStats()} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                        Yangilash
+                    </button>
+                </div>
+            </motion.div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mt-8">
-        {/* Recent Leads Table */}
-        <div className={`xl:col-span-2 p-8 rounded-[2rem] border shadow-sm ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-white border-slate-100'}`}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className={`text-xl font-bold flex items-center gap-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              <Activity className={isDark ? "text-[#60efff]" : "text-blue-600"} size={24} />
-              So'nggi Arizalar
-            </h2>
-            <Link to="/paneladmindata/leads" className={`text-sm font-bold flex items-center gap-2 transition-colors ${isDark ? 'text-[#60efff] hover:text-white' : 'text-blue-600 hover:text-blue-800'}`}>
-              Barchasini ko'rish <ArrowRight size={16} />
-            </Link>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className={`border-b ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-500'}`}>
-                  <th className="pb-3 font-bold text-sm">Sana</th>
-                  <th className="pb-3 font-bold text-sm">Ism</th>
-                  <th className="pb-3 font-bold text-sm">Telefon</th>
-                  <th className="pb-3 font-bold text-sm">Manba</th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y ${isDark ? 'divide-slate-800/50' : 'divide-slate-50'}`}>
-                {leads.slice(0, 5).map((lead: any) => (
-                  <tr key={lead.id} className={`transition-colors ${isDark ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}`}>
-                    <td className={`py-4 text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {new Date(lead.created_at).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className={`py-4 font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{lead.name}</td>
-                    <td className={`py-4 font-mono text-sm ${isDark ? 'text-[#60efff]' : 'text-blue-600'}`}>{lead.phone}</td>
-                    <td className="py-4">
-                      {lead.source_ref ? (
-                        <span className={`inline-block px-2 py-1 rounded-md text-xs font-bold ${isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-indigo-600'}`}>
-                          {lead.source_ref}
-                        </span>
-                      ) : (
-                        <span className={`inline-block px-2 py-1 rounded-md text-xs font-bold ${isDark ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
-                          Organik
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {leads.length === 0 && !isLoading && (
-                  <tr>
-                    <td colSpan={4} className={`py-8 text-center text-sm font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      Hozircha arizalar yo'q.
-                    </td>
-                  </tr>
+            {/* Stat Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {loading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className={`p-6 rounded-2xl animate-pulse ${isDark ? 'bg-slate-800/60 border border-white/10' : 'bg-white border border-slate-200'}`}>
+                            <div className={`w-12 h-12 rounded-2xl mb-4 ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`} />
+                            <div className={`h-8 w-16 rounded-lg mb-2 ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`} />
+                            <div className={`h-4 w-24 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`} />
+                        </div>
+                    ))
+                ) : (
+                    statCards.map((stat, idx) => (
+                        <motion.div key={idx} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: idx * 0.07 }}>
+                            <Link to={stat.link} className={`block p-5 sm:p-6 ${cardCls} hover:shadow-lg transition-all group`}>
+                                <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${stat.bg}`}>
+                                    <stat.icon size={22} className={stat.color} />
+                                </div>
+                                <div className={`text-2xl sm:text-3xl font-black mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{stat.value}</div>
+                                <h3 className={`text-sm font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{stat.title}</h3>
+                                {stat.sub && (
+                                    <div className={`flex items-center gap-1 mt-1.5 text-xs font-bold ${
+                                        stat.sub.diff > 0 ? 'text-green-500' : stat.sub.diff < 0 ? 'text-red-500' : isDark ? 'text-slate-500' : 'text-slate-400'
+                                    }`}>
+                                        {stat.sub.diff > 0 ? <ArrowUp size={12} /> : stat.sub.diff < 0 ? <ArrowDown size={12} /> : <Minus size={12} />}
+                                        {stat.sub.diff > 0 ? `+${stat.sub.diff}` : stat.sub.diff} &nbsp;
+                                        <span className={`font-normal ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{stat.sub.label}</span>
+                                    </div>
+                                )}
+                            </Link>
+                        </motion.div>
+                    ))
                 )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+            </div>
 
-        {/* Quick Settings */}
-        <div className={`p-8 rounded-[2rem] border shadow-sm h-fit ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-white border-slate-100'}`}>
-          <h2 className={`text-xl font-bold mb-6 flex items-center gap-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            <Settings className={isDark ? "text-[#60efff]" : "text-blue-600"} size={24} />
-            Tezkor Sozlamalar
-          </h2>
-          <div className="flex flex-col gap-3">
-            <Link to="/paneladmindata/marketing" className={`p-4 rounded-2xl font-bold transition-all border flex items-center justify-between group ${isDark ? 'bg-slate-800/50 border-white/5 text-slate-300 hover:bg-slate-800 hover:text-white' : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border-slate-100'}`}>
-              Yangi reklama linki yaratish
-              <Plus size={18} className={`transition-transform group-hover:scale-110 ${isDark ? 'text-[#60efff]' : 'text-blue-500'}`} />
-            </Link>
-            <Link to="/paneladmindata/visibility" className={`p-4 rounded-2xl font-bold transition-all border flex items-center justify-between group ${isDark ? 'bg-slate-800/50 border-white/5 text-slate-300 hover:bg-slate-800 hover:text-white' : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border-slate-100'}`}>
-              Bo'limlarni yoqish/yashirish
-              <Eye size={18} className={`transition-transform group-hover:scale-110 ${isDark ? 'text-[#60efff]' : 'text-blue-500'}`} />
-            </Link>
-            <Link to="/paneladmindata/courses" className={`p-4 rounded-2xl font-bold transition-all border flex items-center justify-between group ${isDark ? 'bg-slate-800/50 border-white/5 text-slate-300 hover:bg-slate-800 hover:text-white' : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border-slate-100'}`}>
-              Yangi kurs qo'shish
-              <BookOpen size={18} className={`transition-transform group-hover:scale-110 ${isDark ? 'text-[#60efff]' : 'text-blue-500'}`} />
-            </Link>
-          </div>
+            {/* Conversion Rate Banner */}
+            {stats && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                    className={`p-5 sm:p-6 ${cardCls} flex flex-col sm:flex-row items-start sm:items-center gap-4`}>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+                        <Percent size={24} className="text-indigo-500" />
+                    </div>
+                    <div className="flex-1">
+                        <p className={`text-sm font-bold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Konversiya darajasi (Kirishlar → Arizalar)</p>
+                        <p className={`text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{conversionRate}%</p>
+                    </div>
+                    <div className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {stats.totalClicks} kirish → {stats.totalLeads} ariza
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Leads per Day Line Chart */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+                    className={`lg:col-span-2 p-5 sm:p-6 ${cardCls}`}>
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
+                            <BarChart3 size={20} className="text-blue-500" />
+                        </div>
+                        <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Kunlik Arizalar (30 kun)</h2>
+                    </div>
+                    {stats && stats.leadsPerDay.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={280}>
+                            <LineChart data={stats.leadsPerDay}>
+                                <XAxis
+                                    dataKey="date"
+                                    tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 12 }}
+                                    tickLine={false}
+                                    axisLine={{ stroke: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0' }}
+                                    tickFormatter={(v: string) => v.slice(5)}
+                                />
+                                <YAxis
+                                    tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 12 }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    allowDecimals={false}
+                                />
+                                <Tooltip contentStyle={tooltipStyle} />
+                                <Line
+                                    type="monotone"
+                                    dataKey="count"
+                                    stroke="#3b82f6"
+                                    strokeWidth={2.5}
+                                    dot={{ r: 3, fill: '#3b82f6' }}
+                                    activeDot={{ r: 6 }}
+                                    name="Arizalar"
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className={`h-[280px] flex items-center justify-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {loading ? 'Yuklanmoqda...' : "Ma'lumot yo'q"}
+                        </div>
+                    )}
+                </motion.div>
+
+                {/* Leads by Course Pie Chart */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+                    className={`p-5 sm:p-6 ${cardCls}`}>
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
+                            <PieChartIcon size={20} className="text-purple-500" />
+                        </div>
+                        <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Kurs bo'yicha</h2>
+                    </div>
+                    {stats && stats.leadsByCourse.length > 0 ? (
+                        <>
+                            <ResponsiveContainer width="100%" height={200}>
+                                <PieChart>
+                                    <Pie
+                                        data={stats.leadsByCourse}
+                                        dataKey="count"
+                                        nameKey="course_id"
+                                        cx="50%"
+                                        cy="50%"
+                                        outerRadius={80}
+                                        innerRadius={45}
+                                        paddingAngle={3}
+                                    >
+                                        {stats.leadsByCourse.map((_, i) => (
+                                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip contentStyle={tooltipStyle} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                            <div className="mt-4 space-y-2 max-h-[120px] overflow-y-auto">
+                                {stats.leadsByCourse.map((item, i) => (
+                                    <div key={i} className="flex items-center justify-between text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                                            <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{item.course_id}</span>
+                                        </div>
+                                        <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.count}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    ) : (
+                        <div className={`h-[280px] flex items-center justify-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {loading ? 'Yuklanmoqda...' : "Ma'lumot yo'q"}
+                        </div>
+                    )}
+                </motion.div>
+            </div>
+
+            {/* Top 5 Courses + Funnel */}
+            {stats && stats.leadsByCourse.length > 0 && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }}
+                    className={`p-5 sm:p-6 ${cardCls}`}>
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                            <BarChart3 size={20} className="text-emerald-500" />
+                        </div>
+                        <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Top 5 Kurslar (Arizalar bo'yicha)</h2>
+                    </div>
+                    <div className="space-y-3">
+                        {stats.leadsByCourse.slice(0, 5).map((item, i) => {
+                            const max = stats.leadsByCourse[0]?.count || 1;
+                            const pct = Math.round((item.count / max) * 100);
+                            const colors = ['bg-blue-500', 'bg-purple-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500'];
+                            return (
+                                <div key={i} className="flex items-center gap-3">
+                                    <span className={`text-xs font-black w-5 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{i + 1}</span>
+                                    <span className={`text-sm font-bold truncate w-36 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.course_id || 'Umumiy'}</span>
+                                    <div className={`flex-1 rounded-full h-2.5 ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                                        <div className={`h-2.5 rounded-full ${colors[i % colors.length]} transition-all duration-700`} style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <span className={`text-sm font-black w-8 text-right ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.count}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Top Marketing Links Table */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
+                className={`p-5 sm:p-6 ${cardCls}`}>
+                <div className="flex items-center gap-3 mb-6">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
+                        <Link2 size={20} className="text-pink-500" />
+                    </div>
+                    <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Top Marketing Linklar</h2>
+                </div>
+                {stats && stats.topLinks.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+                                    <th className="text-left py-3 px-4 font-bold">Nomi</th>
+                                    <th className="text-left py-3 px-4 font-bold">Ref kod</th>
+                                    <th className="text-right py-3 px-4 font-bold">Kirishlar</th>
+                                    <th className="text-right py-3 px-4 font-bold">Arizalar</th>
+                                    <th className="text-right py-3 px-4 font-bold">Konversiya</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {stats.topLinks.map((link, i) => {
+                                    const rate = link.clicks > 0 ? ((link.leads_count / link.clicks) * 100).toFixed(1) : '0';
+                                    return (
+                                        <tr key={i} className={`border-t ${isDark ? 'border-white/5 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'} transition-colors`}>
+                                            <td className={`py-3 px-4 font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{link.name}</td>
+                                            <td className={`py-3 px-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                <code className={`px-2 py-1 rounded-lg text-xs ${isDark ? 'bg-slate-700/50' : 'bg-slate-100'}`}>{link.ref_code}</code>
+                                            </td>
+                                            <td className={`py-3 px-4 text-right font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{link.clicks}</td>
+                                            <td className={`py-3 px-4 text-right font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{link.leads_count}</td>
+                                            <td className="py-3 px-4 text-right">
+                                                <span className={`inline-block px-2 py-1 rounded-lg text-xs font-bold ${
+                                                    parseFloat(rate) > 10
+                                                        ? 'bg-green-500/10 text-green-500'
+                                                        : parseFloat(rate) > 5
+                                                        ? 'bg-amber-500/10 text-amber-500'
+                                                        : 'bg-slate-500/10 text-slate-400'
+                                                }`}>{rate}%</span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className={`py-12 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {loading ? 'Yuklanmoqda...' : "Marketing linklar yo'q"}
+                    </div>
+                )}
+            </motion.div>
+
+            {/* Pipeline Funnel + Source Attribution */}
+            {stats && ((stats.pipeline && stats.pipeline.length > 0) || (stats.sourceAttribution && stats.sourceAttribution.length > 0)) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Funnel */}
+                    {stats.pipeline && stats.pipeline.length > 0 && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.47 }}
+                            className={`p-5 sm:p-6 ${cardCls}`}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+                                    <GitMerge size={20} className="text-indigo-500" />
+                                </div>
+                                <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Pipeline Funnel</h2>
+                                {stats.pipelineValue ? (
+                                    <span className={`ml-auto text-sm font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                                        {(stats.pipelineValue).toLocaleString()} so'm
+                                    </span>
+                                ) : null}
+                            </div>
+                            <div className="space-y-2">
+                                {['new', 'contacted', 'enrolled', 'rejected'].map((s, i) => {
+                                    const item = stats.pipeline?.find(p => p.status === s);
+                                    const count = item?.count || 0;
+                                    const total = stats.totalLeads || 1;
+                                    const pct = Math.round((count / total) * 100);
+                                    const labels: Record<string, string> = { new: "Yangi", contacted: "Bog'landi", enrolled: "Yozildi", rejected: "Rad etildi" };
+                                    const colors = ['bg-blue-500', 'bg-amber-500', 'bg-green-500', 'bg-red-500'];
+                                    return (
+                                        <div key={s} className="flex items-center gap-3">
+                                            <span className={`text-sm font-bold w-24 truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{labels[s]}</span>
+                                            <div className={`flex-1 h-3 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                                                <div className={`h-3 rounded-full ${colors[i]} transition-all duration-700`} style={{ width: `${pct}%` }} />
+                                            </div>
+                                            <span className={`text-sm font-black w-8 text-right ${isDark ? 'text-white' : 'text-slate-900'}`}>{count}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Source Attribution Donut */}
+                    {stats.sourceAttribution && stats.sourceAttribution.length > 0 && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.49 }}
+                            className={`p-5 sm:p-6 ${cardCls}`}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
+                                    <PieChartIcon size={20} className="text-pink-500" />
+                                </div>
+                                <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Manba Tahlili</h2>
+                            </div>
+                            <div className="flex gap-4">
+                                <ResponsiveContainer width="50%" height={160}>
+                                    <PieChart>
+                                        <Pie data={stats.sourceAttribution} dataKey="count" nameKey="source_ref" cx="50%" cy="50%" outerRadius={65} innerRadius={35} paddingAngle={3}>
+                                            {stats.sourceAttribution.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                                        </Pie>
+                                        <Tooltip contentStyle={tooltipStyle} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[160px]">
+                                    {stats.sourceAttribution.map((item, i) => (
+                                        <div key={i} className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                                                <span className={`truncate max-w-[80px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.source_ref}</span>
+                                            </div>
+                                            <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.count}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </div>
+            )}
+
+            {/* Quick Actions */}
+            <div className={`p-6 sm:p-8 ${cardCls}`}>
+                <h2 className={`text-xl font-bold mb-5 flex items-center gap-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    <Settings size={20} className={isDark ? 'text-[#60efff]' : 'text-blue-600'} />
+                    Tezkor Amallar
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {[
+                        { to: '/paneladmindata/courses', label: "Yangi kurs qo'shish" },
+                        { to: '/paneladmindata/team', label: "Xodim qo'shish" },
+                        { to: '/paneladmindata/media', label: "Asosiy matnlarni tahrirlash" },
+                        { to: '/paneladmindata/visibility', label: "Bo'limlarni yoqish/o'chirish" },
+                        { to: '/paneladmindata/marketing', label: "Marketing link yaratish" },
+                        { to: '/paneladmindata/leads', label: "Arizalarni ko'rish" },
+                    ].map((item) => (
+                        <Link key={item.to} to={item.to} className={`p-4 rounded-2xl font-bold transition-colors border text-sm ${isDark ? 'bg-slate-800 border-white/5 text-slate-300 hover:bg-slate-700 hover:text-white' : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border-slate-100'}`}>
+                            {item.label}
+                        </Link>
+                    ))}
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }

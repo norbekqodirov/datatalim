@@ -28,11 +28,19 @@ export const About: React.FC = () => {
             <Star1 size={60} color="#0061ff" opacity={isDark ? 0.2 : 0.1} className="absolute -top-16 right-10 rotate-slow pointer-events-none" />
 
             <div className={`relative rounded-[2.5rem] overflow-hidden shadow-2xl transition-transform duration-500 group-hover:scale-[1.02] border-4 ${isDark ? 'border-white/10' : 'border-white/50'}`}>
-              <img
-                src={siteContent.aboutImage}
-                alt="About DATA"
-                className="w-full object-cover z-10"
-              />
+              {siteContent.aboutImage ? (
+                <img
+                  src={siteContent.aboutImage}
+                  alt="About DATA"
+                  className="w-full object-cover z-10"
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <div className={`w-full aspect-[4/3] flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                  <span className={`text-6xl`}>🏫</span>
+                </div>
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60"></div>
             </div>
 
@@ -82,7 +90,7 @@ export const About: React.FC = () => {
               </p>
             </div>
 
-            <Link to="/about">
+            <Link to="/biz-haqimizda">
               <Button className="h-14 px-8 text-lg text-white rounded-2xl shadow-lg shadow-blue-500/20 group font-bold hover:scale-105 active:scale-95 transition-all w-full sm:w-auto" style={{ background: 'linear-gradient(135deg, #0061ff 0%, #60efff 100%)' }}>
                 Batafsil ma'lumot
                 <ArrowRight className="inline ml-2 group-hover:translate-x-1 transition-transform" size={20} />

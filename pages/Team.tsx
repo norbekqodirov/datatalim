@@ -114,13 +114,17 @@ export default function Team() {
                 <div className="h-80 overflow-hidden relative">
                   <div className="absolute inset-0 z-10 opacity-30 mix-blend-overlay pointer-events-none" style={{ background: 'linear-gradient(135deg, #0061ff, #60efff)' }}></div>
                   <div className={`absolute inset-0 z-20 ${isDark ? 'bg-gradient-to-t from-slate-900 to-transparent' : 'bg-gradient-to-t from-white to-transparent'}`}></div>
-                  <img
-                    src={member.image}
-                    alt={tField(member.name)}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 relative z-0"
-                    loading="lazy"
-                    decoding="async"
-                  />
+                  {member.image ? (
+                    <img
+                      src={member.image}
+                      alt={tField(member.name)}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 relative z-0"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <div className={`w-full h-full flex items-center justify-center text-6xl font-black ${isDark ? 'bg-slate-800 text-slate-600' : 'bg-slate-100 text-slate-300'}`}>{tField(member.name)?.[0]}</div>
+                  )}
                   <div className="absolute bottom-6 left-8 right-8 z-30">
                     <h3 className={`text-3xl font-black mb-2 leading-tight ${isDark ? 'text-white' : 'text-slate-900 group-hover:text-[#0061ff] transition-colors'}`}>{tField(member.name)}</h3>
                     <p className="font-bold text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #0061ff, #60efff)' }}>{tField(member.role)}</p>

@@ -34,7 +34,11 @@ export const Team: React.FC = () => {
             <div key={idx} className={`p-6 rounded-[2rem] shadow-sm border text-center transition-all duration-300 hover:-translate-y-2 group relative overflow-hidden ${isDark ? 'bg-slate-900/50 border-white/5 hover:bg-slate-800/80 hover:shadow-xl hover:shadow-[#0061ff]/10' : 'bg-white border-slate-100 hover:shadow-xl hover:shadow-[#0061ff]/5'}`}>
               <div className="absolute top-0 left-0 w-full h-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: 'linear-gradient(90deg, #0061ff, #60efff)' }}></div>
               <div className="w-32 h-32 mx-auto rounded-full overflow-hidden mb-6 border-4 relative z-10 p-1 group-hover:scale-105 transition-transform" style={{ borderColor: isDark ? 'rgba(96,239,255,0.2)' : 'rgba(0,97,255,0.1)' }}>
-                <img src={member.image} alt={tField(member.name)} className="w-full h-full object-cover rounded-full" />
+                {member.image ? (
+                  <img src={member.image} alt={tField(member.name)} className="w-full h-full object-cover rounded-full" loading="lazy" decoding="async" />
+                ) : (
+                  <div className={`w-full h-full rounded-full flex items-center justify-center text-3xl font-bold ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-500'}`}>{tField(member.name)?.[0]}</div>
+                )}
               </div>
               <h3 className={`text-lg font-bold mb-1 relative z-10 ${isDark ? 'text-white' : 'text-slate-900'}`}>{tField(member.name)}</h3>
               <p className="text-sm font-bold text-transparent bg-clip-text relative z-10" style={{ backgroundImage: 'linear-gradient(135deg, #0061ff, #60efff)' }}>{tField(member.role)}</p>
@@ -43,7 +47,7 @@ export const Team: React.FC = () => {
         </div>
 
         <div className="text-center relative z-10">
-          <Link to="/team">
+          <Link to="/jamoa">
             <Button variant="outline" className={`h-14 px-8 text-lg border-2 rounded-2xl group font-bold hover:scale-105 active:scale-95 transition-all ${isDark ? 'border-slate-800 text-slate-300 hover:border-[#60efff]' : 'border-slate-200 text-slate-700 hover:border-[#0061ff] bg-white'}`}>
               Barcha jamoa a'zolari bilan tanishish
               <ArrowRight className="inline ml-2 group-hover:translate-x-1 transition-transform" size={20} />

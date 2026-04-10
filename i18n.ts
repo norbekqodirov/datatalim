@@ -12,6 +12,16 @@ export const translations: Record<Language, Record<string, string>> = {
         'nav.contact': 'Aloqa',
         'nav.careerTest': 'Karyera Testi',
         'nav.languages': 'Til kurslari',
+        'nav.blog': 'Blog',
+
+        // Blog
+        'blog.title': 'Blog',
+        'blog.subtitle': 'Eng so\'nggi maqolalar va yangiliklar',
+        'blog.search': 'Qidirish...',
+        'blog.all': 'Barchasi',
+        'blog.empty': 'Maqolalar topilmadi',
+        'blog.readMore': 'Davomini o\'qish',
+        'blog.back': 'Blogga qaytish',
 
         // Hero
         'hero.cta.test': 'Kasbni aniqlash',
@@ -51,6 +61,16 @@ export const translations: Record<Language, Record<string, string>> = {
         'nav.contact': 'Контакт',
         'nav.careerTest': 'Тест Карьеры',
         'nav.languages': 'Языковые курсы',
+        'nav.blog': 'Блог',
+
+        // Blog
+        'blog.title': 'Блог',
+        'blog.subtitle': 'Последние статьи и новости',
+        'blog.search': 'Поиск...',
+        'blog.all': 'Все',
+        'blog.empty': 'Статьи не найдены',
+        'blog.readMore': 'Читать далее',
+        'blog.back': 'Вернуться к блогу',
 
         // Hero
         'hero.cta.test': 'Определить профессию',
@@ -90,6 +110,16 @@ export const translations: Record<Language, Record<string, string>> = {
         'nav.contact': 'Contact',
         'nav.careerTest': 'Career Test',
         'nav.languages': 'Languages',
+        'nav.blog': 'Blog',
+
+        // Blog
+        'blog.title': 'Blog',
+        'blog.subtitle': 'Latest articles and news',
+        'blog.search': 'Search...',
+        'blog.all': 'All',
+        'blog.empty': 'No articles found',
+        'blog.readMore': 'Read more',
+        'blog.back': 'Back to blog',
 
         // Hero
         'hero.cta.test': 'Find Your Career',

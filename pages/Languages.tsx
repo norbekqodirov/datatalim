@@ -130,7 +130,7 @@ export default function Languages() {
     };
 
     return (
-        <div className={`min-h-screen ${isDark ? 'bg-[#0f172a]' : 'bg-slate-50'}`}>
+        <div className={`min-h-screen ${isDark ? 'bg-[#000000]' : 'bg-slate-50'}`}>
             <SEO title="Til Kurslari | DATA" description="DATA Ta'lim Stansiyasida Ingliz, Rus, Koreys va Nemis tillari. IELTS, TOPIK va CEFR ga tayyorgarlik." />
 
             {/* --- HERO SECTION --- */}
