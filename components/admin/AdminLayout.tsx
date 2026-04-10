@@ -365,7 +365,7 @@ export const AdminLayout: React.FC = () => {
         <div className="px-5 py-6 lg:px-8 lg:py-7 max-w-7xl mx-auto">
           <Outlet />
         </div>
-      </motion.main>
+      </main>
     </div>
   );
 };
