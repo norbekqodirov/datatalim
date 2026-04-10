@@ -4,6 +4,7 @@ import { Button } from './Button';
 import { sendToTelegram } from '../utils/telegram';
 import toast from 'react-hot-toast';
 import { submitLeadToAPI } from '../utils/api';
+import { trackEvent } from '../utils/pixel';
 
 interface EnrollModalProps {
     isOpen: boolean;
@@ -24,44 +25,75 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let val = e.target.value.replace(/\D/g, '');
+        if (val.length > 9) val = val.slice(0, 9);
+        let formatted = '';
+        if (val.length > 0) formatted += val.substring(0, 2);
+        if (val.length > 2) formatted += ' ' + val.substring(2, 5);
+        if (val.length > 5) formatted += ' ' + val.substring(5, 7);
+        if (val.length > 7) formatted += ' ' + val.substring(7, 9);
+        setFormData({ ...formData, phone: formatted });
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.name.trim() || !formData.phone.trim()) {
-            toast.error('Ism va telefon raqamini kiriting!');
+        const rawPhone = formData.phone.replace(/\D/g, '');
+
+        if (!formData.name.trim()) {
+            toast.error('Ismingizni kiriting!');
             return;
         }
+
+        if (rawPhone.length !== 9) {
+            toast.error("Telefon raqamni to'liq kiriting: 90 123 45 67");
+            return;
+        }
+
         setLoading(true);
 
-        const emoji = type === 'enroll' ? '📝' : '💡';
-        const label = type === 'enroll' ? 'Kursga yozilish' : 'Bepul konsultatsiya';
+        // Determine source explicitly to divide into respective Google Sheet tabs
+        const sourceRef = extraInfo ? 'Karyera_Testi' : (type === 'enroll' ? 'Kursga_Yozilish' : 'Konsultatsiya');
+        let crmData: any = null;
 
-        let text = `${emoji} <b>${label} — DATA Ta'lim Stansiyasi</b>\n\n`;
-        text += `👤 <b>Ism:</b> ${formData.name}\n`;
-        text += `📞 <b>Telefon:</b> ${formData.phone}\n`;
-        text += `📚 <b>Kurs:</b> ${courseName}\n`;
-        if (extraInfo) {
-            text += `\n📊 <b>Qo'shimcha:</b>\n${extraInfo}\n`;
-        }
-        text += `\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
+        const fullPhone = '+998' + rawPhone;
 
-        const result = await sendToTelegram(text);
-
-        // Save lead to CRM Database
-        const sourceRef = sessionStorage.getItem('marketing_ref') || undefined;
         try {
-            await submitLeadToAPI({
+            // Include extraInfo in the CRM record so Admins can see Test Results
+            const crmCourseData = extraInfo
+                ? `${courseName || 'consult'} | ${extraInfo}`
+                : (courseName || 'consult');
+
+            crmData = await submitLeadToAPI({
                 name: formData.name,
-                phone: formData.phone,
-                courseId: courseName || 'consult',
+                phone: fullPhone,
+                courseId: crmCourseData,
                 sourceRef,
             });
         } catch (e) {
             console.error("Failed to save lead to CRM", e);
         }
 
+        const emoji = type === 'enroll' ? '📝' : '💡';
+        const label = type === 'enroll' ? 'Kursga yozilish' : 'Bepul konsultatsiya';
+        const displayRef = crmData?.resolvedSourceRef || sourceRef || 'Organik';
+
+        let text = `${emoji} <b>${label} — DATA Ta'lim Stansiyasi</b>\n\n`;
+        text += `👤 <b>Ism:</b> ${formData.name}\n`;
+        text += `📞 <b>Telefon:</b> ${fullPhone}\n`;
+        text += `📚 <b>Kurs:</b> ${courseName}\n`;
+        if (extraInfo) {
+            text += `\n📊 <b>Qo'shimcha:</b>\n${extraInfo}\n`;
+        }
+        text += `🔗 <b>Manba (ref):</b> ${displayRef}\n`;
+        text += `\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
+
+        const result = await sendToTelegram(text);
+
         setLoading(false);
 
         if (result.success) {
+            trackEvent('Lead', { source: type, course: courseName });
             toast.success('Arizangiz qabul qilindi! Tez orada siz bilan bog\'lanamiz.');
             setSent(true);
             setTimeout(() => {
@@ -128,15 +160,18 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-2">Telefon raqamingiz</label>
-                                <div className="relative">
-                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                <div className="relative flex items-center w-full rounded-xl border border-slate-200 focus-within:border-[#0061ff] focus-within:ring-2 focus-within:ring-blue-100 transition-all overflow-hidden bg-white">
+                                    <div className="pl-4 pr-3 py-3 border-r border-slate-200 text-slate-600 font-medium flex items-center gap-2 bg-slate-50">
+                                        <Phone size={16} className="text-slate-400" />
+                                        <span>+998</span>
+                                    </div>
                                     <input
                                         type="tel"
                                         name="phone"
                                         value={formData.phone}
-                                        onChange={handleChange}
-                                        className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-[#0061ff] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                                        placeholder="+998 90 123 45 67"
+                                        onChange={handlePhoneChange}
+                                        className="w-full pl-3 pr-4 py-3 outline-none bg-transparent"
+                                        placeholder="90 123 45 67"
                                         required
                                     />
                                 </div>

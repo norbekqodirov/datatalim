@@ -157,7 +157,7 @@ export const Hero: React.FC = () => {
               <div className="flex -space-x-4">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="w-14 h-14 rounded-full border-2 border-slate-800 bg-slate-200 overflow-hidden shadow-sm relative z-0">
-                    <img src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="Student" className="w-full h-full object-cover" />
+                    <img src={`/images/students/student${i}.webp`} loading="lazy" alt="Student" className="w-full h-full object-cover" decoding="async" />
                   </div>
                 ))}
               </div>

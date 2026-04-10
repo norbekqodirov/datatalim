@@ -3,12 +3,14 @@ import { useTheme } from '../../store/ThemeContext';
 import { Plus, Trash2, Copy, BarChart3, Target } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
+import { getAuthHeaders } from '../../utils/api';
 
 interface MarketingLink {
     id: number;
     name: string;
     ref_code: string;
     target_url: string;
+    category: 'IT' | 'Language';
     clicks: number;
     leads_count: number;
     created_at: string;
@@ -18,11 +20,11 @@ export default function ManageMarketing() {
     const { isDark } = useTheme();
     const [links, setLinks] = useState<MarketingLink[]>([]);
     const [isAdding, setIsAdding] = useState(false);
-    const [newLinkData, setNewLinkData] = useState({ name: '', targetUrl: '/apply' });
+    const [newLinkData, setNewLinkData] = useState({ name: '', targetUrl: '/apply', category: 'IT' });
 
     const fetchLinks = async () => {
         try {
-            const res = await fetch('/api/marketing-links');
+            const res = await fetch('/api/marketing-links', { headers: getAuthHeaders() });
             if (!res.ok) throw new Error('API Error');
             const data = await res.json();
             setLinks(Array.isArray(data) ? data : []);
@@ -44,13 +46,13 @@ export default function ManageMarketing() {
         try {
             const res = await fetch('/api/marketing-links', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify(newLinkData),
             });
             if (res.ok) {
                 toast.success("Link muvaffaqiyatli yaratildi");
                 setIsAdding(false);
-                setNewLinkData({ name: '', targetUrl: '/apply' });
+                setNewLinkData({ name: '', targetUrl: '/apply', category: 'IT' });
                 fetchLinks();
             }
         } catch (e) {
@@ -61,7 +63,10 @@ export default function ManageMarketing() {
     const handleDelete = async (id: number) => {
         if (!confirm("Haqiqatan ham ushbu linkni o'chirasizmi?")) return;
         try {
-            const res = await fetch(`/api/marketing-links/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/marketing-links/${id}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
             if (res.ok) {
                 toast.success("Link o'chirildi");
                 fetchLinks();
@@ -123,8 +128,19 @@ export default function ManageMarketing() {
                                         value={newLinkData.targetUrl}
                                         onChange={e => setNewLinkData({ ...newLinkData, targetUrl: e.target.value })}
                                         className={`w-full px-4 py-3 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'} outline-none`}
-                                        placeholder="/apply"
+                                        placeholder="/apply yoki /languages"
                                     />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold mb-2">Yo'nalish (Kategoriya)</label>
+                                    <select
+                                        value={newLinkData.category}
+                                        onChange={e => setNewLinkData({ ...newLinkData, category: e.target.value })}
+                                        className={`w-full px-4 py-3 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'} outline-none`}
+                                    >
+                                        <option value="IT">IT Kurslari</option>
+                                        <option value="Language">Til kurslari (Languages)</option>
+                                    </select>
                                 </div>
                                 <div className="flex justify-end gap-3 mt-6">
                                     <button type="button" onClick={() => setIsAdding(false)} className="px-5 py-2 rounded-xl font-bold bg-slate-200 text-slate-700">Bekor qilish</button>
@@ -143,7 +159,12 @@ export default function ManageMarketing() {
                         return (
                             <div key={link.id} className={`p-6 rounded-3xl border shadow-xl relative overflow-hidden flex flex-col ${isDark ? 'bg-slate-800/50 border-white/5' : 'bg-white border-slate-100'}`}>
                                 <div className="flex justify-between items-start mb-4">
-                                    <h3 className="text-xl font-bold">{link.name}</h3>
+                                    <div className="flex flex-col gap-1">
+                                        <h3 className="text-xl font-bold">{link.name}</h3>
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded border inline-block w-fit ${link.category === 'Language' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>
+                                            {link.category === 'Language' ? 'Til Kurslari' : 'IT Kurslari'}
+                                        </span>
+                                    </div>
                                     <button onClick={() => handleDelete(link.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
                                         <Trash2 size={20} />
                                     </button>

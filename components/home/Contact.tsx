@@ -8,6 +8,7 @@ import { submitLeadToAPI } from '../../utils/api';
 import { useTheme } from '../../store/ThemeContext';
 import { useLanguage } from '../../i18n';
 import { PatternBg, Star1, Star2 } from '../BrandElements';
+import { trackEvent } from '../../utils/pixel';
 
 export const Contact: React.FC = () => {
   const { siteContent } = useStore();
@@ -21,24 +22,42 @@ export const Contact: React.FC = () => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.length > 9) val = val.slice(0, 9);
+    let formatted = '';
+    if (val.length > 0) formatted += val.substring(0, 2);
+    if (val.length > 2) formatted += ' ' + val.substring(2, 5);
+    if (val.length > 5) formatted += ' ' + val.substring(5, 7);
+    if (val.length > 7) formatted += ' ' + val.substring(7, 9);
+    setFormData(prev => ({ ...prev, phone: formatted }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.phone.trim()) {
-      toast.error('Ism va telefon raqamini kiriting!');
+    const rawPhone = formData.phone.replace(/\D/g, '');
+
+    if (!formData.name.trim()) {
+      toast.error('Ismingizni kiriting!');
+      return;
+    }
+
+    if (rawPhone.length !== 9) {
+      toast.error("Telefon raqamni to'liq kiriting: 90 123 45 67");
       return;
     }
     setLoading(true);
 
-    const text = `📩 <b>Yangi xabar — DATA Ta'lim Stansiyasi</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${formData.phone}\n💬 <b>Xabar:</b> ${formData.message || '—'}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
+    // Determine source reference specifically for Google Sheets partitioning
+    const sourceRef = 'Aloqa';
+    let crmData: any = null;
 
-    const result = await sendToTelegram(text);
+    const fullPhone = '+998' + rawPhone;
 
-    // Save lead to CRM Database
-    const sourceRef = sessionStorage.getItem('marketing_ref') || undefined;
     try {
-      await submitLeadToAPI({
+      crmData = await submitLeadToAPI({
         name: formData.name,
-        phone: formData.phone,
+        phone: fullPhone,
         courseId: 'Contact Form',
         sourceRef,
       });
@@ -46,9 +65,16 @@ export const Contact: React.FC = () => {
       console.error("Failed to save lead to CRM", e);
     }
 
+    const displayRef = crmData?.resolvedSourceRef || sourceRef || 'Organik';
+
+    const text = `📩 <b>Yangi xabar — DATA Ta'lim Stansiyasi</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${fullPhone}\n💬 <b>Xabar:</b> ${formData.message || '—'}\n🔗 <b>Manba (ref):</b> ${displayRef}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
+
+    const result = await sendToTelegram(text);
+
     setLoading(false);
 
     if (result.success) {
+      trackEvent('Lead', { source: 'Contact' });
       toast.success('Xabaringiz muvaffaqiyatli yuborildi! Tez orada siz bilan bog\'lanamiz.');
       setSent(true);
       setFormData({ name: '', phone: '', message: '' });
@@ -127,15 +153,20 @@ export const Contact: React.FC = () => {
                   </div>
                   <div>
                     <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Telefon raqamingiz</label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className={`w-full px-5 py-4 rounded-2xl border-2 outline-none transition-all font-medium ${isDark ? 'bg-slate-800 border-slate-700 focus:border-[#3f5efb] text-white placeholder-slate-500 focus:bg-slate-900' : 'bg-slate-50 border-slate-200 focus:border-[#3f5efb] focus:ring-4 focus:ring-[#3f5efb]/10 text-slate-900 focus:bg-white'}`}
-                      placeholder="+998 90 123 45 67"
-                      required
-                    />
+                    <div className={`flex w-full overflow-hidden rounded-2xl border-2 transition-all font-medium focus-within:ring-4 focus-within:ring-[#3f5efb]/10 ${isDark ? 'bg-slate-800 border-slate-700 focus-within:border-[#3f5efb] text-white focus-within:bg-slate-900' : 'bg-slate-50 border-slate-200 focus-within:border-[#3f5efb] text-slate-900 focus-within:bg-white'}`}>
+                      <div className={`px-5 py-4 flex items-center justify-center border-r ${isDark ? 'border-slate-700 text-slate-400 bg-slate-800/50' : 'border-slate-200 text-slate-500 bg-slate-100/50'}`}>
+                        +998
+                      </div>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handlePhoneChange}
+                        className={`w-full px-5 py-4 outline-none bg-transparent ${isDark ? 'placeholder-slate-500' : 'placeholder-slate-400'}`}
+                        placeholder="90 123 45 67"
+                        required
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Xabaringiz</label>

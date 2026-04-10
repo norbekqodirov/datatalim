@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../store/ThemeContext';
-import { Users, Phone, Calendar, Target } from 'lucide-react';
+import { Users, Phone, Calendar, Target, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getAuthHeaders } from '../../utils/api';
 
 interface Lead {
     id: number;
@@ -18,7 +19,7 @@ export default function ManageLeads() {
 
     const fetchLeads = async () => {
         try {
-            const res = await fetch('/api/leads');
+            const res = await fetch('/api/leads', { headers: getAuthHeaders() });
             if (!res.ok) throw new Error('API Error');
             const data = await res.json();
             setLeads(Array.isArray(data) ? data : []);
@@ -26,6 +27,24 @@ export default function ManageLeads() {
             console.error(e);
             toast.error('Arizalarni yuklashda xatolik');
             setLeads([]);
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (!window.confirm('Haqiqatan ham bu arizani o\'chirmoqchimisiz?')) return;
+
+        try {
+            const res = await fetch(`/api/leads/${id}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+            if (!res.ok) throw new Error('API Error');
+
+            setLeads(leads.filter(lead => lead.id !== id));
+            toast.success('Ariza muvaffaqiyatli o\'chirildi');
+        } catch (e) {
+            console.error(e);
+            toast.error('Arizani o\'chirishda xatolik yuz berdi');
         }
     };
 
@@ -61,6 +80,7 @@ export default function ManageLeads() {
                                     <th className="px-6 py-4">Kurs</th>
                                     <th className="px-6 py-4">Manba (Ref)</th>
                                     <th className="px-6 py-4">Sana</th>
+                                    <th className="px-6 py-4 text-right">Amallar</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -78,7 +98,21 @@ export default function ManageLeads() {
                                             </a>
                                         </td>
                                         <td className="px-6 py-4 font-medium text-slate-700 dark:text-slate-300">
-                                            {lead.course_id || 'Umumiy'}
+                                            {(() => {
+                                                const courseStr = lead.course_id || 'Umumiy';
+                                                const parts = courseStr.split(' | ');
+                                                if (parts.length > 1) {
+                                                    return (
+                                                        <div className="flex flex-col gap-1.5">
+                                                            <span>{parts[0]}</span>
+                                                            <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-md border border-blue-100 dark:border-blue-800/50 block whitespace-pre-wrap">
+                                                                {parts[1]}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return courseStr;
+                                            })()}
                                         </td>
                                         <td className="px-6 py-4">
                                             {lead.source_ref ? (
@@ -92,11 +126,20 @@ export default function ManageLeads() {
                                         <td className="px-6 py-4 text-sm text-slate-500 flex items-center gap-2">
                                             <Calendar size={14} /> {new Date(lead.created_at).toLocaleString('uz-UZ')}
                                         </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button
+                                                onClick={() => handleDelete(lead.id)}
+                                                className={`p-2 rounded-xl transition-colors ${isDark ? 'text-red-400 hover:bg-red-500/10' : 'text-red-500 hover:bg-red-50'}`}
+                                                title="Arizani o'chirish"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                                 {leads.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium">
+                                        <td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">
                                             Hozircha arizalar yo'q.
                                         </td>
                                     </tr>

@@ -95,7 +95,9 @@ export default function CourseDetail() {
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent to-white/20 rounded-[3rem] pointer-events-none z-20"></div>
               <div className={`rounded-[3rem] overflow-hidden h-[600px] relative border-[8px] shadow-2xl ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[color:var(--brand-shadow)]'}`} style={{ '--brand-shadow': `${brandColors.primary}30` } as React.CSSProperties}>
                 <div className="absolute inset-0 z-10 opacity-30 mix-blend-overlay pointer-events-none" style={{ background: `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})` }}></div>
-                <img src={course.coverImage || `https://picsum.photos/seed/${course.id}/800/1000`} alt={tField(course.title)} className="w-full h-full object-cover" />
+                {course.coverImage && (
+                  <img src={course.coverImage} alt={tField(course.title)} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                )}
                 <div className="absolute inset-0 z-20" style={{ background: `linear-gradient(to top, ${isDark ? '#0f172a' : '#000'} 0%, transparent 50%)` }}></div>
                 <div className="absolute inset-0 z-30 flex items-end p-12">
                   <div className="text-white w-full">
@@ -183,7 +185,7 @@ export default function CourseDetail() {
                   {course.mentors.map((mentor, idx) => (
                     <div key={idx} className={`p-5 rounded-2xl border flex items-center gap-5 transition-transform hover:-translate-y-1 ${isDark ? 'bg-slate-900/80 border-white/5 shadow-lg shadow-black' : 'bg-white border-slate-100 shadow-sm'}`}>
                       <div className={`w-16 h-16 rounded-2xl overflow-hidden shrink-0 border-2`} style={{ borderColor: `${brandColors.primary}30` }}>
-                        <img src={mentor.image} alt={tField(mentor.name)} className="w-full h-full object-cover" />
+                        <img src={mentor.image} alt={tField(mentor.name)} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       </div>
                       <div>
                         <h4 className={`font-black text-lg ${isDark ? 'text-white' : 'text-slate-900'}`}>{tField(mentor.name)}</h4>

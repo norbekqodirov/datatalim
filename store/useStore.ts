@@ -18,7 +18,7 @@ export const initialTeam: TeamMember[] = [
     id: '1',
     name: { uz: "Shovvozbek Sattarov", ru: "Shovvozbek Sattarov", en: "Shovvozbek Sattarov" },
     role: { uz: "Ijrochi Direktor", ru: "Ijrochi Direktor", en: "Ijrochi Direktor" },
-    image: "https://picsum.photos/seed/shovvoz/400/500",
+    image: "",
     bio: { uz: "DATA Ta'lim Stansiyasining kundalik operatsiyalari va strategik rivojlanishiga mas'ul. Ta'lim menejmenti sohasida 5 yildan ortiq tajribaga ega.", ru: "DATA Ta'lim Stansiyasining kundalik operatsiyalari va strategik rivojlanishiga mas'ul. Ta'lim menejmenti sohasida 5 yildan ortiq tajribaga ega.", en: "DATA Ta'lim Stansiyasining kundalik operatsiyalari va strategik rivojlanishiga mas'ul. Ta'lim menejmenti sohasida 5 yildan ortiq tajribaga ega." },
     skills: [{ uz: "Menejment", ru: "Menejment", en: "Menejment" }, { uz: "Strategiya", ru: "Strategiya", en: "Strategiya" }, { uz: "Liderlik", ru: "Liderlik", en: "Liderlik" }]
   },
@@ -26,7 +26,7 @@ export const initialTeam: TeamMember[] = [
     id: '2',
     name: { uz: "Shahruza Sultonova", ru: "Shahruza Sultonova", en: "Shahruza Sultonova" },
     role: { uz: "DATA Languages Rahbari", ru: "DATA Languages Rahbari", en: "DATA Languages Rahbari" },
-    image: "https://picsum.photos/seed/shahruza/400/500",
+    image: "",
     bio: { uz: "Xorijiy tillar bo'limi rahbari. Zamonaviy til o'rgatish metodikalari va xalqaro sertifikatlar bo'yicha mutaxassis.", ru: "Xorijiy tillar bo'limi rahbari. Zamonaviy til o'rgatish metodikalari va xalqaro sertifikatlar bo'yicha mutaxassis.", en: "Xorijiy tillar bo'limi rahbari. Zamonaviy til o'rgatish metodikalari va xalqaro sertifikatlar bo'yicha mutaxassis." },
     skills: [{ uz: "IELTS", ru: "IELTS", en: "IELTS" }, { uz: "Metodika", ru: "Metodika", en: "Metodika" }, { uz: "Jamoa boshqaruvi", ru: "Jamoa boshqaruvi", en: "Jamoa boshqaruvi" }]
   },
@@ -34,7 +34,7 @@ export const initialTeam: TeamMember[] = [
     id: '3',
     name: { uz: "Boymirza Qalandarov", ru: "Boymirza Qalandarov", en: "Boymirza Qalandarov" },
     role: { uz: "Moliya Bo'limi Rahbari", ru: "Moliya Bo'limi Rahbari", en: "Moliya Bo'limi Rahbari" },
-    image: "https://picsum.photos/seed/boymirza/400/500",
+    image: "",
     bio: { uz: "Kompaniyaning moliyaviy barqarorligi va investitsiya loyihalari uchun javobgar. Moliyaviy tahlil va rejalashtirish bo'yicha ekspert.", ru: "Kompaniyaning moliyaviy barqarorligi va investitsiya loyihalari uchun javobgar. Moliyaviy tahlil va rejalashtirish bo'yicha ekspert.", en: "Kompaniyaning moliyaviy barqarorligi va investitsiya loyihalari uchun javobgar. Moliyaviy tahlil va rejalashtirish bo'yicha ekspert." },
     skills: [{ uz: "Moliya", ru: "Moliya", en: "Moliya" }, { uz: "Tahlil", ru: "Tahlil", en: "Tahlil" }, { uz: "Buxgalteriya", ru: "Buxgalteriya", en: "Buxgalteriya" }]
   },
@@ -42,7 +42,7 @@ export const initialTeam: TeamMember[] = [
     id: '4',
     name: { uz: "Shonazar Xudoyberganov", ru: "Shonazar Xudoyberganov", en: "Shonazar Xudoyberganov" },
     role: { uz: "Ta'lim Bo'limi Rahbari", ru: "Ta'lim Bo'limi Rahbari", en: "Ta'lim Bo'limi Rahbari" },
-    image: "https://picsum.photos/seed/shonazar/400/500",
+    image: "",
     bio: { uz: "O'quv dasturlarini ishlab chiqish va sifat nazorati bo'yicha rahbar. IT ta'limida innovatsion yondashuvlar tarafdori.", ru: "O'quv dasturlarini ishlab chiqish va sifat nazorati bo'yicha rahbar. IT ta'limida innovatsion yondashuvlar tarafdori.", en: "O'quv dasturlarini ishlab chiqish va sifat nazorati bo'yicha rahbar. IT ta'limida innovatsion yondashuvlar tarafdori." },
     skills: [{ uz: "Ta'lim sifati", ru: "Ta'lim sifati", en: "Ta'lim sifati" }, { uz: "O'quv dasturlari", ru: "O'quv dasturlari", en: "O'quv dasturlari" }, { uz: "IT", ru: "IT", en: "IT" }]
   },
@@ -50,7 +50,7 @@ export const initialTeam: TeamMember[] = [
     id: '5',
     name: { uz: "Azizbek Bekturdiyev", ru: "Azizbek Bekturdiyev", en: "Azizbek Bekturdiyev" },
     role: { uz: "Katta Dasturlash Ustoz", ru: "Katta Dasturlash Ustoz", en: "Katta Dasturlash Ustoz" },
-    image: "https://picsum.photos/seed/azizbek/400/500",
+    image: "",
     bio: { uz: "Full-stack dasturchi va tajribali ustoz. O'nlarcha muvaffaqiyatli loyihalar muallifi va yuzlab shogirdlar ustozi.", ru: "Full-stack dasturchi va tajribali ustoz. O'nlarcha muvaffaqiyatli loyihalar muallifi va yuzlab shogirdlar ustozi.", en: "Full-stack dasturchi va tajribali ustoz. O'nlarcha muvaffaqiyatli loyihalar muallifi va yuzlab shogirdlar ustozi." },
     skills: [{ uz: "React", ru: "React", en: "React" }, { uz: "Node.js", ru: "Node.js", en: "Node.js" }, { uz: "Python", ru: "Python", en: "Python" }]
   },
@@ -58,7 +58,7 @@ export const initialTeam: TeamMember[] = [
     id: '6',
     name: { uz: "Malika Karimova", ru: "Malika Karimova", en: "Malika Karimova" },
     role: { uz: "Katta Dizayn Ustoz", ru: "Katta Dizayn Ustoz", en: "Katta Dizayn Ustoz" },
-    image: "https://picsum.photos/seed/malika/400/500",
+    image: "",
     bio: { uz: "UI/UX va Grafik dizayn bo'yicha yetakchi mutaxassis. Kreativ fikrlash va zamonaviy dizayn trendlari bo'yicha ekspert.", ru: "UI/UX va Grafik dizayn bo'yicha yetakchi mutaxassis. Kreativ fikrlash va zamonaviy dizayn trendlari bo'yicha ekspert.", en: "UI/UX va Grafik dizayn bo'yicha yetakchi mutaxassis. Kreativ fikrlash va zamonaviy dizayn trendlari bo'yicha ekspert." },
     skills: [{ uz: "Figma", ru: "Figma", en: "Figma" }, { uz: "Adobe CC", ru: "Adobe CC", en: "Adobe CC" }, { uz: "UI/UX", ru: "UI/UX", en: "UI/UX" }]
   }
@@ -95,19 +95,19 @@ export const initialSiteContent: SiteContent = {
   aboutTitle: { uz: "Biz shunchaki o'quv markazi emasmiz", ru: "Biz shunchaki o'quv markazi emasmiz", en: "Biz shunchaki o'quv markazi emasmiz" },
   aboutDescription: { uz: "\"DATA UNION\" — mustaqil, o‘z rivojlanish strategiyasi, qadriyatlari va maqsadlariga ega kompaniya. Biz 2019-yilda tashkil topganmiz va shu kungacha minglab yoshlarga innovatsion texnologiyalar bo‘yicha ta’lim berib kelmoqdamiz.", ru: "\"DATA UNION\" — mustaqil, o‘z rivojlanish strategiyasi, qadriyatlari va maqsadlariga ega kompaniya. Biz 2019-yilda tashkil topganmiz va shu kungacha minglab yoshlarga innovatsion texnologiyalar bo‘yicha ta’lim berib kelmoqdamiz.", en: "\"DATA UNION\" — mustaqil, o‘z rivojlanish strategiyasi, qadriyatlari va maqsadlariga ega kompaniya. Biz 2019-yilda tashkil topganmiz va shu kungacha minglab yoshlarga innovatsion texnologiyalar bo‘yicha ta’lim berib kelmoqdamiz." },
   aboutQuote: { uz: "\"Bizning maqsadimiz — yuqori malakali, ijodiy fikrlaydigan va jamiyatimizga ijobiy ta’sir qiladigan avlodni yetishtirishdir.\"", ru: "\"Bizning maqsadimiz — yuqori malakali, ijodiy fikrlaydigan va jamiyatimizga ijobiy ta’sir qiladigan avlodni yetishtirishdir.\"", en: "\"Bizning maqsadimiz — yuqori malakali, ijodiy fikrlaydigan va jamiyatimizga ijobiy ta’sir qiladigan avlodni yetishtirishdir.\"" },
-  aboutImage: "https://picsum.photos/seed/shahzod/600/700",
+  aboutImage: "",
   contactAddress: { uz: "Xorazm viloyati, Urganch sh., V.Fayozov ko'chasi, 9-uy", ru: "Xorazm viloyati, Urganch sh., V.Fayozov ko'chasi, 9-uy", en: "Xorazm viloyati, Urganch sh., V.Fayozov ko'chasi, 9-uy" },
   contactLandmark: { uz: "Mo'ljal: Darital savdo markazi yonida", ru: "Mo'ljal: Darital savdo markazi yonida", en: "Mo'ljal: Darital savdo markazi yonida" },
   contactPhone: "+998 62 227-72-22",
   contactEmail: "dataunionuz@gmail.com",
   contactSchedule: { uz: "Har kuni 09:00 dan 18:00 gacha", ru: "Har kuni 09:00 dan 18:00 gacha", en: "Har kuni 09:00 dan 18:00 gacha" },
   galleryImages: [
-    "https://picsum.photos/seed/gallery1/800/600",
-    "https://picsum.photos/seed/gallery2/800/600",
-    "https://picsum.photos/seed/gallery3/800/600",
-    "https://picsum.photos/seed/gallery4/800/600",
-    "https://picsum.photos/seed/gallery5/800/600",
-    "https://picsum.photos/seed/gallery6/800/600"
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
   ]
 };
 
@@ -148,20 +148,20 @@ interface AppState {
 
   // Actions
   initializeStore: () => Promise<void>;
-  setCourses: (courses: Course[]) => void;
-  addCourse: (course: Course) => void;
-  updateCourse: (id: string, course: Partial<Course>) => void;
-  deleteCourse: (id: string) => void;
+  setCourses: (courses: Course[]) => Promise<void>;
+  addCourse: (course: Course) => Promise<void>;
+  updateCourse: (id: string, course: Partial<Course>) => Promise<void>;
+  deleteCourse: (id: string) => Promise<void>;
 
-  setTeam: (team: TeamMember[]) => void;
-  addTeamMember: (member: TeamMember) => void;
-  updateTeamMember: (id: string, member: Partial<TeamMember>) => void;
-  deleteTeamMember: (id: string) => void;
+  setTeam: (team: TeamMember[]) => Promise<void>;
+  addTeamMember: (member: TeamMember) => Promise<void>;
+  updateTeamMember: (id: string, member: Partial<TeamMember>) => Promise<void>;
+  deleteTeamMember: (id: string) => Promise<void>;
 
-  updateSiteContent: (content: Partial<SiteContent>) => void;
-  toggleSectionVisibility: (section: keyof SectionVisibility) => void;
+  updateSiteContent: (content: Partial<SiteContent>) => Promise<void>;
+  toggleSectionVisibility: (section: keyof SectionVisibility) => Promise<void>;
 
-  resetToDefaults: () => void;
+  resetToDefaults: () => Promise<void>;
 }
 
 export const useStore = create<AppState>()((set, get) => ({
@@ -172,6 +172,12 @@ export const useStore = create<AppState>()((set, get) => ({
   isLoading: true,
 
   initializeStore: async () => {
+    // Agar ma'lumotlar allaqachon yuklangan bo'lsa, qayta yuklamaslik (kesh)
+    const state = get();
+    if (!state.isLoading && state.courses.length > 0) {
+      return; // allaqachon yuklangan
+    }
+
     set({ isLoading: true });
     try {
       const [coursesRes, teamRes, siteRes, visRes] = await Promise.all([
@@ -193,68 +199,146 @@ export const useStore = create<AppState>()((set, get) => ({
     }
   },
 
-  setCourses: (courses) => {
+  setCourses: async (courses) => {
+    const prev = get().courses;
     set({ courses });
-    saveToAPI('courses', courses);
+    try {
+      await saveToAPI('courses', courses);
+    } catch (err) {
+      set({ courses: prev });
+      throw err;
+    }
   },
-  addCourse: (course) => {
-    const newCourses = [...get().courses, course];
+  addCourse: async (course) => {
+    const prev = get().courses;
+    const newCourses = [...prev, course];
     set({ courses: newCourses });
-    saveToAPI('courses', newCourses);
+    try {
+      await saveToAPI('courses', newCourses);
+    } catch (err) {
+      set({ courses: prev });
+      throw err;
+    }
   },
-  updateCourse: (id, updatedCourse) => {
-    const newCourses = get().courses.map(c => c.id === id ? { ...c, ...updatedCourse } : c);
+  updateCourse: async (id, updatedCourse) => {
+    const prev = get().courses;
+    const newCourses = prev.map(c => c.id === id ? { ...c, ...updatedCourse } : c);
     set({ courses: newCourses });
-    saveToAPI('courses', newCourses);
+    try {
+      await saveToAPI('courses', newCourses);
+    } catch (err) {
+      set({ courses: prev });
+      throw err;
+    }
   },
-  deleteCourse: (id) => {
-    const newCourses = get().courses.filter(c => c.id !== id);
+  deleteCourse: async (id) => {
+    const prev = get().courses;
+    const newCourses = prev.filter(c => c.id !== id);
     set({ courses: newCourses });
-    saveToAPI('courses', newCourses);
+    try {
+      await saveToAPI('courses', newCourses);
+    } catch (err) {
+      set({ courses: prev });
+      throw err;
+    }
   },
 
-  setTeam: (team) => {
+  setTeam: async (team) => {
+    const prev = get().team;
     set({ team });
-    saveToAPI('team', team);
+    try {
+      await saveToAPI('team', team);
+    } catch (err) {
+      set({ team: prev });
+      throw err;
+    }
   },
-  addTeamMember: (member) => {
-    const newTeam = [...get().team, member];
+  addTeamMember: async (member) => {
+    const prev = get().team;
+    const newTeam = [...prev, member];
     set({ team: newTeam });
-    saveToAPI('team', newTeam);
+    try {
+      await saveToAPI('team', newTeam);
+    } catch (err) {
+      set({ team: prev });
+      throw err;
+    }
   },
-  updateTeamMember: (id, updatedMember) => {
-    const newTeam = get().team.map(m => m.id === id ? { ...m, ...updatedMember } : m);
+  updateTeamMember: async (id, updatedMember) => {
+    const prev = get().team;
+    const newTeam = prev.map(m => m.id === id ? { ...m, ...updatedMember } : m);
     set({ team: newTeam });
-    saveToAPI('team', newTeam);
+    try {
+      await saveToAPI('team', newTeam);
+    } catch (err) {
+      set({ team: prev });
+      throw err;
+    }
   },
-  deleteTeamMember: (id) => {
-    const newTeam = get().team.filter(m => m.id !== id);
+  deleteTeamMember: async (id) => {
+    const prev = get().team;
+    const newTeam = prev.filter(m => m.id !== id);
     set({ team: newTeam });
-    saveToAPI('team', newTeam);
+    try {
+      await saveToAPI('team', newTeam);
+    } catch (err) {
+      set({ team: prev });
+      throw err;
+    }
   },
 
-  updateSiteContent: (content) => {
-    const newContent = { ...get().siteContent, ...content };
+  updateSiteContent: async (content) => {
+    const prev = get().siteContent;
+    const newContent = { ...prev, ...content };
     set({ siteContent: newContent });
-    saveToAPI('site_content', newContent);
+    try {
+      await saveToAPI('site_content', newContent);
+    } catch (err) {
+      set({ siteContent: prev });
+      throw err;
+    }
   },
 
-  toggleSectionVisibility: (section) => {
-    const newVisibility = { ...get().visibility, [section]: !get().visibility[section] };
+  toggleSectionVisibility: async (section) => {
+    const prev = get().visibility;
+    const newVisibility = { ...prev, [section]: !prev[section] };
     set({ visibility: newVisibility });
-    saveToAPI('visibility', newVisibility);
+    try {
+      await saveToAPI('visibility', newVisibility);
+    } catch (err) {
+      set({ visibility: prev });
+      throw err;
+    }
   },
 
-  resetToDefaults: () => {
+  resetToDefaults: async () => {
+    const cPrev = get().courses;
+    const tPrev = get().team;
+    const sPrev = get().siteContent;
+    const vPrev = get().visibility;
+
     set({
       courses: initialCourses,
       team: initialTeam,
       siteContent: initialSiteContent,
       visibility: initialVisibility
     });
-    saveToAPI('courses', initialCourses);
-    saveToAPI('team', initialTeam);
-    saveToAPI('site_content', initialSiteContent);
-    saveToAPI('visibility', initialVisibility);
+
+    try {
+      await Promise.all([
+        saveToAPI('courses', initialCourses),
+        saveToAPI('team', initialTeam),
+        saveToAPI('site_content', initialSiteContent),
+        saveToAPI('visibility', initialVisibility)
+      ]);
+    } catch (err) {
+      set({
+        courses: cPrev,
+        team: tPrev,
+        siteContent: sPrev,
+        visibility: vPrev
+      });
+      throw err;
+    }
   }
 }));

@@ -5,7 +5,7 @@ import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
 import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
-import { compressImage } from '../../utils/imageCompressor';
+import { compressImageToWebP } from '../../utils/imageCompressor';
 import { useLanguage } from '../../i18n';
 
 export default function ManageTeam() {
@@ -15,6 +15,8 @@ export default function ManageTeam() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [webpSavings, setWebpSavings] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<TeamMember>>({});
   const [activeLang, setActiveLang] = useState<Lang>('uz');
 
@@ -45,28 +47,38 @@ export default function ManageTeam() {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name?.uz || !formData.role?.uz) {
       toast.error('O\'zbek tilida Ism va Lavozim kiritilishi shart!');
       return;
     }
 
-    if (isAdding) {
-      addTeamMember(formData as TeamMember);
-      toast.success('Yangi xodim qo\'shildi!');
-    } else if (editingId) {
-      updateTeamMember(editingId, formData);
-      toast.success('Xodim ma\'lumotlari yangilandi!');
+    setIsSaving(true);
+    try {
+      if (isAdding) {
+        await addTeamMember(formData as TeamMember);
+        toast.success('Yangi xodim muvaffaqiyatli qo\'shildi!');
+      } else if (editingId) {
+        await updateTeamMember(editingId, formData);
+        toast.success('Xodim ma\'lumotlari yangilandi!');
+      }
+      setEditingId(null);
+      setIsAdding(false);
+    } catch (error) {
+      toast.error('Saqlashda xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+    } finally {
+      setIsSaving(false);
     }
-
-    setEditingId(null);
-    setIsAdding(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Rostdan ham bu xodimni o\'chirmoqchimisiz?')) {
-      deleteTeamMember(id);
-      toast.success('Xodim o\'chirildi!');
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Rostdan ham bu xodimni o\'chirmoqchimisiz? Ushbu amalni ortga qaytarib bo\'lmaydi.')) {
+      try {
+        await deleteTeamMember(id);
+        toast.success('Xodim o\'chirildi!');
+      } catch (error) {
+        toast.error('O\'chirishda xatolik yuz berdi.');
+      }
     }
   };
 
@@ -74,8 +86,14 @@ export default function ManageTeam() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressedBase64 = await compressImage(file);
-        setFormData(prev => ({ ...prev, image: compressedBase64 }));
+        setWebpSavings(null);
+        const result = await compressImageToWebP(file);
+        setFormData(prev => ({ ...prev, image: result.base64 }));
+        if (result.compressedSize < result.originalSize) {
+          const pct = Math.round((1 - result.compressedSize / result.originalSize) * 100);
+          const fmt = (b: number) => b >= 1024 * 1024 ? (b / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+          setWebpSavings(`${fmt(result.originalSize)} → ${fmt(result.compressedSize)} (${pct}% kichiklashdi)`);
+        }
       } catch (error) {
         toast.error('Rasm yuklashda xatolik yuz berdi');
       }
@@ -144,9 +162,13 @@ export default function ManageTeam() {
             <div className="md:col-span-2">
               <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Xodim Rasmi (Yuklash)</label>
               <div className="flex gap-4 items-center">
-                {formData.image && <img src={formData.image} className={`w-16 h-16 rounded-xl object-cover shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />}
+                {formData.image && <img src={formData.image} loading="lazy" decoding="async" className={`w-16 h-16 rounded-xl object-cover shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />}
                 <div className="flex-1">
                   <input type="file" accept="image/*" onChange={handleImageUpload} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-emerald-500">✅ WebP avtomatik</span>
+                    {webpSavings && <span className="text-xs font-semibold text-blue-500">{webpSavings}</span>}
+                  </div>
                 </div>
               </div>
               <p className={`text-xs mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>*Rasm avtomatik tarzda siqiladi va saqlanadi.</p>
@@ -165,9 +187,9 @@ export default function ManageTeam() {
             <button onClick={() => { setIsAdding(false); setEditingId(null); }} className={`px-6 py-3 rounded-2xl font-bold transition-colors ${isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
               Bekor qilish
             </button>
-            <button onClick={handleSave} className="bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2">
-              <Save size={20} />
-              Saqlash
+            <button onClick={handleSave} disabled={isSaving} className={`bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2 ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}>
+              {isSaving ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Save size={20} />}
+              {isSaving ? 'Saqlanmoqda...' : 'Saqlash'}
             </button>
           </div>
         </motion.div>
@@ -176,7 +198,7 @@ export default function ManageTeam() {
           {team.map((member) => (
             <motion.div key={member.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className={`p-6 rounded-[2rem] border shadow-sm flex flex-col justify-between group hover:shadow-md transition-all ${isDark ? 'bg-slate-900/50 border-white/5 shadow-black/50 hover:bg-slate-800' : 'bg-white border-slate-100'}`}>
               <div className="flex items-center gap-4 mb-6">
-                <img src={member.image} alt={tField(member.name)} className={`w-16 h-16 rounded-full object-cover border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />
+                <img src={member.image} alt={tField(member.name)} loading="lazy" decoding="async" className={`w-16 h-16 rounded-full object-cover border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />
                 <div>
                   <h3 className={`text-lg font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{tField(member.name)}</h3>
                   <p className={`text-sm font-medium ${isDark ? 'text-[#60efff]' : 'text-blue-600'}`}>{tField(member.role)}</p>

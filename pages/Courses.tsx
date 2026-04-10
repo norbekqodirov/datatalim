@@ -6,6 +6,7 @@ import { useStore } from '../store/useStore';
 import { useTheme } from '../store/ThemeContext';
 import { PatternBg, FloatingStars, Star1, BRAND_COLORS } from '../components/BrandElements';
 import { useLanguage } from '../i18n';
+import { SEO } from '../components/SEO';
 
 const categories = [
   { id: 'all', label: 'Barcha kurslar', icon: null, color: '#0061ff' },
@@ -27,6 +28,7 @@ export default function Courses() {
 
   return (
     <div className="min-h-screen relative overflow-hidden pb-24" style={{ background: isDark ? '#000' : '#f8fafc' }}>
+      <SEO title="Barcha Kurslar" description="Dasturlash, Media, Moliya va Kids yo'nalishlarida zamonaviy kasblarni o'rganing. Amaliy ta'lim va ish bilan ta'minlash." />
       <PatternBg color={activeCategory === 'all' ? (isDark ? '#60efff' : '#0061ff') : categories.find(c => c.id === activeCategory)?.color} opacity={isDark ? 0.03 : 0.02} />
       <FloatingStars color1={categories.find(c => c.id === activeCategory)?.color || '#0061ff'} color2={isDark ? '#fc466b' : '#3f5efb'} className="opacity-40" />
 
@@ -91,15 +93,17 @@ export default function Courses() {
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300 pointer-events-none" style={{ background: `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})` }}></div>
 
                 {/* Course Image */}
-                <div className="h-56 w-full overflow-hidden relative">
-                  <div className="absolute inset-0 z-10 opacity-30 mix-blend-overlay" style={{ background: `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})` }}></div>
-                  <img
-                    src={course.coverImage || `https://picsum.photos/seed/${course.id}/1920/1080`}
-                    alt={course.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute top-4 left-4 z-20">
+                <div className="relative h-56 overflow-hidden">
+                  {course.coverImage && (
+                    <img
+                      src={course.coverImage}
+                      alt={tField(course.title)}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
+                  <div className="absolute top-4 right-4 flex flex-col gap-2">
                     <span className={`inline-block px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg backdrop-blur-md border ${isDark ? 'bg-slate-900/90 border-slate-700' : 'bg-white/95 border-slate-200/50'}`} style={{ color: isDark ? brandColors.primary : brandColors.secondary }}>
                       {categories.find(c => c.id === course.category)?.label}
                     </span>

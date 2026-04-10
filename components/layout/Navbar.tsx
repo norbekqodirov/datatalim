@@ -29,6 +29,7 @@ export const Navbar: React.FC = () => {
     { name: t('nav.courses'), path: '/courses' },
     { name: t('nav.about'), path: '/about' },
     { name: t('nav.team'), path: '/team' },
+    { name: t('nav.languages') || 'Til kurslari', path: '/languages' },
     { name: t('nav.contact'), path: '/#contact' },
   ];
 

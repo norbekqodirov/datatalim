@@ -6,7 +6,7 @@ import { Course } from '../../data/courses';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
 import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
-import { compressImage } from '../../utils/imageCompressor';
+import { compressImageToWebP } from '../../utils/imageCompressor';
 import { useLanguage } from '../../i18n';
 
 export default function ManageCourses() {
@@ -16,6 +16,9 @@ export default function ManageCourses() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [webpSavings, setWebpSavings] = useState<string | null>(null);
+  const [mentorWebpSavings, setMentorWebpSavings] = useState<Record<number, string>>({});
   const [formData, setFormData] = useState<Partial<Course>>({});
   const [activeLang, setActiveLang] = useState<Lang>('uz');
 
@@ -68,28 +71,38 @@ export default function ManageCourses() {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.title?.uz || !formData.category) {
       toast.error('O\'zbek tilida Sarlavha kiritilishi shart!');
       return;
     }
 
-    if (isAdding) {
-      addCourse(formData as Course);
-      toast.success('Yangi kurs qo\'shildi!');
-    } else if (editingId) {
-      updateCourse(editingId, formData);
-      toast.success('Kurs yangilandi!');
+    setIsSaving(true);
+    try {
+      if (isAdding) {
+        await addCourse(formData as Course);
+        toast.success('Yangi kurs muvaffaqiyatli qo\'shildi!');
+      } else if (editingId) {
+        await updateCourse(editingId, formData);
+        toast.success('Kurs ma\'lumotlari yangilandi!');
+      }
+      setEditingId(null);
+      setIsAdding(false);
+    } catch (error) {
+      toast.error('Saqlashda xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+    } finally {
+      setIsSaving(false);
     }
-
-    setEditingId(null);
-    setIsAdding(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Rostdan ham bu kursni o\'chirmoqchimisiz?')) {
-      deleteCourse(id);
-      toast.success('Kurs o\'chirildi!');
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Rostdan ham bu kursni o\'chirmoqchimisiz? Ushbu amalni ortga qaytarib bo\'lmaydi.')) {
+      try {
+        await deleteCourse(id);
+        toast.success('Kurs o\'chirildi!');
+      } catch (error) {
+        toast.error('O\'chirishda xatolik yuz berdi.');
+      }
     }
   };
 
@@ -97,8 +110,14 @@ export default function ManageCourses() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressedBase64 = await compressImage(file);
-        setFormData(prev => ({ ...prev, coverImage: compressedBase64 }));
+        setWebpSavings(null);
+        const result = await compressImageToWebP(file);
+        setFormData(prev => ({ ...prev, coverImage: result.base64 }));
+        if (result.compressedSize < result.originalSize) {
+          const pct = Math.round((1 - result.compressedSize / result.originalSize) * 100);
+          const fmt = (b: number) => b >= 1024 * 1024 ? (b / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+          setWebpSavings(`${fmt(result.originalSize)} → ${fmt(result.compressedSize)} (${pct}% kichiklashdi)`);
+        }
       } catch (error) {
         toast.error('Rasm yuklashda xatolik yuz berdi');
       }
@@ -136,10 +155,15 @@ export default function ManageCourses() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressedBase64 = await compressImage(file);
+        const result = await compressImageToWebP(file);
         const newMentors = [...(formData.mentors || [])];
-        newMentors[idx] = { ...newMentors[idx], image: compressedBase64 };
+        newMentors[idx] = { ...newMentors[idx], image: result.base64 };
         setFormData(prev => ({ ...prev, mentors: newMentors }));
+        if (result.compressedSize < result.originalSize) {
+          const pct = Math.round((1 - result.compressedSize / result.originalSize) * 100);
+          const fmt = (b: number) => b >= 1024 * 1024 ? (b / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+          setMentorWebpSavings(prev => ({ ...prev, [idx]: `${fmt(result.originalSize)} → ${fmt(result.compressedSize)} (${pct}% kichiklashdi)` }));
+        }
       } catch (error) {
         toast.error('Rasm yuklashda xatolik yuz berdi');
       }
@@ -232,12 +256,16 @@ export default function ManageCourses() {
             <div className="md:col-span-2">
               <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Muqova Rasmi (Yuklash)</label>
               <div className="flex gap-4 items-center">
-                {formData.coverImage && <img src={formData.coverImage} className={`w-16 h-16 rounded-xl object-cover shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />}
+                {formData.coverImage && <img src={formData.coverImage} loading="lazy" decoding="async" className={`w-16 h-16 rounded-xl object-cover shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />}
                 <div className="flex-1">
                   <input type="file" accept="image/*" onChange={handleImageUpload} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-emerald-500">✅ WebP avtomatik</span>
+                    {webpSavings && <span className="text-xs font-semibold text-blue-500">{webpSavings}</span>}
+                  </div>
                 </div>
               </div>
-              <p className={`text-xs mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>*Rasm avtomatik tarzda siqiladi va yengil formatda saqlanadi.</p>
+              <p className={`text-xs mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>*Rasm avtomatik WebP formatga o'tkaziladi va siqiladi.</p>
             </div>
             <div className="md:col-span-2">
               <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Tavsif ({activeLang.toUpperCase()})</label>
@@ -275,8 +303,14 @@ export default function ManageCourses() {
                       <div>
                         <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Rasm (Yuklash)</label>
                         <div className="flex gap-3 items-center">
-                          {mentor.image && <img src={mentor.image} className="w-10 h-10 rounded-lg object-cover" />}
-                          <input type="file" accept="image/*" onChange={(e) => handleMentorImageUpload(mIdx, e)} className={`w-full text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:bg-[#0061ff]/10 file:text-[#0061ff]`} />
+                          {mentor.image && <img src={mentor.image} loading="lazy" decoding="async" className="w-10 h-10 rounded-lg object-cover" />}
+                          <div className="flex-1">
+                            <input type="file" accept="image/*" onChange={(e) => handleMentorImageUpload(mIdx, e)} className={`w-full text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:bg-[#0061ff]/10 file:text-[#0061ff]`} />
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className="text-xs font-bold text-emerald-500">✅ WebP</span>
+                              {mentorWebpSavings[mIdx] && <span className="text-xs text-blue-500">{mentorWebpSavings[mIdx]}</span>}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -334,9 +368,9 @@ export default function ManageCourses() {
             <button onClick={() => { setIsAdding(false); setEditingId(null); }} className={`px-6 py-3 rounded-2xl font-bold transition-colors ${isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
               Bekor qilish
             </button>
-            <button onClick={handleSave} className="bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2">
-              <Save size={20} />
-              Saqlash
+            <button onClick={handleSave} disabled={isSaving} className={`bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2 ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}>
+              {isSaving ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Save size={20} />}
+              {isSaving ? 'Saqlanmoqda...' : 'Saqlash'}
             </button>
           </div>
         </motion.div>

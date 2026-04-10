@@ -94,6 +94,8 @@ export default function About() {
               src="https://picsum.photos/seed/shahzod_founder/800/1000"
               alt="Shahzod Sabirov - Asoschi"
               className="relative rounded-[3rem] shadow-2xl w-full object-cover z-10 h-[500px] lg:h-[600px] border-[8px] border-white/10"
+              loading="lazy"
+              decoding="async"
             />
             <div className={`absolute bottom-8 left-8 right-8 p-8 rounded-3xl shadow-2xl z-20 border backdrop-blur-xl ${isDark ? 'bg-slate-900/80 border-white/10' : 'bg-white/90 border-white/50'}`}>
               <h4 className={`text-2xl font-black mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Shahzod Sabirov</h4>
@@ -338,10 +340,10 @@ export default function About() {
       <div className="py-16 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <img src="https://picsum.photos/seed/data_gallery1/600/600" alt="Gallery 1" className={`w-full h-48 md:h-64 object-cover rounded-[2rem] hover:scale-105 transition-transform duration-500 cursor-pointer border-[6px] shadow-xl ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[#3f5efb]/10'}`} />
-            <img src="https://picsum.photos/seed/data_gallery2/600/600" alt="Gallery 2" className={`w-full h-48 md:h-64 object-cover rounded-[2rem] hover:scale-105 transition-transform duration-500 cursor-pointer border-[6px] shadow-xl ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[#fc466b]/10'}`} />
-            <img src="https://picsum.photos/seed/data_gallery3/600/600" alt="Gallery 3" className={`w-full h-48 md:h-64 object-cover rounded-[2rem] hover:scale-105 transition-transform duration-500 cursor-pointer border-[6px] shadow-xl ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[#00b26b]/10'}`} />
-            <img src="https://picsum.photos/seed/data_gallery4/600/600" alt="Gallery 4" className={`w-full h-48 md:h-64 object-cover rounded-[2rem] hover:scale-105 transition-transform duration-500 cursor-pointer border-[6px] shadow-xl ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[#82f4b1]/10'}`} />
+            <img src="https://picsum.photos/seed/data_gallery1/600/600" alt="Gallery 1" loading="lazy" decoding="async" className={`w-full h-48 md:h-64 object-cover rounded-[2rem] hover:scale-105 transition-transform duration-500 cursor-pointer border-[6px] shadow-xl ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[#3f5efb]/10'}`} />
+            <img src="https://picsum.photos/seed/data_gallery2/600/600" alt="Gallery 2" loading="lazy" decoding="async" className={`w-full h-48 md:h-64 object-cover rounded-[2rem] hover:scale-105 transition-transform duration-500 cursor-pointer border-[6px] shadow-xl ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[#fc466b]/10'}`} />
+            <img src="https://picsum.photos/seed/data_gallery3/600/600" alt="Gallery 3" loading="lazy" decoding="async" className={`w-full h-48 md:h-64 object-cover rounded-[2rem] hover:scale-105 transition-transform duration-500 cursor-pointer border-[6px] shadow-xl ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[#00b26b]/10'}`} />
+            <img src="https://picsum.photos/seed/data_gallery4/600/600" alt="Gallery 4" loading="lazy" decoding="async" className={`w-full h-48 md:h-64 object-cover rounded-[2rem] hover:scale-105 transition-transform duration-500 cursor-pointer border-[6px] shadow-xl ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[#82f4b1]/10'}`} />
           </div>
         </div>
       </div>

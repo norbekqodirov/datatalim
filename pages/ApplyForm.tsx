@@ -7,6 +7,8 @@ import { submitLeadToAPI } from '../utils/api';
 import toast from 'react-hot-toast';
 import { Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Logo } from '../components/BrandElements';
+import { SEO } from '../components/SEO';
+import { trackEvent } from '../utils/pixel';
 
 export default function ApplyForm() {
     const [searchParams] = useSearchParams();
@@ -17,8 +19,27 @@ export default function ApplyForm() {
     const [formData, setFormData] = useState({ name: '', phone: '', courseId: '' });
     const [loading, setLoading] = useState(false);
     const [sent, setSent] = useState(false);
+    const [linkCategory, setLinkCategory] = useState<'IT' | 'Language'>('IT');
 
     const refCode = searchParams.get('ref') || sessionStorage.getItem('marketing_ref') || undefined;
+
+    useEffect(() => {
+        // Fetch link category to determine which courses to show
+        const fetchCategory = async () => {
+            if (refCode) {
+                try {
+                    const res = await fetch(`/api/marketing-links/info/${refCode}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setLinkCategory(data.category);
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch link info", e);
+                }
+            }
+        };
+        fetchCategory();
+    }, [refCode]);
 
     useEffect(() => {
         // We only need basic courses for the dropdown
@@ -27,30 +48,68 @@ export default function ApplyForm() {
         }
     }, [courses.length, initializeStore]);
 
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let val = e.target.value.replace(/\D/g, '');
+        if (val.length > 9) val = val.slice(0, 9);
+        let formatted = '';
+        if (val.length > 0) formatted += val.substring(0, 2);
+        if (val.length > 2) formatted += ' ' + val.substring(2, 5);
+        if (val.length > 5) formatted += ' ' + val.substring(5, 7);
+        if (val.length > 7) formatted += ' ' + val.substring(7, 9);
+        setFormData({ ...formData, phone: formatted });
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.name.trim() || !formData.phone.trim() || !formData.courseId) {
-            toast.error("Iltimos, barcha maydonlarni to'ldiring!");
+        const rawPhone = formData.phone.replace(/\D/g, '');
+
+        if (!formData.name.trim() || !formData.courseId) {
+            toast.error("Iltimos, ism va yo'nalishni kiriting!");
             return;
         }
+
+        if (rawPhone.length !== 9) {
+            toast.error("Telefon raqamni to'liq kiriting: 90 123 45 67");
+            return;
+        }
+
         setLoading(true);
 
-        const selectedCourse = courses.find(c => c.id === formData.courseId);
-        const courseName = selectedCourse ? selectedCourse.title.uz : 'Boshqa';
+        const LANGUAGE_COURSES = [
+            { id: 'english', titleUz: "Ingliz tili" },
+            { id: 'russian', titleUz: "Rus tili" },
+            { id: 'korean', titleUz: "Koreys tili" },
+            { id: 'german', titleUz: "Nemis tili" }
+        ];
 
-        const text = `🎯 <b>Yangi Ariza (Marketing) — DATA</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${formData.phone}\n📚 <b>Kurs:</b> ${courseName}\n🔗 <b>Manba (ref):</b> ${refCode || 'Organik'}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
+        let courseName = 'Boshqa';
+        if (linkCategory === 'Language') {
+            const selected = LANGUAGE_COURSES.find(c => c.id === formData.courseId);
+            courseName = selected ? selected.titleUz : 'Boshqa';
+        } else {
+            const selectedCourse = courses.find(c => c.id === formData.courseId);
+            courseName = selectedCourse ? selectedCourse.title.uz : 'Boshqa';
+        }
+
+        const fullPhone = '+998' + rawPhone;
 
         try {
-            // 1. O'zimizning CRM ga saqlaymiz
-            await submitLeadToAPI({
+            // 1. O'zimizning CRM ga saqlaymiz va nomini qaytaramiz (resolvedSourceRef)
+            const crmData = await submitLeadToAPI({
                 name: formData.name,
-                phone: formData.phone,
+                phone: fullPhone,
                 courseId: courseName,
                 sourceRef: refCode,
             });
 
-            // 2. Telegramga yuboramiz
+            // Agar crmData ichida backend'dan marketing link nomi kelsa shuni ishlatsin
+            const displayRef = crmData?.resolvedSourceRef || refCode || 'Organik';
+
+            // 2. Telegramga moslashtirilgan xabarni yuboramiz
+            const text = `🎯 <b>Yangi Ariza (Marketing) — DATA</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${fullPhone}\n📚 <b>Kurs:</b> ${courseName}\n🔗 <b>Manba (ref):</b> ${displayRef}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
             await sendToTelegram(text);
+
+            trackEvent('Lead', { source: 'ApplyForm', course: courseName });
 
             setSent(true);
             toast.success('Arizangiz muvaffaqiyatli qabul qilindi!');
@@ -88,6 +147,7 @@ export default function ApplyForm() {
 
     return (
         <div className={`min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden ${isDark ? 'bg-[#0f172a]' : 'bg-slate-50'}`}>
+            <SEO title="O'qishga Yozilish" description="DATA Ta'lim Stansiyasiga onlayn ariza qoldiring. Biz sizga mos kursni tanlashga yordam beramiz." />
             {/* Background glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[500px] bg-[#0061ff] blur-[150px] opacity-10 rounded-full pointer-events-none"></div>
 
@@ -120,15 +180,20 @@ export default function ApplyForm() {
                     </div>
                     <div>
                         <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Telefon raqam *</label>
-                        <input
-                            type="tel"
-                            required
-                            disabled={loading}
-                            value={formData.phone}
-                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                            className={`w-full px-5 py-4 rounded-xl border focus:ring-2 focus:ring-[#0061ff] transition-all outline-none ${isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
-                            placeholder="+998 90 123 45 67"
-                        />
+                        <div className={`flex w-full overflow-hidden rounded-xl border focus-within:ring-2 focus-within:ring-[#0061ff] transition-all bg-transparent ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
+                            <div className={`px-4 py-4 flex items-center justify-center border-r font-medium ${isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
+                                +998
+                            </div>
+                            <input
+                                type="tel"
+                                required
+                                disabled={loading}
+                                value={formData.phone}
+                                onChange={handlePhoneChange}
+                                className={`w-full px-4 py-4 outline-none bg-transparent ${isDark ? 'placeholder-slate-500' : 'placeholder-slate-400'}`}
+                                placeholder="90 123 45 67"
+                            />
+                        </div>
                     </div>
                     <div>
                         <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Yo'nalishni tanlang *</label>
@@ -140,9 +205,18 @@ export default function ApplyForm() {
                             className={`w-full px-5 py-4 rounded-xl border focus:ring-2 focus:ring-[#0061ff] transition-all outline-none appearance-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
                         >
                             <option value="" disabled>Kursni tanlang...</option>
-                            {courses.map(c => (
-                                <option key={c.id} value={c.id}>{c.title.uz}</option>
-                            ))}
+                            {linkCategory === 'Language' ? (
+                                <>
+                                    <option value="english">Ingliz tili</option>
+                                    <option value="russian">Rus tili</option>
+                                    <option value="korean">Koreys tili</option>
+                                    <option value="german">Nemis tili</option>
+                                </>
+                            ) : (
+                                courses.map(c => (
+                                    <option key={c.id} value={c.id}>{c.title.uz}</option>
+                                ))
+                            )}
                         </select>
                     </div>
 
