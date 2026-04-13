@@ -5,7 +5,12 @@
       "Bash(grep -r process.env D:Projectdata-talim.claudeworktreessuspicious-galileo --include=*.tsx --include=*.ts --include=*.js)",
       "Bash(python3 -c \":*)",
       "Bash(node -e \"const fs = require\\(''fs''\\); const content = fs.readFileSync\\(''/d/Project/data-talim/.claude/worktrees/suspicious-galileo/server/index.js'', ''utf8''\\); console.log\\(content.length\\);\")",
-      "Bash(node -e \"const fs = require\\(''fs''\\); const content = fs.readFileSync\\(''D:/Project/data-talim/.claude/worktrees/suspicious-galileo/server/index.js'', ''utf8''\\); console.log\\(content.length\\);\")"
+      "Bash(node -e \"const fs = require\\(''fs''\\); const content = fs.readFileSync\\(''D:/Project/data-talim/.claude/worktrees/suspicious-galileo/server/index.js'', ''utf8''\\); console.log\\(content.length\\);\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(node -e \":*)",
+      "Bash(node --input-type=module -e \":*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

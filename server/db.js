@@ -173,6 +173,108 @@ export function initDB() {
     );
   `);
 
+  // ===== LEARNING CENTER CORE TABLES =====
+
+  // Students table — full student registry
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS students(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      email TEXT DEFAULT '',
+      address TEXT DEFAULT '',
+      birth_date TEXT DEFAULT '',
+      gender TEXT DEFAULT '',
+      photo TEXT DEFAULT '',
+      parent_name TEXT DEFAULT '',
+      parent_phone TEXT DEFAULT '',
+      status TEXT DEFAULT 'active',
+      source TEXT DEFAULT '',
+      lead_id INTEGER DEFAULT NULL,
+      notes TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Groups/Classes table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS groups(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      course_id TEXT NOT NULL,
+      teacher TEXT DEFAULT '',
+      room TEXT DEFAULT '',
+      days TEXT DEFAULT 'Dush,Chor,Juma',
+      start_time TEXT DEFAULT '09:00',
+      end_time TEXT DEFAULT '11:00',
+      start_date TEXT DEFAULT '',
+      end_date TEXT DEFAULT '',
+      capacity INTEGER DEFAULT 15,
+      price_per_month INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'active',
+      notes TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Group-Student enrollment (many-to-many)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS group_students(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL,
+      student_id INTEGER NOT NULL,
+      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      left_at DATETIME DEFAULT NULL,
+      status TEXT DEFAULT 'active',
+      discount INTEGER DEFAULT 0,
+      notes TEXT DEFAULT '',
+      UNIQUE(group_id, student_id)
+    );
+  `);
+
+  // Attendance tracking
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS attendance(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL,
+      student_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      status TEXT DEFAULT 'present',
+      note TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(group_id, student_id, date)
+    );
+  `);
+
+  // Payments — detailed finance tracking
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS payments(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      group_id INTEGER DEFAULT NULL,
+      amount INTEGER NOT NULL,
+      payment_type TEXT DEFAULT 'cash',
+      purpose TEXT DEFAULT 'tuition',
+      month_for TEXT DEFAULT '',
+      paid_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      notes TEXT DEFAULT '',
+      created_by TEXT DEFAULT 'admin'
+    );
+  `);
+
+  // Expenses — center cost tracking
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS expenses(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      category TEXT DEFAULT 'other',
+      date TEXT NOT NULL,
+      notes TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // Seed default admin user if none exists
   const adminCount = db.prepare('SELECT COUNT(*) as count FROM admin_users').get();
   if (adminCount.count === 0) {

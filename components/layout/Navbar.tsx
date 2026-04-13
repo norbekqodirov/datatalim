@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Moon, Sun, Globe } from 'lucide-react';
 import { Button } from '../Button';
@@ -34,13 +34,25 @@ export const Navbar: React.FC = () => {
     }
   }, [location.pathname, navigate]);
 
+  // Auto-hide on scroll down, show on scroll up
+  const [navHidden, setNavHidden] = useState(false);
+  const lastScrollY = useRef(0);
+
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      const currentY = window.scrollY;
+      setScrolled(currentY > 20);
+      if (currentY > lastScrollY.current && currentY > 100) {
+        setNavHidden(true);
+      } else {
+        setNavHidden(false);
+      }
+      lastScrollY.current = currentY;
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
 
   const navLinks = [
     { name: t('nav.home'), path: '/' },
@@ -69,7 +81,7 @@ export const Navbar: React.FC = () => {
       initial={{ opacity: 0, scale: 0.97, filter: 'blur(8px)' }}
       animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className={`fixed top-4 left-0 right-0 mx-auto w-[calc(100%-2rem)] md:top-6 md:w-[calc(100%-3rem)] max-w-7xl z-50 transition-all duration-500 rounded-[2rem]`}
+      className={`fixed top-4 left-0 right-0 mx-auto w-[calc(100%-2rem)] md:top-6 md:w-[calc(100%-3rem)] max-w-7xl z-50 transition-all duration-500 rounded-[2rem] ${navHidden && !isOpen ? '-translate-y-[calc(100%+2rem)]' : 'translate-y-0'}`}
       style={{
         background: isDark
           ? (scrolled ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.6)')

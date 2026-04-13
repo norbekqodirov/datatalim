@@ -3,7 +3,8 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, BookOpen, Settings, LogOut, Eye, Video, Sun, Moon,
   Target, UserPlus, Menu, X, FileText, Instagram, BarChart2, Brain,
-  ChevronDown, ChevronRight, Zap, Bell, TrendingUp, Globe, GraduationCap, GitMerge, Send
+  ChevronDown, ChevronRight, Zap, Bell, TrendingUp, Globe, GraduationCap, GitMerge, Send,
+  CheckSquare, DollarSign, UserCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../store/ThemeContext';
@@ -17,6 +18,15 @@ const NAV_GROUPS = [
       { path: '/paneladmindata/enrollments', icon: GraduationCap, label: 'Yozilganlar' },
       { path: '/paneladmindata/pipeline', icon: GitMerge, label: 'Pipeline' },
       { path: '/paneladmindata/marketing', icon: Target, label: 'Marketing' },
+    ],
+  },
+  {
+    label: "O'quv Markaz",
+    items: [
+      { path: '/paneladmindata/students', icon: UserCheck, label: "O'quvchilar" },
+      { path: '/paneladmindata/groups', icon: Users, label: 'Guruhlar' },
+      { path: '/paneladmindata/attendance', icon: CheckSquare, label: 'Davomat' },
+      { path: '/paneladmindata/finance', icon: DollarSign, label: 'Moliya' },
     ],
   },
   {

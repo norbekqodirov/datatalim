@@ -1368,6 +1368,315 @@ app.get('/api/telegram/advanced-analytics', authenticateToken, async (req, res) 
     }
 });
 
+// ============================================================
+// ====  LEARNING CENTER CORE API  ============================
+// ============================================================
+
+// --- STUDENTS ---
+app.get('/api/students', authenticateToken, (req, res) => {
+    try {
+        const rows = db.prepare(`
+            SELECT s.*,
+              (SELECT COUNT(*) FROM group_students gs WHERE gs.student_id = s.id AND gs.status = 'active') AS active_groups,
+              (SELECT COALESCE(SUM(p.amount),0) FROM payments p WHERE p.student_id = s.id) AS total_paid
+            FROM students s ORDER BY s.created_at DESC
+        `).all();
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/students/:id', authenticateToken, (req, res) => {
+    try {
+        const student = db.prepare('SELECT * FROM students WHERE id = ?').get(req.params.id);
+        if (!student) return res.status(404).json({ error: 'Topilmadi' });
+        const groups = db.prepare(`
+            SELECT g.*, gs.joined_at, gs.status as enroll_status, gs.discount
+            FROM groups g JOIN group_students gs ON g.id = gs.group_id
+            WHERE gs.student_id = ? ORDER BY gs.joined_at DESC
+        `).all(req.params.id);
+        const payments = db.prepare('SELECT * FROM payments WHERE student_id = ? ORDER BY paid_at DESC').all(req.params.id);
+        res.json({ ...student, groups, payments });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/students', authenticateToken, (req, res) => {
+    try {
+        const { name, phone, email='', address='', birth_date='', gender='', photo='',
+                parent_name='', parent_phone='', status='active', source='', lead_id=null, notes='' } = req.body;
+        if (!name || !phone) return res.status(400).json({ error: 'Ism va telefon majburiy' });
+        const result = db.prepare(`
+            INSERT INTO students (name,phone,email,address,birth_date,gender,photo,parent_name,parent_phone,status,source,lead_id,notes)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        `).run(name,phone,email,address,birth_date,gender,photo,parent_name,parent_phone,status,source,lead_id,notes);
+        res.json({ success: true, id: result.lastInsertRowid });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/students/:id', authenticateToken, (req, res) => {
+    try {
+        const { name,phone,email,address,birth_date,gender,photo,parent_name,parent_phone,status,source,notes } = req.body;
+        db.prepare(`UPDATE students SET name=?,phone=?,email=?,address=?,birth_date=?,gender=?,photo=?,
+            parent_name=?,parent_phone=?,status=?,source=?,notes=? WHERE id=?`
+        ).run(name,phone,email||'',address||'',birth_date||'',gender||'',photo||'',
+              parent_name||'',parent_phone||'',status||'active',source||'',notes||'',req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/students/:id', authenticateToken, (req, res) => {
+    try {
+        db.prepare('DELETE FROM students WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- GROUPS ---
+app.get('/api/groups', authenticateToken, (req, res) => {
+    try {
+        const rows = db.prepare(`
+            SELECT g.*,
+              (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id AND gs.status = 'active') AS student_count
+            FROM groups g ORDER BY g.created_at DESC
+        `).all();
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/groups/:id', authenticateToken, (req, res) => {
+    try {
+        const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(req.params.id);
+        if (!group) return res.status(404).json({ error: 'Topilmadi' });
+        const students = db.prepare(`
+            SELECT s.*, gs.joined_at, gs.status as enroll_status, gs.discount, gs.id as gs_id
+            FROM students s JOIN group_students gs ON s.id = gs.student_id
+            WHERE gs.group_id = ? ORDER BY gs.joined_at DESC
+        `).all(req.params.id);
+        res.json({ ...group, students });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/groups', authenticateToken, (req, res) => {
+    try {
+        const { name, course_id, teacher='', room='', days='Dush,Chor,Juma',
+                start_time='09:00', end_time='11:00', start_date='', end_date='',
+                capacity=15, price_per_month=0, status='active', notes='' } = req.body;
+        if (!name || !course_id) return res.status(400).json({ error: 'Nomi va kurs majburiy' });
+        const result = db.prepare(`
+            INSERT INTO groups (name,course_id,teacher,room,days,start_time,end_time,start_date,end_date,capacity,price_per_month,status,notes)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        `).run(name,course_id,teacher,room,days,start_time,end_time,start_date,end_date,capacity,price_per_month,status,notes);
+        res.json({ success: true, id: result.lastInsertRowid });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/groups/:id', authenticateToken, (req, res) => {
+    try {
+        const { name,course_id,teacher,room,days,start_time,end_time,start_date,end_date,capacity,price_per_month,status,notes } = req.body;
+        db.prepare(`UPDATE groups SET name=?,course_id=?,teacher=?,room=?,days=?,start_time=?,end_time=?,
+            start_date=?,end_date=?,capacity=?,price_per_month=?,status=?,notes=? WHERE id=?`
+        ).run(name,course_id,teacher||'',room||'',days||'Dush,Chor,Juma',start_time||'09:00',end_time||'11:00',
+              start_date||'',end_date||'',capacity||15,price_per_month||0,status||'active',notes||'',req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/groups/:id', authenticateToken, (req, res) => {
+    try {
+        db.prepare('DELETE FROM groups WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Add student to group
+app.post('/api/groups/:id/students', authenticateToken, (req, res) => {
+    try {
+        const { student_id, discount=0, notes='' } = req.body;
+        db.prepare(`INSERT OR REPLACE INTO group_students (group_id,student_id,discount,notes,status,joined_at)
+            VALUES (?,?,?,?,'active',CURRENT_TIMESTAMP)`).run(req.params.id, student_id, discount, notes);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Remove student from group
+app.delete('/api/groups/:id/students/:sid', authenticateToken, (req, res) => {
+    try {
+        db.prepare(`UPDATE group_students SET status='dropped', left_at=CURRENT_TIMESTAMP
+            WHERE group_id=? AND student_id=?`).run(req.params.id, req.params.sid);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- ATTENDANCE ---
+app.get('/api/attendance', authenticateToken, (req, res) => {
+    try {
+        const { group_id, date, student_id } = req.query;
+        let query = `SELECT a.*, s.name as student_name, s.phone as student_phone
+            FROM attendance a JOIN students s ON a.student_id = s.id WHERE 1=1`;
+        const params = [];
+        if (group_id) { query += ' AND a.group_id = ?'; params.push(group_id); }
+        if (date) { query += ' AND a.date = ?'; params.push(date); }
+        if (student_id) { query += ' AND a.student_id = ?'; params.push(student_id); }
+        query += ' ORDER BY a.date DESC, s.name ASC';
+        res.json(db.prepare(query).all(...params));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Save attendance for a group+date (bulk upsert)
+app.post('/api/attendance', authenticateToken, (req, res) => {
+    try {
+        const { group_id, date, records } = req.body;
+        // records: [{student_id, status, note}]
+        const stmt = db.prepare(`INSERT INTO attendance (group_id,student_id,date,status,note)
+            VALUES (?,?,?,?,?) ON CONFLICT(group_id,student_id,date) DO UPDATE SET status=excluded.status, note=excluded.note`);
+        const tx = db.transaction(() => {
+            for (const r of records) {
+                stmt.run(group_id, r.student_id, date, r.status || 'present', r.note || '');
+            }
+        });
+        tx();
+        res.json({ success: true, saved: records.length });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Attendance stats for a group
+app.get('/api/attendance/stats/:group_id', authenticateToken, (req, res) => {
+    try {
+        const { month } = req.query;
+        let dateFilter = month ? `AND a.date LIKE '${month}%'` : '';
+        const stats = db.prepare(`
+            SELECT s.id, s.name, s.phone,
+              COUNT(CASE WHEN a.status='present' THEN 1 END) AS present,
+              COUNT(CASE WHEN a.status='absent' THEN 1 END) AS absent,
+              COUNT(CASE WHEN a.status='late' THEN 1 END) AS late,
+              COUNT(CASE WHEN a.status='excused' THEN 1 END) AS excused,
+              COUNT(a.id) AS total_days
+            FROM students s
+            JOIN group_students gs ON s.id = gs.student_id AND gs.group_id = ? AND gs.status = 'active'
+            LEFT JOIN attendance a ON a.student_id = s.id AND a.group_id = ? ${dateFilter}
+            GROUP BY s.id ORDER BY s.name
+        `).all(req.params.group_id, req.params.group_id);
+        res.json(stats);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- PAYMENTS ---
+app.get('/api/payments', authenticateToken, (req, res) => {
+    try {
+        const { student_id, group_id, month } = req.query;
+        let query = `SELECT p.*, s.name as student_name, s.phone as student_phone,
+            g.name as group_name FROM payments p
+            JOIN students s ON p.student_id = s.id
+            LEFT JOIN groups g ON p.group_id = g.id WHERE 1=1`;
+        const params = [];
+        if (student_id) { query += ' AND p.student_id = ?'; params.push(student_id); }
+        if (group_id) { query += ' AND p.group_id = ?'; params.push(group_id); }
+        if (month) { query += " AND p.month_for = ?"; params.push(month); }
+        query += ' ORDER BY p.paid_at DESC';
+        res.json(db.prepare(query).all(...params));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/payments', authenticateToken, (req, res) => {
+    try {
+        const { student_id, group_id=null, amount, payment_type='cash',
+                purpose='tuition', month_for='', notes='' } = req.body;
+        if (!student_id || !amount) return res.status(400).json({ error: "O'quvchi va summa majburiy" });
+        const result = db.prepare(`INSERT INTO payments (student_id,group_id,amount,payment_type,purpose,month_for,notes)
+            VALUES (?,?,?,?,?,?,?)`).run(student_id,group_id,amount,payment_type,purpose,month_for,notes);
+        res.json({ success: true, id: result.lastInsertRowid });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/payments/:id', authenticateToken, (req, res) => {
+    try {
+        db.prepare('DELETE FROM payments WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Finance summary — revenue by month
+app.get('/api/finance/summary', authenticateToken, (req, res) => {
+    try {
+        const monthly = db.prepare(`
+            SELECT strftime('%Y-%m', paid_at) AS month,
+              SUM(amount) AS revenue,
+              COUNT(*) AS payment_count
+            FROM payments
+            GROUP BY month ORDER BY month DESC LIMIT 12
+        `).all();
+        const byType = db.prepare(`
+            SELECT payment_type, SUM(amount) AS total, COUNT(*) AS count
+            FROM payments GROUP BY payment_type
+        `).all();
+        const byPurpose = db.prepare(`
+            SELECT purpose, SUM(amount) AS total, COUNT(*) AS count
+            FROM payments GROUP BY purpose
+        `).all();
+        const totalRevenue = db.prepare('SELECT COALESCE(SUM(amount),0) AS total FROM payments').get();
+        const thisMonth = db.prepare(`
+            SELECT COALESCE(SUM(amount),0) AS total FROM payments
+            WHERE strftime('%Y-%m', paid_at) = strftime('%Y-%m','now')
+        `).get();
+        res.json({ monthly, byType, byPurpose, totalRevenue: totalRevenue.total, thisMonth: thisMonth.total });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- EXPENSES ---
+app.get('/api/expenses', authenticateToken, (req, res) => {
+    try {
+        res.json(db.prepare('SELECT * FROM expenses ORDER BY date DESC').all());
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/expenses', authenticateToken, (req, res) => {
+    try {
+        const { title, amount, category='other', date, notes='' } = req.body;
+        if (!title || !amount || !date) return res.status(400).json({ error: 'Nomi, summa va sana majburiy' });
+        const result = db.prepare('INSERT INTO expenses (title,amount,category,date,notes) VALUES (?,?,?,?,?)')
+            .run(title, amount, category, date, notes);
+        res.json({ success: true, id: result.lastInsertRowid });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/expenses/:id', authenticateToken, (req, res) => {
+    try {
+        db.prepare('DELETE FROM expenses WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- ENHANCED STATS (for dashboard) ---
+app.get('/api/lc-stats', authenticateToken, (req, res) => {
+    try {
+        const totalStudents = db.prepare("SELECT COUNT(*) AS n FROM students WHERE status='active'").get().n;
+        const totalGroups = db.prepare("SELECT COUNT(*) AS n FROM groups WHERE status='active'").get().n;
+        const thisMonthRevenue = db.prepare(`SELECT COALESCE(SUM(amount),0) AS n FROM payments WHERE strftime('%Y-%m', paid_at)=strftime('%Y-%m','now')`).get().n;
+        const lastMonthRevenue = db.prepare(`SELECT COALESCE(SUM(amount),0) AS n FROM payments WHERE strftime('%Y-%m', paid_at)=strftime('%Y-%m', date('now','-1 month'))`).get().n;
+        const todayAttendance = db.prepare(`SELECT COUNT(*) AS n, SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) AS present FROM attendance WHERE date=date('now')`).get();
+        const newStudentsThisMonth = db.prepare(`SELECT COUNT(*) AS n FROM students WHERE strftime('%Y-%m', created_at)=strftime('%Y-%m','now')`).get().n;
+        const graduatedThisMonth = db.prepare(`SELECT COUNT(*) AS n FROM students WHERE status='graduated' AND strftime('%Y-%m', created_at)=strftime('%Y-%m','now')`).get().n;
+        const debtStudents = db.prepare(`
+            SELECT COUNT(DISTINCT gs.student_id) AS n
+            FROM group_students gs
+            JOIN groups g ON g.id = gs.group_id
+            WHERE gs.status='active'
+            AND NOT EXISTS (
+                SELECT 1 FROM payments p WHERE p.student_id=gs.student_id
+                AND p.month_for=strftime('%Y-%m','now')
+            )
+        `).get().n;
+        const revenueByMonth = db.prepare(`
+            SELECT strftime('%Y-%m', paid_at) AS month, SUM(amount) AS total
+            FROM payments GROUP BY month ORDER BY month DESC LIMIT 6
+        `).all();
+        res.json({
+            totalStudents, totalGroups, thisMonthRevenue, lastMonthRevenue,
+            todayAttendance, newStudentsThisMonth, graduatedThisMonth,
+            debtStudents, revenueByMonth
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`✅ Backend server running at http://localhost:${PORT}`);

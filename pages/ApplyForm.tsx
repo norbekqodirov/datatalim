@@ -72,16 +72,9 @@ export default function ApplyForm() {
         const selectedCourse = courses.find(c => c.id === formData.courseId);
         const courseName = selectedCourse ? getTitle(selectedCourse) : 'Boshqa';
 
-        let courseName = 'Boshqa';
-        if (linkCategory === 'Language') {
-            const selected = LANGUAGE_COURSES.find(c => c.id === formData.courseId);
-            courseName = selected ? selected.titleUz : 'Boshqa';
-        } else {
-            const selectedCourse = courses.find(c => c.id === formData.courseId);
-            courseName = selectedCourse ? selectedCourse.title.uz : 'Boshqa';
-        }
-
         const fullPhone = '+998' + rawPhone;
+
+        const text = `📩 <b>Yangi ariza — DATA Ta'lim Stansiyasi</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${fullPhone}\n📚 <b>Kurs:</b> ${courseName}\n🔗 <b>Manba (ref):</b> ${refCode || 'Organik'}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
 
         try {
             await submitLeadToAPI({

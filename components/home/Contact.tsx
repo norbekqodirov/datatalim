@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Phone, Mail, Loader2, CheckCircle2 } from 'lucide-react';
+import { MapPin, Phone, Mail, Loader2, CheckCircle2, Copy, Check, Clock, ExternalLink } from 'lucide-react';
 import { Button } from '../Button';
 import { useStore } from '../../store/useStore';
 import { sendToTelegram } from '../../utils/telegram';
@@ -17,6 +17,20 @@ export const Contact: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const { isDark } = useTheme();
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedField(field);
+      toast.success('Nusxa olindi!');
+      setTimeout(() => setCopiedField(null), 2000);
+    });
+  };
+
+  // Live availability: 9:00 - 18:00
+  const now = new Date();
+  const hour = now.getHours();
+  const isOpen = hour >= 9 && hour < 18;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -103,22 +117,59 @@ export const Contact: React.FC = () => {
             </p>
 
             <div className="space-y-6">
+              {/* Live availability */}
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-bold ${isOpen ? isDark ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-green-50 text-green-600 border border-green-200' : isDark ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                <span className={`w-2 h-2 rounded-full ${isOpen ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                <Clock size={14} />
+                {isOpen ? 'Hozir ochiq · 09:00 - 18:00' : 'Yopiq · Ertaga 09:00 da ochiladi'}
+              </div>
+
               {[
-                { icon: MapPin, title: "Manzil", subtitle: tField(siteContent.contactAddress), extra: tField(siteContent.contactLandmark) },
-                { icon: Phone, title: "Telefon", subtitle: siteContent.contactPhone, extra: tField(siteContent.contactSchedule) },
-                { icon: Mail, title: "Email", subtitle: siteContent.contactEmail }
+                { icon: MapPin, title: "Manzil", subtitle: tField(siteContent.contactAddress), extra: tField(siteContent.contactLandmark), copyable: false },
+                { icon: Phone, title: "Telefon", subtitle: siteContent.contactPhone, extra: tField(siteContent.contactSchedule), copyable: true, copyValue: siteContent.contactPhone, field: 'phone' },
+                { icon: Mail, title: "Email", subtitle: siteContent.contactEmail, copyable: true, copyValue: siteContent.contactEmail, field: 'email' }
               ].map((item, i) => (
                 <div key={i} className={`flex items-start gap-5 p-6 rounded-3xl border transition-all hover:translate-x-2 group ${isDark ? 'bg-slate-900/50 border-white/5 hover:bg-slate-800/80 hover:shadow-xl hover:shadow-[#3f5efb]/20' : 'bg-slate-50 border-slate-100 hover:bg-white hover:shadow-xl hover:shadow-[#3f5efb]/10'}`}>
                   <div className={`p-4 rounded-2xl shrink-0 transition-transform group-hover:scale-110 group-hover:rotate-3 ${isDark ? 'bg-[#3f5efb]/20 text-[#60efff]' : 'bg-blue-100 text-[#3f5efb]'}`}>
                     <item.icon size={26} />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h4 className={`font-black text-lg mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.title}</h4>
                     <p className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{item.subtitle}</p>
                     {item.extra && <p className={`text-sm mt-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{item.extra}</p>}
                   </div>
+                  {item.copyable && (
+                    <button
+                      onClick={() => copyToClipboard(item.copyValue!, item.field!)}
+                      className={`self-center p-2 rounded-xl transition-all shrink-0 ${copiedField === item.field ? 'bg-green-500/15 text-green-500' : isDark ? 'bg-slate-800 text-slate-500 hover:text-white hover:bg-slate-700' : 'bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200'}`}
+                      title="Nusxa olish"
+                    >
+                      {copiedField === item.field ? <Check size={16} /> : <Copy size={16} />}
+                    </button>
+                  )}
                 </div>
               ))}
+
+              {/* Social links */}
+              <div className="flex gap-3 pt-2">
+                {[
+                  { label: 'Instagram', href: 'https://instagram.com/data_talim_stansiyasi', emoji: '📸' },
+                  { label: 'Telegram', href: 'https://t.me/data_talim_stansiyasi', emoji: '✈️' },
+                  { label: 'YouTube', href: '#', emoji: '🎬' },
+                ].map((link, i) => (
+                  <a
+                    key={i}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold transition-all hover:scale-105 ${isDark ? 'bg-slate-900/60 border border-white/5 text-slate-400 hover:text-white hover:border-white/15' : 'bg-slate-50 border border-slate-100 text-slate-500 hover:text-slate-900 hover:bg-white hover:shadow-md'}`}
+                  >
+                    <span>{link.emoji}</span>
+                    {link.label}
+                    <ExternalLink size={12} className="opacity-50" />
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
 

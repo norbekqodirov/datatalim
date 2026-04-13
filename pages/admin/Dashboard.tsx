@@ -25,20 +25,37 @@ interface StatsData {
 
 const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
 
+interface LCStats {
+    totalStudents: number;
+    totalGroups: number;
+    thisMonthRevenue: number;
+    lastMonthRevenue: number;
+    todayAttendance: { n: number; present: number };
+    newStudentsThisMonth: number;
+    debtStudents: number;
+    revenueByMonth: { month: string; total: number }[];
+}
+
 export default function Dashboard() {
     const { isDark } = useTheme();
     const [stats, setStats] = useState<StatsData | null>(null);
+    const [lcStats, setLcStats] = useState<LCStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     const fetchStats = useCallback((silent = false) => {
         if (!silent) setLoading(true);
         const token = localStorage.getItem('adminToken');
-        fetch('/api/stats', { headers: { 'Authorization': `Bearer ${token}` } })
-            .then(r => r.json())
-            .then(data => { setStats(data); setLastUpdated(new Date()); })
-            .catch(() => setStats(null))
-            .finally(() => setLoading(false));
+        const h = { 'Authorization': `Bearer ${token}` };
+        Promise.all([
+            fetch('/api/stats', { headers: h }).then(r => r.json()),
+            fetch('/api/lc-stats', { headers: h }).then(r => r.json()).catch(() => null),
+        ]).then(([crmData, lcData]) => {
+            setStats(crmData);
+            if (lcData && !lcData.error) setLcStats(lcData);
+            setLastUpdated(new Date());
+        }).catch(() => setStats(null))
+        .finally(() => setLoading(false));
     }, []);
 
     useEffect(() => {
@@ -135,6 +152,33 @@ export default function Dashboard() {
                     ))
                 )}
             </div>
+
+            {/* Learning Center Stats */}
+            {lcStats && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
+                    <div className="flex items-center gap-2 mb-3">
+                        <GraduationCap size={16} className="text-violet-500" />
+                        <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>O'quv Markaz</span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {[
+                            { label: "Faol o'quvchilar", value: lcStats.totalStudents, icon: Users, color: 'text-violet-500', bg: isDark ? 'bg-violet-500/10' : 'bg-violet-50', link: '/paneladmindata/students', sub: `+${lcStats.newStudentsThisMonth} bu oy` },
+                            { label: 'Faol guruhlar', value: lcStats.totalGroups, icon: BookOpen, color: 'text-blue-500', bg: isDark ? 'bg-blue-500/10' : 'bg-blue-50', link: '/paneladmindata/groups', sub: null },
+                            { label: 'Bu oy daromad', value: (lcStats.thisMonthRevenue || 0).toLocaleString() + " so'm", icon: TrendingUp, color: 'text-emerald-500', bg: isDark ? 'bg-emerald-500/10' : 'bg-emerald-50', link: '/paneladmindata/finance', sub: null, raw: true },
+                            { label: "Qarzdor o'quvchi", value: lcStats.debtStudents, icon: Target, color: lcStats.debtStudents > 0 ? 'text-red-500' : 'text-slate-400', bg: isDark ? 'bg-red-500/10' : 'bg-red-50', link: '/paneladmindata/finance', sub: null },
+                        ].map((item, idx) => (
+                            <Link key={idx} to={item.link} className={`block p-4 ${cardCls} hover:shadow-lg transition-all`}>
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${item.bg}`}>
+                                    <item.icon size={18} className={item.color} />
+                                </div>
+                                <div className={`text-xl font-black mb-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.value}</div>
+                                <p className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.label}</p>
+                                {item.sub && <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{item.sub}</p>}
+                            </Link>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
 
             {/* Conversion Rate Banner */}
             {stats && (
