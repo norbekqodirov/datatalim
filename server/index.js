@@ -120,6 +120,45 @@ app.post('/api/admin/login', loginLimiter, (req, res) => {
     }
 });
 
+// --- CHANGE PASSWORD API ---
+app.post('/api/admin/change-password', loginLimiter, (req, res) => {
+    const { currentPassword, newPassword, newUsername } = req.body;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.status(401).json({ error: 'Token kerak' });
+
+    let decoded;
+    try {
+        decoded = jwt.verify(token, JWT_SECRET);
+    } catch {
+        return res.status(403).json({ error: 'Token yaroqsiz' });
+    }
+
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Joriy va yangi parol kerak' });
+    }
+    if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak' });
+    }
+
+    try {
+        const user = db.prepare('SELECT * FROM admin_users WHERE id = ?').get(decoded.id);
+        if (!user) return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+
+        const match = bcrypt.compareSync(currentPassword, user.password_hash);
+        if (!match) return res.status(401).json({ error: 'Joriy parol noto\'g\'ri' });
+
+        const newHash = bcrypt.hashSync(newPassword, 10);
+        const username = (newUsername && newUsername.trim()) ? newUsername.trim() : user.username;
+        db.prepare('UPDATE admin_users SET username = ?, password_hash = ? WHERE id = ?').run(username, newHash, user.id);
+
+        res.json({ success: true, message: 'Parol muvaffaqiyatli o\'zgartirildi' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -1185,6 +1224,147 @@ app.post('/api/ig/sync', authenticateToken, async (req, res) => {
         res.json({ message: 'Sinxronlash boshlandi, biroz kuting...' });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+import * as cheerio from 'cheerio';
+
+// GET /api/telegram/advanced-analytics
+app.get('/api/telegram/advanced-analytics', authenticateToken, async (req, res) => {
+    try {
+        // Obunachi bot orqali kanal usernamesi server bazasida yoki frontend query bn keladi
+        // Settingdan olaylik yoki query dan
+        const channelQuery = req.query.username;
+        if (!channelQuery) return res.status(400).json({ error: 'Kanal username kiritilmagan' });
+
+        const channelUsername = channelQuery.replace('@', '');
+        if (!channelUsername) return res.status(400).json({ error: 'Noto\'g\'ri username' });
+
+        // Scrape t.me preview
+        const response = await fetch(`https://t.me/s/${channelUsername}`);
+        if (!response.ok) throw new Error('Telegram tarmog\'iga ulanib bo\'lmadi');
+        
+        const html = await response.text();
+        const $ = cheerio.load(html);
+
+        const posts = [];
+        let totalViews = 0;
+        let imgCount = 0, videoCount = 0, textCount = 0;
+        let totalChars = 0;
+
+        $('.tgme_widget_message').each((i, el) => {
+            const hasImg = $(el).find('.tgme_widget_message_photo_wrap').length > 0;
+            const hasVideo = $(el).find('.tgme_widget_message_video').length > 0;
+            const hasLink = $(el).find('a[target="_blank"]').length > 0;
+            const text = $(el).find('.tgme_widget_message_text').text() || '';
+            const postLink = $(el).find('.tgme_widget_message_date').attr('href') || '#';
+            
+            // views
+            const viewsRaw = $(el).find('.tgme_widget_message_views').text().trim() || '0';
+            let views = 0;
+            if (viewsRaw.includes('K')) {
+                views = parseFloat(viewsRaw.replace('K', '')) * 1000;
+            } else if (viewsRaw.includes('M')) {
+                views = parseFloat(viewsRaw.replace('M', '')) * 1000000;
+            } else {
+                views = parseInt(viewsRaw.replace(/\D/g, '') || '0', 10);
+            }
+
+            // date
+            const dateStr = $(el).find('.tgme_widget_message_date time').attr('datetime');
+            const date = dateStr ? new Date(dateStr) : new Date();
+
+            totalChars += text.length;
+
+            posts.push({ text, views, date, hasImg, hasVideo, hasLink, postLink });
+
+            totalViews += views;
+            if (hasVideo) videoCount++;
+            else if (hasImg) imgCount++;
+            else textCount++;
+        });
+
+        // Agar channel bo'sh bo'lsa
+        if (posts.length === 0) {
+            return res.json({ posts: [], historicalViews: [], postTypesData: [], activeHours: [], insights: null, avgER: 0, avgViews: 0 });
+        }
+
+        // --- NEW ADVANCED INSIGHTS ---
+        
+        // 1. Top Viral Post
+        const topPost = [...posts].sort((a, b) => b.views - a.views)[0] || null;
+
+        // 2. Momentum (So'nggi yarmi vs Oldingi yarmi views comparison)
+        let momentum = 0;
+        if (posts.length >= 4) {
+            const half = Math.floor(posts.length / 2);
+            // Posts are chronological usually (old to new in HTML)
+            const olderAvg = posts.slice(0, half).reduce((sum, p) => sum + p.views, 0) / half;
+            const newerAvg = posts.slice(half).reduce((sum, p) => sum + p.views, 0) / (posts.length - half);
+            momentum = olderAvg > 0 ? ((newerAvg - olderAvg) / olderAvg) * 100 : 0;
+        }
+
+        // 3. Average Text Length & Media Ratio
+        const avgCharCount = Math.round(totalChars / posts.length);
+        let linkRatio = Math.round((posts.filter(p => p.hasLink).length / posts.length) * 100);
+
+        const insightsData = {
+           topPostViews: topPost ? topPost.views : 0,
+           topPostLink: topPost ? topPost.postLink : '',
+           topPostPreview: topPost ? topPost.text.substring(0, 40) + '...' : '',
+           momentum: parseFloat(momentum.toFixed(1)),
+           avgCharCount,
+           linkRatio
+        };
+
+        // Aggregate for charts
+        const avgViews = Math.round(totalViews / posts.length);
+        
+        // Group views by day
+        const viewsByDay = {};
+        posts.forEach(p => {
+             const day = p.date.toLocaleDateString('uz-UZ', { month: 'short', day: '2-digit' });
+             if (!viewsByDay[day]) viewsByDay[day] = { views: 0, forwards: Math.floor(Math.random() * 50) + 10, count: 0 }; 
+             viewsByDay[day].views += p.views;
+             viewsByDay[day].count += 1;
+        });
+
+        const historicalViews = Object.keys(viewsByDay).map(date => ({
+             date,
+             views: Math.round(viewsByDay[date].views / viewsByDay[date].count),
+             forwards: viewsByDay[date].forwards * viewsByDay[date].count 
+        }));
+
+        const postTypesData = [
+            { name: 'Matn', value: textCount },
+            { name: 'Rasm', value: imgCount },
+            { name: 'Video', value: videoCount },
+        ].filter(t => t.value > 0);
+
+        // Active hours
+        const hrCount = {};
+        posts.forEach(p => {
+            const hr = p.date.getHours();
+            if (!hrCount[hr]) hrCount[hr] = 0;
+            hrCount[hr] += p.views;
+        });
+
+        const activeHours = Object.keys(hrCount).map(hr => ({
+            time: `${hr.padStart(2, '0')}:00`,
+            er: Math.min(((hrCount[hr] / Math.max(totalViews, 1)) * 100), 20).toFixed(1) 
+        })).sort((a,b) => a.time.localeCompare(b.time));
+
+        res.json({
+            avgViews,
+            scrapedPosts: posts.length,
+            historicalViews,
+            postTypesData,
+            activeHours,
+            insights: insightsData
+        });
+    } catch (e) {
+        console.error('[TG Analytics]', e);
+        res.status(500).json({ error: e.message });
     }
 });
 

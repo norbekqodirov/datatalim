@@ -1,58 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, ShieldAlert, Clock } from 'lucide-react';
+import { Lock, ShieldAlert, Clock, Eye, EyeOff, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const ADMIN_PASSWORD = (process.env as any).VITE_ADMIN_PASSWORD || 'admin123';
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_DURATION = 60; // seconds
+const LOCKOUT_DURATION = 60;
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [lockoutEnd, setLockoutEnd] = useState<number | null>(null);
   const [remainingTime, setRemainingTime] = useState(0);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Load lockout state from localStorage
   useEffect(() => {
     const savedLockout = localStorage.getItem('adminLockoutEnd');
     const savedAttempts = localStorage.getItem('adminLoginAttempts');
     if (savedLockout) {
       const end = parseInt(savedLockout, 10);
-      if (Date.now() < end) {
-        setLockoutEnd(end);
-      } else {
-        localStorage.removeItem('adminLockoutEnd');
-        localStorage.removeItem('adminLoginAttempts');
-      }
+      if (Date.now() < end) setLockoutEnd(end);
+      else { localStorage.removeItem('adminLockoutEnd'); localStorage.removeItem('adminLoginAttempts'); }
     }
-    if (savedAttempts) {
-      setAttempts(parseInt(savedAttempts, 10));
-    }
+    if (savedAttempts) setAttempts(parseInt(savedAttempts, 10));
   }, []);
 
-  // Countdown timer for lockout
   useEffect(() => {
-    if (!lockoutEnd) {
-      setRemainingTime(0);
-      return;
-    }
+    if (!lockoutEnd) { setRemainingTime(0); return; }
     const interval = setInterval(() => {
       const diff = Math.ceil((lockoutEnd - Date.now()) / 1000);
       if (diff <= 0) {
-        setLockoutEnd(null);
-        setAttempts(0);
-        setRemainingTime(0);
-        localStorage.removeItem('adminLockoutEnd');
-        localStorage.removeItem('adminLoginAttempts');
+        setLockoutEnd(null); setAttempts(0); setRemainingTime(0);
+        localStorage.removeItem('adminLockoutEnd'); localStorage.removeItem('adminLoginAttempts');
         clearInterval(interval);
-      } else {
-        setRemainingTime(diff);
-      }
+      } else setRemainingTime(diff);
     }, 1000);
     return () => clearInterval(interval);
   }, [lockoutEnd]);
@@ -61,125 +45,161 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (isLocked) {
-      toast.error(`Tizim qulflangan. ${remainingTime} soniya kuting.`);
-      return;
-    }
-
-    if (!username.trim() || !password.trim()) {
-      toast.error("Iltimos, login va parolni kiriting.");
-      return;
-    }
-
+    if (isLocked) { toast.error(`Tizim qulflangan. ${remainingTime} soniya kuting.`); return; }
+    if (!username.trim() || !password.trim()) { toast.error('Login va parolni kiriting'); return; }
     setLoading(true);
-
     try {
-      const response = await fetch('/api/admin/login', {
+      const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      const data = await res.json();
+      if (res.ok && data.success) {
         localStorage.setItem('adminAuth', 'true');
-        localStorage.setItem('adminToken', data.token); // Store JWT token
+        localStorage.setItem('adminToken', data.token);
         localStorage.setItem('adminAuthTime', Date.now().toString());
         localStorage.removeItem('adminLoginAttempts');
         localStorage.removeItem('adminLockoutEnd');
         toast.success('Xush kelibsiz!');
         navigate('/paneladmindata');
       } else {
-        handleFailedAttempt(data.error || "Noto'g'ri ism yoki parol");
+        const newAttempts = attempts + 1;
+        setAttempts(newAttempts);
+        localStorage.setItem('adminLoginAttempts', newAttempts.toString());
+        if (newAttempts >= MAX_ATTEMPTS) {
+          const end = Date.now() + LOCKOUT_DURATION * 1000;
+          setLockoutEnd(end);
+          localStorage.setItem('adminLockoutEnd', end.toString());
+          toast.error(`${MAX_ATTEMPTS} marta noto'g'ri! Tizim ${LOCKOUT_DURATION} soniyaga qulflandi.`);
+        } else {
+          toast.error(`Noto'g'ri login yoki parol (${newAttempts}/${MAX_ATTEMPTS})`);
+        }
       }
-    } catch (error) {
-      console.error("Login xatosi:", error);
-      toast.error("Tarmoqda xatolik yuz berdi. Backend ishlayotganini tekshiring.");
+    } catch {
+      toast.error('Server bilan aloqa yo\'q. Backend ishlamoqdami?');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFailedAttempt = (errorMessage: string) => {
-    const newAttempts = attempts + 1;
-    setAttempts(newAttempts);
-    localStorage.setItem('adminLoginAttempts', newAttempts.toString());
-
-    if (newAttempts >= MAX_ATTEMPTS) {
-      const end = Date.now() + LOCKOUT_DURATION * 1000;
-      setLockoutEnd(end);
-      localStorage.setItem('adminLockoutEnd', end.toString());
-      toast.error(`${MAX_ATTEMPTS} marta noto'g'ri urinish! Tizim ${LOCKOUT_DURATION} soniyaga qulflandi.`);
-    } else {
-      toast.error(`${errorMessage} (${newAttempts}/${MAX_ATTEMPTS})`);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white p-8 rounded-[2rem] shadow-xl shadow-blue-900/5 max-w-md w-full border border-slate-100"
-      >
-        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 ${isLocked ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-[#0061ff]'}`}>
-          {isLocked ? <ShieldAlert size={32} /> : <Lock size={32} />}
-        </div>
-        <h1 className="text-3xl font-black text-center text-slate-900 mb-2">Admin Panel</h1>
-        <p className="text-slate-500 text-center mb-8 font-medium">
-          {isLocked ? 'Tizim vaqtincha qulflangan' : 'Tizimga kirish uchun parolni kiriting'}
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/3 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        {isLocked && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
-            <Clock className="text-red-500 shrink-0" size={20} />
-            <div>
-              <p className="text-sm font-bold text-red-700">Tizim qulflangan</p>
-              <p className="text-xs text-red-500">{remainingTime} soniyadan keyin qayta urinib ko'ring</p>
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="w-full max-w-sm"
+      >
+        {/* Card */}
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl shadow-black/40">
+          {/* Icon */}
+          <div className="flex justify-center mb-6">
+            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg ${
+              isLocked ? 'bg-red-500/20 shadow-red-500/20' : 'bg-blue-500/20 shadow-blue-500/20'
+            }`}>
+              {isLocked
+                ? <ShieldAlert size={30} className="text-red-400" />
+                : <Lock size={28} className="text-blue-400" />
+              }
             </div>
           </div>
-        )}
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Login username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-[#0061ff] focus:ring-2 focus:ring-blue-100 outline-none transition-all font-medium disabled:bg-slate-100 disabled:cursor-not-allowed mb-4"
-              placeholder="admin"
-              required
-              disabled={isLocked || loading}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Parol</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-[#0061ff] focus:ring-2 focus:ring-blue-100 outline-none transition-all font-medium disabled:bg-slate-100 disabled:cursor-not-allowed"
-              placeholder="••••••••"
-              required
-              disabled={isLocked || loading}
-            />
-          </div>
-          {attempts > 0 && !isLocked && (
-            <p className="text-xs text-amber-600 font-medium">
-              ⚠️ {attempts}/{MAX_ATTEMPTS} noto'g'ri urinish
-            </p>
+          <h1 className="text-2xl font-black text-center text-white mb-1">Admin Panel</h1>
+          <p className="text-slate-400 text-center text-sm mb-7">
+            {isLocked ? 'Tizim vaqtincha qulflangan' : 'Kirish uchun ma\'lumotlaringizni kiriting'}
+          </p>
+
+          {/* Lockout warning */}
+          {isLocked && (
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+              className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 mb-5 flex items-center gap-3">
+              <Clock className="text-red-400 shrink-0" size={18} />
+              <div>
+                <p className="text-sm font-bold text-red-300">Tizim qulflangan</p>
+                <p className="text-xs text-red-400">{remainingTime} soniyadan keyin qayta urinib ko'ring</p>
+              </div>
+            </motion.div>
           )}
-          <button
-            type="submit"
-            disabled={isLocked || loading}
-            className="w-full bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Tekshirilmoqda...' : isLocked ? 'Qulflangan' : 'Kirish'}
-          </button>
-        </form>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            {/* Username */}
+            <div>
+              <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Login</label>
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500">
+                  <User size={16} />
+                </div>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="admin"
+                  disabled={isLocked || loading}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-white/10 rounded-xl text-white placeholder-slate-600 text-sm font-medium focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Parol</label>
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500">
+                  <Lock size={16} />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={isLocked || loading}
+                  className="w-full pl-10 pr-11 py-3 bg-slate-800/80 border border-white/10 rounded-xl text-white placeholder-slate-600 text-sm font-medium focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Attempts warning */}
+            {attempts > 0 && !isLocked && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="text-xs text-amber-400 font-medium flex items-center gap-1.5">
+                <ShieldAlert size={12} />
+                {attempts}/{MAX_ATTEMPTS} noto'g'ri urinish
+              </motion.p>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isLocked || loading}
+              className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-blue-600/25 disabled:opacity-50 disabled:cursor-not-allowed mt-2 text-sm"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Tekshirilmoqda...
+                </span>
+              ) : isLocked ? 'Qulflangan' : 'Kirish'}
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center text-slate-600 text-xs mt-5">DATA Ta'lim Stansiyasi © {new Date().getFullYear()}</p>
       </motion.div>
     </div>
   );

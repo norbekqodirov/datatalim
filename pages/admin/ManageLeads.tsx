@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTheme } from '../../store/ThemeContext';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {
     Users, Phone, Calendar, Target, Trash2, Download, Filter, RefreshCw,
     CheckCircle, MessageSquare, XCircle, Clock, Search, ChevronDown,
@@ -243,12 +244,38 @@ export default function ManageLeads() {
         }
     };
 
+    const handleBulkDelete = async () => {
+        const ids = Array.from(selectedIds);
+        if (ids.length === 0) return;
+        if (!window.confirm(`${ids.length} ta arizani o'chirishni tasdiqlaysizmi?`)) return;
+        try {
+            await Promise.all(ids.map(id =>
+                fetch(`/api/leads/${id}`, { method: 'DELETE', headers: authHeaders() })
+            ));
+            setLeads(prev => prev.filter(l => !selectedIds.has(l.id)));
+            setSelectedIds(new Set());
+            toast.success(`${ids.length} ta ariza o'chirildi`);
+        } catch {
+            toast.error('Xatolik yuz berdi');
+        }
+    };
+
     const toggleSelect = (id: number) => {
         setSelectedIds(prev => {
             const s = new Set(prev);
             if (s.has(id)) s.delete(id); else s.add(id);
             return s;
         });
+    };
+
+    const handleDragEnd = (result: DropResult) => {
+        const { destination, source, draggableId } = result;
+        if (!destination) return;
+        if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+        
+        const leadId = parseInt(draggableId);
+        const newStatus = destination.droppableId as LeadStatus;
+        handleStatusChange(leadId, newStatus);
     };
 
     const toggleSelectAll = () => {
@@ -453,6 +480,12 @@ export default function ManageLeads() {
                             )}
                         </div>
                         <button
+                            onClick={handleBulkDelete}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20"
+                        >
+                            <Trash2 size={14} /> O'chirish
+                        </button>
+                        <button
                             onClick={() => setSelectedIds(new Set())}
                             className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'}`}
                         >
@@ -464,19 +497,26 @@ export default function ManageLeads() {
 
             {/* Kanban Board */}
             {viewMode === 'kanban' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                    {ALL_STATUSES.map(status => {
-                        const cfg = STATUS_CONFIG[status];
-                        const Icon = cfg.icon;
-                        const colLeads = filteredLeads.filter(l => l.status === status);
-                        const colColors: Record<LeadStatus, string> = {
-                            new: 'border-blue-500',
-                            contacted: 'border-amber-500',
-                            enrolled: 'border-emerald-500',
-                            rejected: 'border-red-500',
-                        };
-                        return (
-                            <div key={status} className={`rounded-2xl border-t-4 ${colColors[status]} ${isDark ? 'bg-slate-800/60' : 'bg-slate-50'} flex flex-col min-h-[400px]`}>
+                <DragDropContext onDragEnd={handleDragEnd}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                        {ALL_STATUSES.map(status => {
+                            const cfg = STATUS_CONFIG[status];
+                            const Icon = cfg.icon;
+                            const colLeads = filteredLeads.filter(l => l.status === status);
+                            const colColors: Record<LeadStatus, string> = {
+                                new: 'border-blue-500',
+                                contacted: 'border-amber-500',
+                                enrolled: 'border-emerald-500',
+                                rejected: 'border-red-500',
+                            };
+                            return (
+                                <Droppable key={status} droppableId={status}>
+                                    {(provided, snapshot) => (
+                                        <div 
+                                            ref={provided.innerRef} 
+                                            {...provided.droppableProps}
+                                            className={`rounded-2xl border-t-4 ${colColors[status]} ${isDark ? 'bg-slate-800/60' : 'bg-slate-50'} flex flex-col min-h-[400px] transition-colors ${snapshot.isDraggingOver ? (isDark ? 'bg-slate-800/90 ring-2 ring-white/10' : 'bg-slate-100 ring-2 ring-blue-500/10') : ''}`}
+                                        >
                                 {/* Column header */}
                                 <div className={`px-4 py-3 flex items-center justify-between border-b ${isDark ? 'border-white/5' : 'border-slate-200'}`}>
                                     <div className="flex items-center gap-2">
@@ -503,90 +543,73 @@ export default function ManageLeads() {
                                         <div className={`text-center py-12 text-sm ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
                                             Bo'sh
                                         </div>
-                                    ) : colLeads.map(lead => (
-                                        <div key={lead.id} className={`rounded-xl p-3 border transition-shadow hover:shadow-md ${isDark ? 'bg-slate-900/70 border-white/5' : 'bg-white border-slate-100 shadow-sm'}`}>
-                                            {/* Name + avatar */}
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${isDark ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
-                                                    {lead.name.charAt(0).toUpperCase()}
+                                    ) : colLeads.map((lead, index) => (
+                                        <Draggable key={lead.id} draggableId={lead.id.toString()} index={index}>
+                                            {(provided, snapshot) => (
+                                                <div 
+                                                    ref={provided.innerRef}
+                                                    {...provided.draggableProps}
+                                                    {...provided.dragHandleProps}
+                                                    className={`rounded-xl p-3 border transition-shadow ${snapshot.isDragging ? 'shadow-xl shadow-blue-500/10 ring-2 ring-blue-500 z-50' : 'hover:shadow-md'} ${isDark ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-100 shadow-sm'}`}
+                                                >
+                                                    {/* Name + avatar */}
+                                                    <div className="flex items-center gap-2 mb-2 cursor-grab active:cursor-grabbing">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${isDark ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
+                                                            {lead.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <span className={`font-bold text-sm truncate flex-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{lead.name}</span>
+                                                        <ScoreBadge score={lead.score} grade={lead.grade} />
+                                                    </div>
+
+                                                    {/* Phone */}
+                                                    <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-xs text-blue-500 hover:underline mb-1">
+                                                        <Phone size={11} /> {lead.phone}
+                                                    </a>
+
+                                                    {/* Course */}
+                                                    {lead.course_id && (
+                                                        <p className={`text-xs truncate mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                            📚 {lead.course_id}
+                                                        </p>
+                                                    )}
+
+                                                    {/* Note snippet */}
+                                                    {lead.notes && (
+                                                        <p className={`text-xs italic truncate mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                            💬 {lead.notes}
+                                                        </p>
+                                                    )}
+
+                                                    {/* Date */}
+                                                    <p className={`text-xs mb-3 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                                                        {new Date(lead.created_at).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+
+                                                    {/* Quick actions */}
+                                                    <div className="flex items-center gap-1.5">
+                                                        <a href={`tel:${lead.phone}`}
+                                                            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${isDark ? 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
+                                                            <Phone size={11} /> Qo'ng'iroq
+                                                        </a>
+                                                        <a href={`https://t.me/${lead.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer"
+                                                            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${isDark ? 'bg-sky-900/30 text-sky-400 hover:bg-sky-900/50' : 'bg-sky-50 text-sky-600 hover:bg-sky-100'}`}>
+                                                            <Send size={11} /> Telegram
+                                                        </a>
+                                                    </div>
                                                 </div>
-                                                <span className={`font-bold text-sm truncate flex-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{lead.name}</span>
-                                                <ScoreBadge score={lead.score} grade={lead.grade} />
-                                            </div>
-
-                                            {/* Phone */}
-                                            <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-xs text-blue-500 hover:underline mb-1">
-                                                <Phone size={11} /> {lead.phone}
-                                            </a>
-
-                                            {/* Course */}
-                                            {lead.course_id && (
-                                                <p className={`text-xs truncate mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                    📚 {lead.course_id}
-                                                </p>
                                             )}
-
-                                            {/* Note snippet */}
-                                            {lead.notes && (
-                                                <p className={`text-xs italic truncate mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                                                    💬 {lead.notes}
-                                                </p>
-                                            )}
-
-                                            {/* Date */}
-                                            <p className={`text-xs mb-3 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-                                                {new Date(lead.created_at).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                                            </p>
-
-                                            {/* Quick actions */}
-                                            <div className="flex items-center gap-1.5">
-                                                <a href={`tel:${lead.phone}`}
-                                                    className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${isDark ? 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
-                                                    <Phone size={11} /> Qo'ng'iroq
-                                                </a>
-                                                <a href={`https://t.me/${lead.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer"
-                                                    className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${isDark ? 'bg-sky-900/30 text-sky-400 hover:bg-sky-900/50' : 'bg-sky-50 text-sky-600 hover:bg-sky-100'}`}>
-                                                    <Send size={11} /> Telegram
-                                                </a>
-                                                {/* Status change buttons */}
-                                                <button
-                                                    onClick={() => openActivityPanel(lead.id)}
-                                                    className={`p-1.5 rounded-lg transition-colors ${isDark ? 'bg-purple-900/30 text-purple-400 hover:bg-purple-900/50' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'}`}
-                                                    title="Faoliyat tarixi"
-                                                >
-                                                    <Activity size={14} />
-                                                </button>
-                                                {status !== 'enrolled' && (
-                                                    <button
-                                                        onClick={() => handleStatusChange(lead.id, status === 'new' ? 'contacted' : status === 'contacted' ? 'enrolled' : 'enrolled')}
-                                                        className={`p-1.5 rounded-lg transition-colors ${isDark ? 'bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
-                                                        title="Keyingi bosqich"
-                                                    >
-                                                        <CheckCircle size={14} />
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            {/* Move to column */}
-                                            <div className="mt-2">
-                                                <select
-                                                    value={lead.status}
-                                                    onChange={e => handleStatusChange(lead.id, e.target.value as LeadStatus)}
-                                                    className={`w-full text-xs font-bold px-2 py-1 rounded-lg border outline-none cursor-pointer transition-colors ${isDark ? 'bg-slate-800 border-white/10 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
-                                                >
-                                                    {ALL_STATUSES.map(s => (
-                                                        <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
+                                        </Draggable>
                                     ))}
+                                    {provided.placeholder}
                                 </div>
                             </div>
+                                )}
+                            </Droppable>
                         );
                     })}
                 </div>
-            )}
+            </DragDropContext>
+        )}
 
             {/* Table */}
             {viewMode === 'table' && <div className={`rounded-3xl border shadow-xl overflow-hidden ${isDark ? 'bg-slate-800/60 backdrop-blur-xl border-white/10' : 'bg-white border-slate-200'}`}>

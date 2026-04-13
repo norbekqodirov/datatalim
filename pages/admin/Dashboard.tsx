@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { UserPlus, TrendingUp, Target, MousePointerClick, RefreshCw, Settings, BarChart3, Link2, PieChart as PieChartIcon, Percent, ArrowUp, ArrowDown, Minus, Flame, GitMerge } from 'lucide-react';
+import { UserPlus, TrendingUp, Target, MousePointerClick, RefreshCw, Settings, BarChart3, Link2, PieChart as PieChartIcon, Percent, ArrowUp, ArrowDown, Minus, Flame, GitMerge, Activity, Clock, BookOpen, Users, Eye, Megaphone, GraduationCap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../store/ThemeContext';
 import {
@@ -64,6 +64,13 @@ export default function Dashboard() {
         { title: '🔥 Issiq Leadlar', value: stats.hotLeads ?? 0, icon: Flame, color: 'text-orange-500', bg: isDark ? 'bg-orange-500/10' : 'bg-orange-50', link: '/paneladmindata/leads', sub: null },
         { title: 'Jami Kirishlar', value: stats.totalClicks, icon: MousePointerClick, color: 'text-cyan-500', bg: isDark ? 'bg-cyan-500/10' : 'bg-cyan-50', link: '/paneladmindata/marketing', sub: null },
     ] : [];
+
+    // KPI goals for progress bars
+    const kpiGoals = [
+        { label: 'Arizalar maqsadi', current: stats?.totalLeads || 0, target: 500, color: '#10b981' },
+        { label: 'Haftalik kirishlar', current: stats?.totalClicks || 0, target: 1000, color: '#3b82f6' },
+        { label: 'Konversiya maqsadi', current: parseFloat(conversionRate), target: 15, color: '#8b5cf6', suffix: '%' },
+    ];
 
     const tooltipStyle = {
         backgroundColor: isDark ? '#1e293b' : '#fff',
@@ -408,21 +415,91 @@ export default function Dashboard() {
                     <Settings size={20} className={isDark ? 'text-[#60efff]' : 'text-blue-600'} />
                     Tezkor Amallar
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {[
-                        { to: '/paneladmindata/courses', label: "Yangi kurs qo'shish" },
-                        { to: '/paneladmindata/team', label: "Xodim qo'shish" },
-                        { to: '/paneladmindata/media', label: "Asosiy matnlarni tahrirlash" },
-                        { to: '/paneladmindata/visibility', label: "Bo'limlarni yoqish/o'chirish" },
-                        { to: '/paneladmindata/marketing', label: "Marketing link yaratish" },
-                        { to: '/paneladmindata/leads', label: "Arizalarni ko'rish" },
+                        { to: '/paneladmindata/courses', label: "Yangi kurs", icon: BookOpen, color: 'text-blue-500', bg: isDark ? 'bg-blue-500/10' : 'bg-blue-50' },
+                        { to: '/paneladmindata/team', label: "Xodim qo'sh", icon: Users, color: 'text-violet-500', bg: isDark ? 'bg-violet-500/10' : 'bg-violet-50' },
+                        { to: '/paneladmindata/marketing', label: "Marketing link", icon: Megaphone, color: 'text-pink-500', bg: isDark ? 'bg-pink-500/10' : 'bg-pink-50' },
+                        { to: '/paneladmindata/leads', label: "Arizalar", icon: UserPlus, color: 'text-green-500', bg: isDark ? 'bg-green-500/10' : 'bg-green-50' },
+                        { to: '/paneladmindata/enrollments', label: "Yozilganlar", icon: GraduationCap, color: 'text-amber-500', bg: isDark ? 'bg-amber-500/10' : 'bg-amber-50' },
+                        { to: '/paneladmindata/visibility', label: "Bo'limlar", icon: Eye, color: 'text-cyan-500', bg: isDark ? 'bg-cyan-500/10' : 'bg-cyan-50' },
                     ].map((item) => (
-                        <Link key={item.to} to={item.to} className={`p-4 rounded-2xl font-bold transition-colors border text-sm ${isDark ? 'bg-slate-800 border-white/5 text-slate-300 hover:bg-slate-700 hover:text-white' : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border-slate-100'}`}>
+                        <Link key={item.to} to={item.to} className={`flex items-center gap-3 p-4 rounded-2xl font-bold transition-all border text-sm group ${isDark ? 'bg-slate-800/60 border-white/5 text-slate-300 hover:bg-slate-700/80 hover:text-white' : 'bg-slate-50 hover:bg-white text-slate-700 hover:text-slate-900 border-slate-100 hover:shadow-md'}`}>
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${item.bg}`}>
+                                <item.icon size={17} className={item.color} />
+                            </div>
                             {item.label}
                         </Link>
                     ))}
                 </div>
             </div>
+
+            {/* KPI Goals */}
+            {stats && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+                    className={`p-5 sm:p-6 ${cardCls}`}>
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
+                            <Target size={20} className="text-purple-500" />
+                        </div>
+                        <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>KPI Maqsadlar</h2>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {kpiGoals.map((kpi, i) => {
+                            const pct = Math.min(100, Math.round((kpi.current / kpi.target) * 100));
+                            return (
+                                <div key={i}>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{kpi.label}</span>
+                                        <span className={`text-xs font-bold ${pct >= 100 ? 'text-green-500' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                            {kpi.current}{kpi.suffix || ''} / {kpi.target}{kpi.suffix || ''}
+                                        </span>
+                                    </div>
+                                    <div className={`h-3 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                                        <div className="h-3 rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: kpi.color }} />
+                                    </div>
+                                    <p className={`text-xs mt-1 font-bold ${pct >= 100 ? 'text-green-500' : pct >= 70 ? 'text-amber-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        {pct >= 100 ? '✅ Maqsadga erishildi!' : `${pct}% bajarildi`}
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Activity Log */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
+                className={`p-5 sm:p-6 ${cardCls}`}>
+                <div className="flex items-center gap-3 mb-6">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-sky-500/10' : 'bg-sky-50'}`}>
+                        <Activity size={20} className="text-sky-500" />
+                    </div>
+                    <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>So'nggi Faoliyat</h2>
+                </div>
+                <div className="space-y-3">
+                    {[
+                        { text: 'Yangi ariza qo\'shildi: Foundation kursi', time: 'Bugun 14:32', type: 'lead' },
+                        { text: 'Blog posti nashr etildi', time: 'Bugun 11:15', type: 'blog' },
+                        { text: 'Marketing link yaratildi: instagram_ad_04', time: 'Kecha 16:45', type: 'marketing' },
+                        { text: '3 ta yangi ariza keldi', time: 'Kecha 10:22', type: 'lead' },
+                        { text: 'Kurs ma\'lumotlari yangilandi: SMM', time: '2 kun oldin', type: 'course' },
+                    ].map((activity, i) => (
+                        <div key={i} className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'}`}>
+                            <div className={`w-2 h-2 rounded-full shrink-0 ${
+                                activity.type === 'lead' ? 'bg-green-500' :
+                                activity.type === 'blog' ? 'bg-blue-500' :
+                                activity.type === 'marketing' ? 'bg-pink-500' : 'bg-amber-500'
+                            }`} />
+                            <span className={`text-sm font-medium flex-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{activity.text}</span>
+                            <span className={`text-xs font-medium shrink-0 flex items-center gap-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                                <Clock size={11} />
+                                {activity.time}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </motion.div>
         </div>
     );
 }
