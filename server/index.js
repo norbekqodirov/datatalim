@@ -832,11 +832,11 @@ app.delete('/api/leads/:id', authenticateToken, (req, res) => {
 // API Endpoints for Data Ta'lim Store
 const KEYS = ['courses', 'team', 'site_content', 'visibility'];
 
-// GET data by key
-app.get('/api/:key', (req, res) => {
+// GET data by key (only for content store keys)
+app.get('/api/:key', (req, res, next) => {
     const { key } = req.params;
     if (!KEYS.includes(key)) {
-        return res.status(400).json({ error: 'Invalid key' });
+        return next(); // pass to specific route handlers below
     }
 
     try {
@@ -869,11 +869,11 @@ app.get('/api/:key', (req, res) => {
     }
 });
 
-// PUT (update) data by key
-app.put('/api/:key', authenticateToken, (req, res) => {
+// PUT (update) data by key (only for content store keys)
+app.put('/api/:key', authenticateToken, (req, res, next) => {
     const { key } = req.params;
     if (!KEYS.includes(key)) {
-        return res.status(400).json({ error: 'Invalid key' });
+        return next(); // pass to specific route handlers below
     }
 
     try {
