@@ -4,7 +4,7 @@ import {
   Users, Plus, Search, Phone, Mail, MapPin, Edit3, Trash2,
   X, Save, Loader2, ChevronDown, Filter, UserCheck, UserX,
   GraduationCap, BookOpen, Calendar, Star, RefreshCw,
-  Download, Eye, User, ChevronRight
+  Download, Eye, User, ChevronRight, CreditCard, AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
@@ -26,7 +26,11 @@ interface Student {
   created_at: string;
   active_groups?: number;
   total_paid?: number;
+  paid_this_month?: number;
+  last_payment_at?: string;
 }
+
+const EMPTY_PAY = { student_id: 0, amount: '', payment_type: 'cash', purpose: 'tuition', month_for: new Date().toISOString().slice(0, 7), note: '' };
 
 const STATUS_CFG = {
   active:    { label: "Faol",      color: "text-green-500",  bg: "bg-green-500/10",  dot: "bg-green-500"  },
@@ -52,6 +56,10 @@ export default function ManageStudents() {
   const [saving, setSaving] = useState(false);
   const [viewId, setViewId] = useState<number | null>(null);
   const [viewData, setViewData] = useState<any>(null);
+  const [payForm, setPayForm] = useState<typeof EMPTY_PAY>(EMPTY_PAY);
+  const [showPay, setShowPay] = useState(false);
+  const [payingSt, setPayingSt] = useState<Student | null>(null);
+  const [savingPay, setSavingPay] = useState(false);
   const token = () => localStorage.getItem('adminToken');
 
   const fetch_ = async () => {
@@ -108,6 +116,29 @@ export default function ManageStudents() {
     await fetch(`/api/students/${id}`, { method:'DELETE', headers:{ Authorization:`Bearer ${token()}` } });
     setStudents(prev => prev.filter(s => s.id !== id));
     toast.success("O'chirildi");
+  };
+
+  const openQuickPay = (s: Student) => {
+    setPayingSt(s);
+    setPayForm({ ...EMPTY_PAY, student_id: s.id });
+    setShowPay(true);
+  };
+
+  const handleSavePay = async () => {
+    if (!payForm.amount || isNaN(Number(payForm.amount)) || Number(payForm.amount) <= 0) return toast.error("Summa kiriting");
+    setSavingPay(true);
+    try {
+      const r = await fetch('/api/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ ...payForm, amount: Number(payForm.amount) })
+      });
+      if (!r.ok) throw new Error((await r.json()).error);
+      toast.success("To'lov saqlandi ✓");
+      setShowPay(false);
+      fetch_();
+    } catch (e: any) { toast.error(e.message || 'Xatolik'); }
+    finally { setSavingPay(false); }
   };
 
   const exportCSV = () => {
@@ -216,7 +247,14 @@ export default function ManageStudents() {
                             {s.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{s.name}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{s.name}</p>
+                              {s.status === 'active' && (s.active_groups || 0) > 0 && !(s.paid_this_month) && (
+                                <span title="Bu oy to'lov qilinmagan" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-xs font-bold bg-red-500/10 text-red-500">
+                                  <AlertTriangle size={10} /> Qarzdor
+                                </span>
+                              )}
+                            </div>
                             {s.email && <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{s.email}</p>}
                           </div>
                         </div>
@@ -241,6 +279,9 @@ export default function ManageStudents() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          {s.status === 'active' && (
+                            <button onClick={() => openQuickPay(s)} className={`p-1.5 rounded-lg transition-colors text-emerald-500 hover:bg-emerald-500/10`} title="To'lov qilish"><CreditCard size={15} /></button>
+                          )}
                           <button onClick={() => openView(s.id)} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-white' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`} title="Ko'rish"><Eye size={15} /></button>
                           <button onClick={() => openEdit(s)} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-white' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`} title="Tahrirlash"><Edit3 size={15} /></button>
                           <button onClick={() => handleDelete(s.id)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors" title="O'chirish"><Trash2 size={15} /></button>
@@ -314,6 +355,63 @@ export default function ManageStudents() {
                 <button onClick={() => setShowForm(false)} className={`px-5 py-2.5 rounded-xl font-bold text-sm ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Bekor</button>
                 <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm disabled:opacity-50">
                   {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Saqlash
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Quick Pay Modal */}
+      <AnimatePresence>
+        {showPay && payingSt && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowPay(false)}>
+            <motion.div initial={{ scale: 0.93, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.93, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className={`w-full max-w-md rounded-3xl shadow-2xl ${isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+              <div className={`flex items-center justify-between p-5 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <div>
+                  <h2 className={`font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Tezkor To'lov</h2>
+                  <p className={`text-sm mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{payingSt.name} · {payingSt.phone}</p>
+                </div>
+                <button onClick={() => setShowPay(false)}><X size={18} className="text-slate-400" /></button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className={lbl}>Summa (so'm) *</label>
+                  <input type="number" value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))}
+                    className={inp} placeholder="500000" autoFocus />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={lbl}>To'lov turi</label>
+                    <select value={payForm.payment_type} onChange={e => setPayForm(f => ({ ...f, payment_type: e.target.value }))} className={inp}>
+                      <option value="cash">Naqd</option>
+                      <option value="card">Karta</option>
+                      <option value="transfer">O'tkazma</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={lbl}>Maqsad</label>
+                    <select value={payForm.purpose} onChange={e => setPayForm(f => ({ ...f, purpose: e.target.value }))} className={inp}>
+                      <option value="tuition">O'quv to'lovi</option>
+                      <option value="registration">Ro'yxatdan o'tish</option>
+                      <option value="other">Boshqa</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className={lbl}>Oy uchun</label>
+                  <input type="month" value={payForm.month_for} onChange={e => setPayForm(f => ({ ...f, month_for: e.target.value }))} className={inp} />
+                </div>
+              </div>
+              <div className={`flex justify-end gap-3 p-5 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <button onClick={() => setShowPay(false)} className={`px-4 py-2 rounded-xl font-bold text-sm ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Bekor</button>
+                <button onClick={handleSavePay} disabled={savingPay}
+                  className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm disabled:opacity-50">
+                  {savingPay ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />} Saqlash
                 </button>
               </div>
             </motion.div>

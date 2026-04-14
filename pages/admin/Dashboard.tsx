@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { UserPlus, TrendingUp, Target, MousePointerClick, RefreshCw, Settings, BarChart3, Link2, PieChart as PieChartIcon, Percent, ArrowUp, ArrowDown, Minus, Flame, GitMerge, Activity, Clock, BookOpen, Users, Eye, Megaphone, GraduationCap } from 'lucide-react';
+import { UserPlus, TrendingUp, Target, MousePointerClick, RefreshCw, Settings, BarChart3, Link2, PieChart as PieChartIcon, Percent, ArrowUp, ArrowDown, Minus, Flame, GitMerge, Activity, Clock, BookOpen, Users, Eye, Megaphone, GraduationCap, AlertTriangle, CreditCard, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../store/ThemeContext';
 import {
@@ -42,6 +42,7 @@ export default function Dashboard() {
     const [lcStats, setLcStats] = useState<LCStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [recentPayments, setRecentPayments] = useState<any[]>([]);
 
     const fetchStats = useCallback((silent = false) => {
         if (!silent) setLoading(true);
@@ -50,9 +51,11 @@ export default function Dashboard() {
         Promise.all([
             fetch('/api/stats', { headers: h }).then(r => r.json()),
             fetch('/api/lc-stats', { headers: h }).then(r => r.json()).catch(() => null),
-        ]).then(([crmData, lcData]) => {
+            fetch('/api/finance/recent-payments?limit=8', { headers: h }).then(r => r.json()).catch(() => []),
+        ]).then(([crmData, lcData, paymentsData]) => {
             setStats(crmData);
             if (lcData && !lcData.error) setLcStats(lcData);
+            if (Array.isArray(paymentsData)) setRecentPayments(paymentsData);
             setLastUpdated(new Date());
         }).catch(() => setStats(null))
         .finally(() => setLoading(false));
@@ -175,6 +178,62 @@ export default function Dashboard() {
                                 <p className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.label}</p>
                                 {item.sub && <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{item.sub}</p>}
                             </Link>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Debtors Warning */}
+            {lcStats && lcStats.debtStudents > 0 && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.29 }}>
+                    <Link to="/paneladmindata/finance"
+                        className={`flex items-center gap-4 p-4 rounded-2xl border transition-all hover:shadow-md ${isDark ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/15' : 'bg-red-50 border-red-200 hover:bg-red-100'}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-red-500/20' : 'bg-red-100'}`}>
+                            <AlertTriangle size={20} className="text-red-500" />
+                        </div>
+                        <div className="flex-1">
+                            <p className={`text-sm font-black ${isDark ? 'text-red-400' : 'text-red-700'}`}>
+                                {lcStats.debtStudents} ta o'quvchi bu oy to'lov qilmagan
+                            </p>
+                            <p className={`text-xs mt-0.5 ${isDark ? 'text-red-500/70' : 'text-red-500'}`}>
+                                Finance sahifasida Qarzdorlar tabini tekshiring
+                            </p>
+                        </div>
+                        <ChevronRight size={16} className="text-red-400 shrink-0" />
+                    </Link>
+                </motion.div>
+            )}
+
+            {/* Recent Payments */}
+            {recentPayments.length > 0 && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.31 }}
+                    className={`p-5 sm:p-6 ${cardCls}`}>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                                <CreditCard size={20} className="text-emerald-500" />
+                            </div>
+                            <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>So'nggi To'lovlar</h2>
+                        </div>
+                        <Link to="/paneladmindata/finance" className={`text-xs font-bold flex items-center gap-1 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}>
+                            Barchasi <ChevronRight size={13} />
+                        </Link>
+                    </div>
+                    <div className="space-y-2">
+                        {recentPayments.map((p: any, i: number) => (
+                            <div key={p.id || i} className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {p.student_name?.charAt(0)?.toUpperCase() || '?'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{p.student_name}</p>
+                                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{p.group_name || '—'} · {p.month_for}</p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <p className={`text-sm font-black ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>{(p.amount || 0).toLocaleString()} so'm</p>
+                                    <p className={`text-xs ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{new Date(p.paid_at).toLocaleDateString('uz-UZ')}</p>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </motion.div>

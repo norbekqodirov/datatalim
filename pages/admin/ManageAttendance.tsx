@@ -3,8 +3,9 @@ import { motion } from 'framer-motion';
 import {
   CheckCircle, XCircle, Clock, AlertCircle, Save, Loader2,
   ChevronLeft, ChevronRight, Users, BarChart2, RefreshCw,
-  Calendar, BookOpen
+  Calendar, BookOpen, Download
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
 
@@ -86,6 +87,29 @@ export default function ManageAttendance() {
 
   useEffect(() => { if (tab === 'stats' && selGroup) loadStats(); }, [tab, selGroup, statsMonth]);
 
+  const exportStatsCSV = () => {
+    if (!stats.length) return;
+    const grpName = groups.find(g => g.id === selGroup)?.name || 'guruh';
+    const h = ["O'quvchi", 'Telefon', 'Keldi', 'Kelmadi', 'Kech', 'Sababli', 'Jami kunlar', '% Davomat'];
+    const rows = stats.map(s => {
+      const pct = s.total_days > 0 ? Math.round(((s.present + s.late * 0.5) / s.total_days) * 100) : 0;
+      return [`"${s.name}"`, s.phone, s.present, s.absent, s.late, s.excused, s.total_days, pct + '%'];
+    });
+    const csv = [h, ...rows].map(r => r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv' }));
+    a.download = `davomat-${grpName}-${statsMonth}.csv`;
+    a.click();
+    toast.success('CSV yuklab olindi');
+  };
+
+  const chartData = useMemo(() =>
+    stats.map(s => {
+      const pct = s.total_days > 0 ? Math.round(((s.present + s.late * 0.5) / s.total_days) * 100) : 0;
+      return { name: s.name.split(' ')[0], present: s.present, absent: s.absent, late: s.late, excused: s.excused, pct };
+    })
+  , [stats]);
+
   const setStatus = (sid: number, status: string) => setRecords(prev => ({ ...prev, [sid]: { ...prev[sid], status } }));
   const setNote = (sid: number, note: string) => setRecords(prev => ({ ...prev, [sid]: { ...prev[sid], note } }));
 
@@ -108,8 +132,8 @@ export default function ManageAttendance() {
   const prevDate = () => { const d = new Date(selDate); d.setDate(d.getDate() - 1); setSelDate(d.toISOString().slice(0,10)); };
   const nextDate = () => { const d = new Date(selDate); d.setDate(d.getDate() + 1); setSelDate(d.toISOString().slice(0,10)); };
 
-  const presentCount = useMemo(() => Object.values(records).filter(r => r.status === 'present').length, [records]);
-  const absentCount = useMemo(() => Object.values(records).filter(r => r.status === 'absent').length, [records]);
+  const presentCount = useMemo(() => Object.values(records).filter((r: { status: string; note: string }) => r.status === 'present').length, [records]);
+  const absentCount = useMemo(() => Object.values(records).filter((r: { status: string; note: string }) => r.status === 'absent').length, [records]);
 
   const card = `rounded-2xl border ${isDark ? 'bg-slate-800/60 border-white/10' : 'bg-white border-slate-200 shadow-sm'}`;
   const inp = `w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-all ${isDark ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500' : 'bg-white border-slate-200 text-slate-900 focus:border-blue-400'}`;
@@ -172,8 +196,8 @@ export default function ManageAttendance() {
               {[
                 { label: "Keldi", val: presentCount, color: "text-green-500", bg: isDark ? "bg-green-500/10" : "bg-green-50" },
                 { label: "Kelmadi", val: absentCount, color: "text-red-500", bg: isDark ? "bg-red-500/10" : "bg-red-50" },
-                { label: "Kech", val: Object.values(records).filter(r => r.status === 'late').length, color: "text-amber-500", bg: isDark ? "bg-amber-500/10" : "bg-amber-50" },
-                { label: "Sababli", val: Object.values(records).filter(r => r.status === 'excused').length, color: "text-blue-500", bg: isDark ? "bg-blue-500/10" : "bg-blue-50" },
+                { label: "Kech", val: Object.values(records).filter((r: { status: string; note: string }) => r.status === 'late').length, color: "text-amber-500", bg: isDark ? "bg-amber-500/10" : "bg-amber-50" },
+                { label: "Sababli", val: Object.values(records).filter((r: { status: string; note: string }) => r.status === 'excused').length, color: "text-blue-500", bg: isDark ? "bg-blue-500/10" : "bg-blue-50" },
               ].map(({ label, val, color, bg }) => (
                 <div key={label} className={`p-3 rounded-2xl border text-center ${card}`}>
                   <div className={`text-2xl font-black ${color}`}>{val}</div>
@@ -243,6 +267,38 @@ export default function ManageAttendance() {
 
       {/* Stats Tab */}
       {tab === 'stats' && selGroup && (
+        <div className="space-y-4">
+          {/* Export button */}
+          {stats.length > 0 && !statsLoading && (
+            <div className="flex justify-end">
+              <button onClick={exportStatsCSV}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${isDark ? 'border-white/10 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                <Download size={14} /> CSV Export
+              </button>
+            </div>
+          )}
+
+          {/* Bar Chart */}
+          {!statsLoading && chartData.length > 0 && (
+            <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-800/60 border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <p className={`text-xs font-black uppercase tracking-wider mb-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                {statsMonth} — Davomat diagrammasi
+              </p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                  <XAxis dataKey="name" tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={{ backgroundColor: isDark ? '#1e293b' : '#fff', border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0', borderRadius: '12px', color: isDark ? '#e2e8f0' : '#1e293b' }} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="present" name="Keldi" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="absent" name="Kelmadi" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="late" name="Kech" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="excused" name="Sababli" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
         <div className={`rounded-2xl border overflow-hidden ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
           {statsLoading ? (
             <div className="flex justify-center h-40 items-center"><Loader2 className="animate-spin text-blue-500" size={28} /></div>
@@ -289,6 +345,7 @@ export default function ManageAttendance() {
               </tbody>
             </table>
           )}
+        </div>
         </div>
       )}
 

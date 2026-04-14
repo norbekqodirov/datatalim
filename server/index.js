@@ -1378,7 +1378,9 @@ app.get('/api/students', authenticateToken, (req, res) => {
         const rows = db.prepare(`
             SELECT s.*,
               (SELECT COUNT(*) FROM group_students gs WHERE gs.student_id = s.id AND gs.status = 'active') AS active_groups,
-              (SELECT COALESCE(SUM(p.amount),0) FROM payments p WHERE p.student_id = s.id) AS total_paid
+              (SELECT COALESCE(SUM(p.amount),0) FROM payments p WHERE p.student_id = s.id) AS total_paid,
+              (SELECT COALESCE(SUM(p.amount),0) FROM payments p WHERE p.student_id = s.id AND p.month_for = strftime('%Y-%m','now')) AS paid_this_month,
+              (SELECT MAX(p.paid_at) FROM payments p WHERE p.student_id = s.id) AS last_payment_at
             FROM students s ORDER BY s.created_at DESC
         `).all();
         res.json(rows);
@@ -1674,6 +1676,48 @@ app.get('/api/lc-stats', authenticateToken, (req, res) => {
             todayAttendance, newStudentsThisMonth, graduatedThisMonth,
             debtStudents, revenueByMonth
         });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/finance/debtors — students who haven't fully paid the given month
+app.get('/api/finance/debtors', authenticateToken, (req, res) => {
+    const month = req.query.month || new Date().toISOString().slice(0, 7);
+    try {
+        const rows = db.prepare(`
+            SELECT
+                s.id, s.name, s.phone,
+                g.id as group_id, g.name as group_name, g.price_per_month,
+                gs.discount,
+                CAST(ROUND(g.price_per_month * (1.0 - gs.discount / 100.0)) AS INTEGER) as expected,
+                COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.student_id=s.id AND p.month_for=?), 0) as paid,
+                CAST(ROUND(g.price_per_month * (1.0 - gs.discount / 100.0)) AS INTEGER) -
+                COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.student_id=s.id AND p.month_for=?), 0) as debt,
+                (SELECT MAX(p.paid_at) FROM payments p WHERE p.student_id=s.id) as last_payment_at
+            FROM students s
+            JOIN group_students gs ON gs.student_id=s.id AND gs.status='active'
+            JOIN groups g ON g.id=gs.group_id AND g.status='active'
+            WHERE s.status='active' AND g.price_per_month > 0
+            HAVING debt > 0
+            ORDER BY debt DESC, s.name
+        `).all(month, month);
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/finance/recent-payments — last N payments
+app.get('/api/finance/recent-payments', authenticateToken, (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    try {
+        const rows = db.prepare(`
+            SELECT p.id, p.amount, p.payment_type, p.purpose, p.month_for, p.paid_at,
+                   s.name as student_name, s.phone as student_phone,
+                   g.name as group_name
+            FROM payments p
+            JOIN students s ON s.id = p.student_id
+            LEFT JOIN groups g ON g.id = p.group_id
+            ORDER BY p.paid_at DESC LIMIT ?
+        `).all(limit);
+        res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
