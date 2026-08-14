@@ -27,5 +27,16 @@ dist-ssr
 
 # Database and archives (don't commit to git)
 server/data.db
+server/data.db-shm
+server/data.db-wal
 *.tar.gz
 *.tmp
+
+# Instagram analytics cache (generated at runtime)
+.ig_cache/
+
+# Build/deploy scratch logs (not source)
+build_log.txt
+
+# One-off prompt export snapshots (not project source)
+migrated_prompt_history/
