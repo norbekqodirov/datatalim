@@ -1,3 +1,4 @@
+import { sshConfig } from './sshConfig.mjs';
 import { Client } from 'ssh2';
 import * as fs from 'fs';
 
@@ -10,9 +11,4 @@ conn.on('ready', () => {
             conn.end();
         });
     });
-}).connect({
-    host: '188.225.74.65',
-    port: 22,
-    username: 'root',
-    password: 'y,Qx9i6-dWMNCi'
-});
+}).connect(sshConfig);

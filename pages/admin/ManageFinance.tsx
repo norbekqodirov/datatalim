@@ -4,7 +4,7 @@ import {
   DollarSign, Plus, Search, Trash2, X, Save, Loader2,
   TrendingUp, TrendingDown, CreditCard, Banknote, Smartphone,
   RefreshCw, Download, Filter, ChevronDown, AlertTriangle,
-  BarChart2, Users, CheckCircle, Clock
+  BarChart2, Users, CheckCircle, Clock, Send
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import toast from 'react-hot-toast';
@@ -58,6 +58,7 @@ export default function ManageFinance() {
   const [payForm, setPayForm] = useState(EMPTY_PAY);
   const [expForm, setExpForm] = useState(EMPTY_EXP);
   const [saving, setSaving] = useState(false);
+  const [sendingNotif, setSendingNotif] = useState(false);
 
   const token = () => localStorage.getItem('adminToken');
   const authH = () => ({ Authorization: `Bearer ${token()}` });
@@ -91,6 +92,31 @@ export default function ManageFinance() {
       setDebtors(Array.isArray(d) ? d : []);
     } catch { toast.error('Yuklab olmadi'); }
     finally { setDebtLoading(false); }
+  };
+
+  const handleNotifyDebtors = async () => {
+    setSendingNotif(true);
+    try {
+      const r = await fetch('/api/finance/notify-debtors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authH() },
+        body: JSON.stringify({ month: debtMonth })
+      });
+      const data = await r.json();
+      if (data.success) {
+        if (data.sent) {
+          toast.success(`${data.count} ta qarzdor o'quvchi haqida ma'lumot Telegram guruhga yuborildi ✓`);
+        } else {
+          toast.success(data.message || 'Xabarlar muvaffaqiyatli yuborildi ✓');
+        }
+      } else {
+        throw new Error(data.error || 'Server xatosi');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Xatolik yuz berdi');
+    } finally {
+      setSendingNotif(false);
+    }
   };
 
   useEffect(() => { fetchAll(); }, [filterMonth]);
@@ -413,6 +439,13 @@ export default function ManageFinance() {
                   <AlertTriangle size={15} className="text-red-500" />
                   <span className="text-sm font-black text-red-500">Jami qarz: {totalDebt.toLocaleString()} so'm</span>
                 </div>
+              )}
+              {debtors.length > 0 && (
+                <button onClick={handleNotifyDebtors} disabled={sendingNotif}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-sky-500/25 transition-all disabled:opacity-50">
+                  {sendingNotif ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                  Qarzdorlarni ogohlantirish (Telegram)
+                </button>
               )}
               <button onClick={exportDebtorsCSV} disabled={debtors.length === 0} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${isDark ? 'border-white/10 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}><Download size={15} /> CSV</button>
             </div>

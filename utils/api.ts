@@ -141,3 +141,36 @@ export const submitLeadToAPI = async (leadData: { name: string; phone: string; c
         throw error;
     }
 };
+
+export interface TokenPayload {
+  id: number;
+  username: string;
+  role: string;
+}
+
+export const getDecodedToken = (): TokenPayload | null => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) return null;
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        console.error('Failed to decode token:', e);
+        return null;
+    }
+};
+
+export const getRoleFromToken = (): string => {
+    const decoded = getDecodedToken();
+    return decoded?.role || 'admin';
+};
+
+export const getUsernameFromToken = (): string => {
+    const decoded = getDecodedToken();
+    return decoded?.username || '';
+};
+

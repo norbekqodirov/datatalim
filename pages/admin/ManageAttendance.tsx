@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   CheckCircle, XCircle, Clock, AlertCircle, Save, Loader2,
   ChevronLeft, ChevronRight, Users, BarChart2, RefreshCw,
-  Calendar, BookOpen, Download
+  Calendar, BookOpen, Download, Send
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import toast from 'react-hot-toast';
@@ -33,6 +33,7 @@ export default function ManageAttendance() {
   const [stats, setStats] = useState<StatRow[]>([]);
   const [statsMonth, setStatsMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [statsLoading, setStatsLoading] = useState(false);
+  const [sendingNotif, setSendingNotif] = useState(false);
 
   const token = () => localStorage.getItem('adminToken');
   const authH = () => ({ Authorization: `Bearer ${token()}` });
@@ -129,6 +130,31 @@ export default function ManageAttendance() {
     finally { setSaving(false); }
   };
 
+  const handleNotifyAbsent = async () => {
+    if (!selGroup) return toast.error('Guruh tanlang');
+    setSendingNotif(true);
+    try {
+      const r = await fetch('/api/attendance/notify-absent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authH() },
+        body: JSON.stringify({ group_id: selGroup, date: selDate })
+      });
+      const data = await r.json();
+      if (data.success) {
+        if (data.sent) {
+          toast.success(`${data.count} ta o'quvchi ota-onasi uchun xabarnoma Telegram guruhga yuborildi ✓`);
+        } else {
+          toast.success(data.message || 'Xabarlar yuborildi ✓');
+        }
+      } else {
+        throw new Error(data.error || 'Server xatosi');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Xatolik yuz berdi');
+    } finally {
+      setSendingNotif(false);
+    }
+  };
   const prevDate = () => { const d = new Date(selDate); d.setDate(d.getDate() - 1); setSelDate(d.toISOString().slice(0,10)); };
   const nextDate = () => { const d = new Date(selDate); d.setDate(d.getDate() + 1); setSelDate(d.toISOString().slice(0,10)); };
 
@@ -254,7 +280,14 @@ export default function ManageAttendance() {
           )}
 
           {groupStudents.length > 0 && (
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+              {absentCount > 0 && (
+                <button onClick={handleNotifyAbsent} disabled={sendingNotif}
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-sky-500/25 disabled:opacity-50">
+                  {sendingNotif ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                  Ota-onalarni ogohlantirish (Telegram)
+                </button>
+              )}
               <button onClick={handleSave} disabled={saving}
                 className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-green-500/25 disabled:opacity-50">
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}

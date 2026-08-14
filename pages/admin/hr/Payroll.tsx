@@ -49,7 +49,7 @@ export default function Payroll() {
       // Fetch payroll history
       const rPay = await fetch('/api/payroll', { headers: { Authorization: `Bearer ${token()}` } });
       const payData = await rPay.json();
-      setRecords(payData);
+      setRecords(Array.isArray(payData) ? payData : []);
 
       // Fetch teachers & staff for selection dropdown
       const rTeachers = await fetch('/api/teachers', { headers: { Authorization: `Bearer ${token()}` } });
@@ -58,8 +58,8 @@ export default function Payroll() {
       const staffData = await rStaff.json();
 
       const options: EmployeeOption[] = [
-        ...teachersData.map((t: any) => ({ id: t.id, name: t.name, type: 'teacher' as const, roleOrSpecialty: t.specialty || "O'qituvchi" })),
-        ...staffData.map((s: any) => ({ id: s.id, name: s.name, type: 'staff' as const, roleOrSpecialty: s.role || 'Kadr' }))
+        ...(Array.isArray(teachersData) ? teachersData : []).map((t: any) => ({ id: t.id, name: t.name, type: 'teacher' as const, roleOrSpecialty: t.specialty || "O'qituvchi" })),
+        ...(Array.isArray(staffData) ? staffData : []).map((s: any) => ({ id: s.id, name: s.name, type: 'staff' as const, roleOrSpecialty: s.role || 'Kadr' }))
       ];
       setEmployees(options);
     } catch {

@@ -73,7 +73,7 @@ export default function TelegramAnalytics() {
                 <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                     <AlertCircle className="text-red-500" size={32} />
                 </div>
-                <h2 className={`text-xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Xatolik yuz berdi</h2>
+                <h2 className={`text-xl font-extrabold mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Xatolik yuz berdi</h2>
                 <p className={`mb-6 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{errorMsg}</p>
                 <Link to="/paneladmindata/settings" className="px-6 py-3 bg-[#0088cc] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-[#0077b3] transition-colors">
                     Sozlamalarga o'tish <ArrowRight size={18} />
@@ -91,7 +91,7 @@ export default function TelegramAnalytics() {
           <Send className="text-white" size={24} />
         </div>
         <div>
-          <h1 className={`text-2xl sm:text-3xl font-black mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          <h1 className={`text-2xl sm:text-3xl font-extrabold mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             Telegram Analitika
           </h1>
           <p className={isDark ? 'text-slate-400' : 'text-slate-500'}>
@@ -108,7 +108,7 @@ export default function TelegramAnalytics() {
               <Users className="text-blue-500" size={20} />
            </div>
            <p className={`text-sm font-bold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Jami Obunachilar</p>
-           <h3 className={`text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+           <h3 className={`text-3xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {stats?.memberCount?.toLocaleString() || '...'}
            </h3>
            <p className={`text-xs font-bold mt-3 ${isDark ? 'text-green-400' : 'text-green-600'} flex items-center gap-1`}>
@@ -122,7 +122,7 @@ export default function TelegramAnalytics() {
               <Activity className="text-[#0088cc]" size={20} />
            </div>
            <p className={`text-sm font-bold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Kanal Nomi</p>
-           <h3 className={`text-xl font-black truncate max-w-full ${isDark ? 'text-white' : 'text-slate-900'}`}>
+           <h3 className={`text-xl font-semibold truncate max-w-full ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {stats?.channelInfo?.title || 'Noma\'lum'}
            </h3>
            <p className={`text-sm mt-1 truncate max-w-full font-medium text-[#0088cc]`}>
@@ -136,7 +136,7 @@ export default function TelegramAnalytics() {
               <BarChart2 className="text-purple-500" size={20} />
            </div>
            <p className={`text-sm font-bold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Engagement Rate (ER)</p>
-           <h3 className={`text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+           <h3 className={`text-3xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {advancedStats?.avgViews && stats?.memberCount ? ((advancedStats.avgViews / stats.memberCount) * 100).toFixed(1) : '–'}%
            </h3>
            <div className={`mt-3 flex items-center gap-2 text-xs font-bold ${advancedStats?.insights?.momentum > 0 ? 'text-green-500' : (advancedStats?.insights?.momentum < 0 ? 'text-red-500' : 'text-slate-500')}`}>
@@ -150,7 +150,7 @@ export default function TelegramAnalytics() {
               <Eye className="text-orange-500" size={20} />
            </div>
            <p className={`text-sm font-bold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>O'rtacha Ko'rishlar</p>
-           <h3 className={`text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+           <h3 className={`text-3xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {advancedStats?.avgViews?.toLocaleString() || '–'}
            </h3>
            <div className="mt-3 flex items-center gap-2 text-xs font-bold text-slate-500">
@@ -165,7 +165,7 @@ export default function TelegramAnalytics() {
               <div className="p-3 bg-pink-500/10 rounded-xl flex-shrink-0"><Zap className="text-pink-500" size={20} /></div>
               <div>
                   <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} uppercase`}>Eng Top Post</p>
-                  <p className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-800'} mt-1`}>{advancedStats?.insights?.topPostViews?.toLocaleString() || '0'} 👁️</p>
+                  <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-800'} mt-1`}>{advancedStats?.insights?.topPostViews?.toLocaleString() || '0'} 👁️</p>
                   <p className="text-xs text-slate-500 truncate w-32 mt-1">{advancedStats?.insights?.topPostPreview || 'Kutilyapti...'}</p>
               </div>
           </motion.div>
@@ -173,7 +173,7 @@ export default function TelegramAnalytics() {
               <div className="p-3 bg-indigo-500/10 rounded-xl flex-shrink-0"><FileText className="text-indigo-500" size={20} /></div>
               <div>
                   <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} uppercase`}>O'rtacha Matn Umr</p>
-                  <p className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-800'} mt-1`}>{advancedStats?.insights?.avgCharCount || '0'} ta belgi</p>
+                  <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-800'} mt-1`}>{advancedStats?.insights?.avgCharCount || '0'} ta belgi</p>
                   <p className="text-xs text-slate-500 mt-1">Sizning kontent hajmingiz</p>
               </div>
           </motion.div>
@@ -181,7 +181,7 @@ export default function TelegramAnalytics() {
               <div className="p-3 bg-teal-500/10 rounded-xl flex-shrink-0"><LinkIcon className="text-teal-500" size={20} /></div>
               <div>
                   <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} uppercase`}>Ssilkalar Qo'shilgani</p>
-                  <p className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-800'} mt-1`}>{advancedStats?.insights?.linkRatio || '0'}%</p>
+                  <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-800'} mt-1`}>{advancedStats?.insights?.linkRatio || '0'}%</p>
                   <p className="text-xs text-slate-500 mt-1">Postlarda ssilka uchrashi</p>
               </div>
           </motion.div>
@@ -189,7 +189,7 @@ export default function TelegramAnalytics() {
               <div className="p-3 bg-emerald-500/10 rounded-xl flex-shrink-0"><Target className="text-emerald-500" size={20} /></div>
               <div>
                   <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'} uppercase`}>Samaradorlik trendi</p>
-                  <p className={`text-lg font-black mt-1 ${advancedStats?.insights?.momentum >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  <p className={`text-lg font-bold mt-1 ${advancedStats?.insights?.momentum >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                       {advancedStats?.insights?.momentum > 0 ? '+' : ''}{advancedStats?.insights?.momentum || 0}%
                   </p>
                   <p className="text-xs text-slate-500 mt-1">Oxirgi vs oldingi postlar</p>
@@ -205,7 +205,7 @@ export default function TelegramAnalytics() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
                 <Eye size={18} className="text-[#0088cc]" />
-                <h2 className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Post Ko'rishlar Va Ulashishlar</h2>
+                <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Post Ko'rishlar Va Ulashishlar</h2>
             </div>
             <div className={`text-xs px-2 py-1 rounded-lg font-bold ${isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
                 Kunlik statistika
@@ -240,7 +240,7 @@ export default function TelegramAnalytics() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className={cardClass}>
           <div className="flex items-center gap-2 mb-6">
             <PieIcon size={18} className="text-[#0088cc]" />
-            <h2 className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Kontent Turi</h2>
+            <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Kontent Turi</h2>
           </div>
           <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>So'nggi postlar taqsimoti</p>
           <ResponsiveContainer width="100%" height={240}>
@@ -264,7 +264,7 @@ export default function TelegramAnalytics() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className={`${cardClass} lg:col-span-1`}>
           <div className="flex items-center gap-2 mb-2">
             <MessageCircle size={18} className="text-[#8b5cf6]" />
-            <h2 className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Eng Faol Vaqtlar</h2>
+            <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Eng Faol Vaqtlar</h2>
           </div>
           <p className={`text-xs mb-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Kanal ER % bo'yicha</p>
           <ResponsiveContainer width="100%" height={200}>
@@ -284,7 +284,7 @@ export default function TelegramAnalytics() {
         
         {/* Channel Description Fallback */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }} className={`lg:col-span-2 ${cardClass} flex flex-col justify-center`}>
-            <h2 className={`text-lg font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Kanal tavsifi (Bio)</h2>
+            <h2 className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Kanal tavsifi (Bio)</h2>
             <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                 <p className={`whitespace-pre-wrap text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                     {stats?.channelInfo?.description || 'Kanal tavsifi kiritilmagan.'}

@@ -1,3 +1,4 @@
+import { sshConfig } from '../utils/sshConfig.mjs';
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
@@ -169,7 +170,7 @@ async function deploy() {
                 });
             });
         });
-    }).connect({ host: '188.225.74.65', port: 22, username: 'root', password: 'y,Qx9i6-dWMNCi' });
+    }).connect(sshConfig);
 }
 
 deploy().catch(console.error);

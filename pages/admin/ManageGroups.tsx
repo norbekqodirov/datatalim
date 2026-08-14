@@ -61,6 +61,7 @@ export default function ManageGroups() {
   const [detailId, setDetailId] = useState<number | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [allDiscounts, setAllDiscounts] = useState<any[]>([]);
   const [addStudentId, setAddStudentId] = useState('');
   const [addDiscount, setAddDiscount] = useState(0);
 
@@ -83,7 +84,19 @@ export default function ManageGroups() {
     setAllStudents(Array.isArray(data) ? data.filter((s: Student) => s.status === 'active') : []);
   };
 
-  useEffect(() => { fetchGroups(); fetchAllStudents(); }, []);
+  const fetchAllDiscounts = async () => {
+    try {
+      const r = await fetch('/api/discounts', { headers: authH() });
+      const data = await r.json();
+      setAllDiscounts(Array.isArray(data) ? data.filter((d: any) => d.status === 'active') : []);
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchGroups();
+    fetchAllStudents();
+    fetchAllDiscounts();
+  }, []);
 
   const openDetail = async (id: number) => {
     setDetailId(id);
@@ -314,18 +327,47 @@ export default function ManageGroups() {
                 {/* Add student */}
                 <div className={`p-4 rounded-2xl ${isDark ? 'bg-slate-800' : 'bg-slate-50'}`}>
                   <p className={`text-xs font-black uppercase tracking-wider mb-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>O'quvchi qo'shish</p>
-                  <div className="flex gap-2">
-                    <select value={addStudentId} onChange={e => setAddStudentId(e.target.value)} className={inp + ' flex-1'}>
+                  <div className="flex flex-col gap-2.5">
+                    <select value={addStudentId} onChange={e => setAddStudentId(e.target.value)} className={inp + ' w-full'}>
                       <option value="">O'quvchi tanlang...</option>
                       {allStudents.filter(s => !detailData.students?.some((ds: any) => ds.id === s.id && ds.enroll_status === 'active')).map(s => (
                         <option key={s.id} value={s.id}>{s.name} — {s.phone}</option>
                       ))}
                     </select>
-                    <input type="number" min={0} max={100} placeholder="% chegirma" value={addDiscount||''} onChange={e => setAddDiscount(parseInt(e.target.value)||0)}
-                      className={inp + ' w-28'} />
-                    <button onClick={handleAddStudent} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors shrink-0">
-                      <UserPlus size={16} />
-                    </button>
+                    <div className="flex gap-2">
+                      <select
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (!val) {
+                            setAddDiscount(0);
+                            return;
+                          }
+                          const disc = allDiscounts.find(d => d.id === Number(val));
+                          if (disc) {
+                            if (disc.type === 'percentage') {
+                              setAddDiscount(disc.value);
+                            } else {
+                              const groupPrice = detailData.price_per_month || 1;
+                              const pct = Math.round((disc.value / groupPrice) * 100);
+                              setAddDiscount(pct);
+                            }
+                          }
+                        }}
+                        className={inp + ' flex-1'}
+                      >
+                        <option value="">Chegirma turi (ixtiyoriy)...</option>
+                        {allDiscounts.map(d => (
+                          <option key={d.id} value={d.id}>
+                            {d.name} ({d.type === 'percentage' ? `${d.value}%` : `${d.value.toLocaleString()} UZS`})
+                          </option>
+                        ))}
+                      </select>
+                      <input type="number" min={0} max={100} placeholder="% chegirma" value={addDiscount||''} onChange={e => setAddDiscount(parseInt(e.target.value)||0)}
+                        className={inp + ' w-24'} />
+                      <button onClick={handleAddStudent} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors shrink-0">
+                        <UserPlus size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
 

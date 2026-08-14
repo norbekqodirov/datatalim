@@ -59,7 +59,7 @@ export default function IGAudience() {
             </div>
             <span className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Auditoriya Demografiyasi</span>
           </div>
-          <h1 className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Followers Tahlili</h1>
+          <h1 className={`text-2xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Followers Tahlili</h1>
           <p className={`text-sm mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Kuzatvchilarning yoshi, jinsi va joylashuvi tahlili</p>
         </div>
         <button onClick={handleSync} disabled={syncing}
@@ -75,7 +75,7 @@ export default function IGAudience() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cardClass}>
           <div className="flex items-center gap-2 mb-6">
             <Users size={18} className="text-pink-500" />
-            <h2 className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Jins Taqsimoti</h2>
+            <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Jins Taqsimoti</h2>
           </div>
           <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Erkaklar va Ayollar ulushi (%)</p>
           <ResponsiveContainer width="100%" height={250}>
@@ -95,7 +95,7 @@ export default function IGAudience() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
                 <PieIcon size={18} className="text-blue-500" />
-                <h2 className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Yosh va Jins</h2>
+                 <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Yosh va Jins</h2>
             </div>
             <div className={`text-xs px-2 py-1 rounded-lg font-bold ${isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
                 Asosiy: 18-24 yosh
@@ -119,7 +119,7 @@ export default function IGAudience() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`${cardClass} md:col-span-3 lg:col-span-1`}>
           <div className="flex items-center gap-2 mb-2">
             <MapPin size={18} className="text-emerald-500" />
-            <h2 className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Top Hududlar</h2>
+             <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Top Hududlar</h2>
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <RadarChart data={mockCityData.slice(0, 5)} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
@@ -135,7 +135,7 @@ export default function IGAudience() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className={`lg:col-span-2 ${cardClass}`}>
           <div className="flex items-center gap-2 mb-6">
             <Activity size={18} className="text-[#a855f7]" />
-            <h2 className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Kun Davomidagi Faollik</h2>
+             <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Kun Davomidagi Faollik</h2>
           </div>
           
           <ResponsiveContainer width="100%" height={300}>

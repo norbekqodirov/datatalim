@@ -1,8 +1,21 @@
 @import "tailwindcss";
-/* Google Fonts — index.html ga ko'chirildi (preconnect + link) */
+
+@theme {
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Enforce Poppins globally on all elements with sharp anti-aliasing */
+* {
+  font-family: 'Poppins', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body, button, input, optgroup, select, textarea, h1, h2, h3, h4, h5, h6, span, p, a, div, li, option {
+  font-family: 'Poppins', sans-serif !important;
+}
 
 body {
-  font-family: 'Golos Text', sans-serif;
   background-color: #f8fafc;
 }
 

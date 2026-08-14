@@ -64,7 +64,7 @@ export default function IGAIInsights() {
             </div>
             <span className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>AI Tahlil</span>
           </div>
-          <h1 className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>AI Tavsiyalar va Tahlil</h1>
+          <h1 className={`text-2xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>AI Tavsiyalar va Tahlil</h1>
           <p className={`text-sm mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Matematik algoritmlar asosidagi chuqur tahlil</p>
         </div>
         <button onClick={fetchData} disabled={loading}
@@ -103,11 +103,11 @@ export default function IGAIInsights() {
                     strokeLinecap="round" className="transition-all duration-1000" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-black" style={{ color: healthColor(data.healthScore) }}>{data.healthScore}</span>
+                  <span className="text-3xl font-extrabold" style={{ color: healthColor(data.healthScore) }}>{data.healthScore}</span>
                   <span className={`text-[10px] font-bold ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>/100</span>
                 </div>
               </div>
-              <span className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Akaunt Salomatligi</span>
+              <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Akaunt Salomatligi</span>
               <span className="text-xs font-bold mt-1" style={{ color: healthColor(data.healthScore) }}>
                 {healthEmoji(data.healthScore)} {healthLabel(data.healthScore)}
               </span>
@@ -121,14 +121,14 @@ export default function IGAIInsights() {
                   : data.trend?.overall === 'declining'
                     ? <div className="w-8 h-8 rounded-xl bg-red-500/15 flex items-center justify-center"><TrendingDown size={16} className="text-red-500" /></div>
                     : <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center"><Minus size={16} className="text-amber-500" /></div>}
-                <span className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Trend Holati</span>
+                <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Trend Holati</span>
               </div>
               <p className={`text-sm mb-4 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{data.trend?.summary}</p>
               <div className="space-y-2">
                 {(data.trend?.metrics || []).map((m: any) => (
                   <div key={m.name} className={`flex items-center justify-between px-3 py-2 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                     <span className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{m.name}</span>
-                    <span className={`text-xs font-black ${m.change > 0 ? 'text-green-500' : m.change < 0 ? 'text-red-500' : 'text-amber-500'}`}>
+                    <span className={`text-xs font-bold ${m.change > 0 ? 'text-green-500' : m.change < 0 ? 'text-red-500' : 'text-amber-500'}`}>
                       {m.change > 0 ? '↑' : m.change < 0 ? '↓' : '→'} {Math.abs(m.change)}%
                     </span>
                   </div>
@@ -138,7 +138,7 @@ export default function IGAIInsights() {
 
             {/* Key KPIs */}
             <div className={`rounded-2xl p-5 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-              <h3 className={`text-sm font-black mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>Asosiy Ko'rsatkichlar</h3>
+              <h3 className={`text-sm font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>Asosiy Ko'rsatkichlar</h3>
               <div className="space-y-3">
                 {[
                   { label: "O'rtacha Engagement Rate", val: `${data.avgER}%`, color: '#0061ff', icon: Activity },
@@ -149,7 +149,7 @@ export default function IGAIInsights() {
                       <item.icon size={13} style={{ color: item.color }} />
                       <div className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{item.label}</div>
                     </div>
-                    <div className={`text-xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.val}</div>
+                    <div className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.val}</div>
                   </div>
                 ))}
                 <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-purple-500/8 border-purple-500/20' : 'bg-purple-50 border-purple-100'}`}>
@@ -188,7 +188,7 @@ export default function IGAIInsights() {
                     <div className="w-8 h-8 rounded-xl bg-red-500/20 flex items-center justify-center">
                       <AlertTriangle size={16} className="text-red-500" />
                     </div>
-                    <span className={`font-black text-sm ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+                    <span className={`font-bold text-sm ${isDark ? 'text-red-400' : 'text-red-600'}`}>
                       Reach Tushishi Aniqlandi: −{data.drop.dropPercent?.toFixed(1)}%
                     </span>
                   </div>
@@ -197,7 +197,7 @@ export default function IGAIInsights() {
                     {(data.drop.causes || []).slice(0, 3).map((cause: any, i: number) => (
                       <div key={i} className={`p-3.5 rounded-xl border ${isDark ? 'bg-red-500/5 border-red-500/15' : 'bg-red-100/50 border-red-200'}`}>
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className={`text-xs font-black ${isDark ? 'text-red-300' : 'text-red-700'}`}>{cause.reason}</span>
+                           <span className={`text-xs font-bold ${isDark ? 'text-red-300' : 'text-red-700'}`}>{cause.reason}</span>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${cause.impact === 'yuqori' ? 'bg-red-500/20 text-red-400' : cause.impact === "o'rta" ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-500/20 text-slate-400'}`}>
                             {cause.impact}
                           </span>
@@ -231,8 +231,8 @@ export default function IGAIInsights() {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <span className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{rec.title}</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full font-black border" style={{ background: cfg.bg, color: cfg.color, borderColor: cfg.border }}>
+                          <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{rec.title}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold border" style={{ background: cfg.bg, color: cfg.color, borderColor: cfg.border }}>
                             {cfg.label}
                           </span>
                         </div>
@@ -250,7 +250,7 @@ export default function IGAIInsights() {
               {!data.insights?.length && !data.drop?.detected && (
                 <div className={`rounded-2xl p-10 border text-center ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200'}`}>
                   <CheckCircle size={36} className="text-green-500 mx-auto mb-3" />
-                  <p className={`font-black text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>Hozircha hamma narsa yaxshi!</p>
+                  <p className={`font-bold text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>Hozircha hamma narsa yaxshi!</p>
                   <p className={`text-sm mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Tavsiyalar uchun yetarli ma'lumot to'planmaguncha kuting.</p>
                 </div>
               )}
@@ -261,14 +261,14 @@ export default function IGAIInsights() {
           {activeTab === 'trend' && (
             <div className="space-y-5">
               <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-                <h3 className={`font-black mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>30 kun vs oldingi 30 kun</h3>
+                <h3 className={`font-bold mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>30 kun vs oldingi 30 kun</h3>
                 <p className={`text-sm mb-5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{data.trend?.summary}</p>
                 <div className="grid grid-cols-2 gap-3">
                   {(data.trend?.metrics || []).map((m: any) => (
                     <div key={m.name} className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                       <div className={`text-xs mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m.name}</div>
-                      <div className={`text-xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmt(m.current)}</div>
-                      <div className={`text-xs font-black mt-1 flex items-center gap-1 ${m.change > 0 ? 'text-green-500' : m.change < 0 ? 'text-red-500' : 'text-amber-500'}`}>
+                      <div className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmt(m.current)}</div>
+                      <div className={`text-xs font-bold mt-1 flex items-center gap-1 ${m.change > 0 ? 'text-green-500' : m.change < 0 ? 'text-red-500' : 'text-amber-500'}`}>
                         {m.change > 0 ? <TrendingUp size={10} /> : m.change < 0 ? <TrendingDown size={10} /> : <Minus size={10} />}
                         {Math.abs(m.change)}% oldingi davrga nisbatan
                       </div>
@@ -279,7 +279,7 @@ export default function IGAIInsights() {
 
               {/* Content type comparison */}
               <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-                <h3 className={`font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Kontent Turi Taqqoslash</h3>
+                <h3 className={`font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Kontent Turi Taqqoslash</h3>
                 {data.contentTypes?.recommendation && (
                   <p className={`text-sm mb-4 px-3 py-2 rounded-xl ${isDark ? 'bg-blue-500/10 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>{data.contentTypes.recommendation}</p>
                 )}
@@ -287,12 +287,12 @@ export default function IGAIInsights() {
                   {(data.contentTypes?.types || []).map((t: any) => (
                     <div key={t.type} className={`p-4 rounded-xl border ${isDark ? 'border-slate-800 bg-slate-800/30' : 'border-slate-100 bg-slate-50'}`}>
                       <div className="flex items-center justify-between mb-3">
-                        <span className={`text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {t.label}
                           <span className={`ml-2 text-xs font-normal ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>({t.count} post)</span>
                         </span>
                         {t.reachMultiplier > 1 && (
-                          <span className={`text-xs font-black px-2 py-0.5 rounded-full ${isDark ? 'bg-[#0061ff]/15 text-[#60efff]' : 'bg-blue-50 text-[#0061ff]'}`}>{t.reachMultiplier}x reach</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-[#0061ff]/15 text-[#60efff]' : 'bg-blue-50 text-[#0061ff]'}`}>{t.reachMultiplier}x reach</span>
                         )}
                       </div>
                       <div className="grid grid-cols-4 gap-2">
@@ -322,7 +322,7 @@ export default function IGAIInsights() {
                 ].map(p => (
                   <div key={p.label} className={`rounded-2xl p-5 border text-center ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                     <div className="text-2xl mb-2">{p.icon}</div>
-                    <div className={`text-xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmt(p.val)}</div>
+                    <div className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmt(p.val)}</div>
                     <div className={`text-xs font-bold mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{p.label}</div>
                     <div className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>followers</div>
                   </div>
@@ -332,7 +332,7 @@ export default function IGAIInsights() {
               <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                 <div className="flex items-start justify-between mb-5">
                   <div>
-                    <h3 className={`font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Follower O'sish Bashorati</h3>
+                    <h3 className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Follower O'sish Bashorati</h3>
                     <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       {data.followerPrediction.degree === 2
                         ? 'Polynomial regression (daraja 2)'
@@ -392,7 +392,7 @@ export default function IGAIInsights() {
               <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                 <div className="flex items-center gap-2 mb-1">
                   <Calendar size={15} className="text-[#0061ff]" />
-                  <h3 className={`font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Haftalik Faollik Indeksi</h3>
+                  <h3 className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Haftalik Faollik Indeksi</h3>
                 </div>
                 <p className={`text-xs mb-5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   1.0 = o'rtacha · Eng yaxshi kun:{' '}
@@ -441,7 +441,7 @@ export default function IGAIInsights() {
               <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                 <div className="flex items-center gap-2 mb-4">
                   <Target size={15} className="text-[#0061ff]" />
-                  <h3 className={`font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Ta'lim nishi bilan solishtirma</h3>
+                  <h3 className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Ta'lim nishi bilan solishtirma</h3>
                 </div>
                 <div className="space-y-3">
                   {[
@@ -463,12 +463,12 @@ export default function IGAIInsights() {
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <div className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Siz</div>
-                          <div className={`text-sm font-black ${row.above === true ? 'text-green-500' : row.above === false ? 'text-red-500' : isDark ? 'text-slate-300' : 'text-slate-700'}`}>{row.yours}</div>
+                          <div className={`text-sm font-bold ${row.above === true ? 'text-green-500' : row.above === false ? 'text-red-500' : isDark ? 'text-slate-300' : 'text-slate-700'}`}>{row.yours}</div>
                         </div>
                         <div className={`w-px h-8 ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
                         <div className="text-right">
                           <div className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nish o'rtachasi</div>
-                          <div className={`text-sm font-black ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{row.benchmark}</div>
+                          <div className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{row.benchmark}</div>
                         </div>
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${row.above === true ? 'bg-green-500/20 text-green-500' : row.above === false ? 'bg-red-500/20 text-red-500' : isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-400'}`}>
                           {row.above === true ? '↑' : row.above === false ? '↓' : '—'}
@@ -481,7 +481,7 @@ export default function IGAIInsights() {
 
               {/* Priority Matrix */}
               <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-                <h3 className={`font-black mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Ustuvorlik Matrisi</h3>
+                <h3 className={`font-bold mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Ustuvorlik Matrisi</h3>
                 <p className={`text-xs mb-5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Kontent strategiyangizni rejalashtirish uchun</p>
                 <div className="grid grid-cols-2 gap-3">
                   {[
@@ -491,7 +491,7 @@ export default function IGAIInsights() {
                     { title: 'Behuda', desc: 'Past ER, yuqori reach. Ko\'p ko\'rish lekin kam ta\'sir. Qayta ko\'rib chiqish yoki chiqarib tashlash kerak.', color: '#ef4444', bg: '#ef444415', border: '#ef444430' },
                   ].map(q => (
                     <div key={q.title} className="rounded-xl p-4 border" style={{ background: q.bg, borderColor: q.border }}>
-                      <p className="text-sm font-black mb-1" style={{ color: q.color }}>{q.title}</p>
+                      <p className="text-sm font-bold mb-1" style={{ color: q.color }}>{q.title}</p>
                       <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{q.desc}</p>
                     </div>
                   ))}

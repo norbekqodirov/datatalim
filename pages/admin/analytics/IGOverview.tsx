@@ -43,7 +43,7 @@ const KPICard = ({ icon: Icon, label, value, sub, color, trend, isDark }: any) =
         </div>
       )}
     </div>
-    <div className={`text-2xl font-black mb-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</div>
+    <div className={`text-2xl font-extrabold mb-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</div>
     <div className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{label}</div>
     {sub && <div className={`text-xs mt-1.5 font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{sub}</div>}
   </div>
@@ -103,7 +103,7 @@ export default function IGOverview() {
             </div>
             <span className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Instagram Analytics</span>
           </div>
-          <h1 className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Umumiy Ko'rinish</h1>
+          <h1 className={`text-2xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Umumiy Ko'rinish</h1>
           {data?.username && (
             <p className={`text-sm mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               @{data.username} · {fmt(data.followersCount)} followers
@@ -133,7 +133,7 @@ export default function IGOverview() {
           <div className="flex items-start gap-3 mb-4">
             <AlertCircle size={19} className="text-amber-500 shrink-0 mt-0.5" />
             <div>
-              <p className={`font-black text-sm ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>Instagram Token Sozlanmagan yoki Muddati Tugagan</p>
+              <p className={`font-bold text-sm ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>Instagram Token Sozlanmagan yoki Muddati Tugagan</p>
               <p className={`text-xs mt-1 ${isDark ? 'text-amber-400/60' : 'text-amber-600'}`}>{error}</p>
             </div>
           </div>
@@ -170,20 +170,20 @@ export default function IGOverview() {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className={`font-black text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>@{data.username}</p>
+                <p className={`font-bold text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>@{data.username}</p>
                 <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Instagram Business Akaunt</p>
               </div>
               <div className="flex gap-6 text-center">
                 <div>
-                  <div className={`text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmt(data.followersCount)}</div>
+                  <div className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmt(data.followersCount)}</div>
                   <div className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Followers</div>
                 </div>
                 <div>
-                  <div className={`text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmt(data.followsCount)}</div>
+                  <div className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmt(data.followsCount)}</div>
                   <div className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Following</div>
                 </div>
                 <div>
-                  <div className={`text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmt(data.mediaCount)}</div>
+                  <div className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmt(data.mediaCount)}</div>
                   <div className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Postlar</div>
                 </div>
               </div>
@@ -218,7 +218,7 @@ export default function IGOverview() {
             ];
             return (
               <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-                <h2 className={`text-base font-black mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Akaunt Salomatligi Radari</h2>
+                <h2 className={`text-base font-bold mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Akaunt Salomatligi Radari</h2>
                 <p className={`text-xs mb-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>5 ta asosiy ko'rsatkich bo'yicha baho</p>
                 <ResponsiveContainer width="100%" height={280}>
                   <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
@@ -234,7 +234,7 @@ export default function IGOverview() {
 
           {/* Health Scorecard */}
           <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-            <h2 className={`text-base font-black mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>Akaunt Holati Xulosasi</h2>
+            <h2 className={`text-base font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>Akaunt Holati Xulosasi</h2>
             <div className="space-y-2">
               {[
                 {
@@ -279,7 +279,7 @@ export default function IGOverview() {
                     <span className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{row.label}</span>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-black" style={{ color: row.color }}>{row.value}</div>
+                    <div className="text-sm font-bold" style={{ color: row.color }}>{row.value}</div>
                     {row.sub && <div className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{row.sub}</div>}
                   </div>
                 </div>
@@ -291,7 +291,7 @@ export default function IGOverview() {
           <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
             <div className="flex items-start justify-between mb-5">
               <div>
-                <h2 className={`text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Qamrov (Reach) Dinamikasi</h2>
+                <h2 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Qamrov (Reach) Dinamikasi</h2>
                 <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Oxirgi {days} kun · O'rtacha: {fmt(avgReach)}/kun</p>
               </div>
               <div className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg ${isDark ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
@@ -330,7 +330,7 @@ export default function IGOverview() {
           <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
             <div className="flex items-start justify-between mb-5">
               <div>
-                <h2 className={`text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Follower O'sish Dinamikasi</h2>
+                <h2 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Follower O'sish Dinamikasi</h2>
                 <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Kunlik yangi va yo'qotilgan followers</p>
               </div>
             </div>
@@ -385,7 +385,7 @@ export default function IGOverview() {
                 </div>
                 <div>
                   <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{item.title}</p>
-                  <p className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.val}</p>
+                  <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.val}</p>
                   <p className={`text-xs ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{item.desc}</p>
                 </div>
               </div>

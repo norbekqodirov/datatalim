@@ -112,7 +112,7 @@ app.post('/api/admin/login', loginLimiter, (req, res) => {
         }
 
         // Generate JWT token valid for 8 hours
-        const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '8h' });
+        const token = jwt.sign({ id: user.id, username: user.username, role: user.role || 'admin' }, JWT_SECRET, { expiresIn: '8h' });
 
         res.json({ success: true, token });
     } catch (err) {
@@ -176,6 +176,62 @@ const authenticateToken = (req, res, next) => {
         next();
     });
 };
+
+// Route-level role gate — mirrors the nav policy in components/admin/AdminLayout.tsx
+// (isPathAllowed): 'admin' passes everything, 'teacher' is confined to
+// schedule/journal/attendance and never reaches routes gated here, 'manager'
+// is blocked only from payroll (and pre-existing settings/media/etc). Without
+// this, authenticateToken alone let any logged-in role call these endpoints
+// directly even though the UI hides them.
+const requireRole = (...roles) => (req, res, next) => {
+    if (!roles.includes(req.user?.role)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    next();
+};
+
+// --- ADMIN USERS (RBAC) ---
+app.get('/api/admin/users', authenticateToken, (req, res) => {
+    try {
+        const rows = db.prepare('SELECT id, username, role, created_at FROM admin_users ORDER BY created_at DESC').all();
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/users', authenticateToken, (req, res) => {
+    const { username, password, role = 'admin' } = req.body;
+    if (!username || !password) {
+        return res.status(400).json({ error: "Foydalanuvchi nomi va parol majburiy" });
+    }
+    if (password.length < 6) {
+        return res.status(400).json({ error: "Parol kamida 6 ta belgi bo'lishi kerak" });
+    }
+    try {
+        const hash = bcrypt.hashSync(password, 10);
+        const result = db.prepare('INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, ?)').run(username.trim(), hash, role);
+        res.json({ success: true, id: result.lastInsertRowid });
+    } catch (err) {
+        if (err.message.includes('UNIQUE')) {
+            return res.status(400).json({ error: "Ushbu foydalanuvchi nomi band" });
+        }
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/admin/users/:id', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    try {
+        if (req.user && req.user.id === Number(id)) {
+            return res.status(400).json({ error: "O'z hisobingizni o'chira olmaysiz" });
+        }
+        db.prepare('DELETE FROM admin_users WHERE id = ?').run(id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // --- MARKETING LINKS API ---
 app.get('/api/marketing-links', authenticateToken, (req, res) => {
@@ -379,6 +435,55 @@ app.delete('/api/leads/:id', authenticateToken, (req, res) => {
 // --- STATS API ---
 app.get('/api/stats', authenticateToken, (req, res) => {
     try {
+        if (req.user && req.user.role === 'teacher') {
+            const teacherName = req.user.username;
+            // Count active groups
+            const groups = db.prepare("SELECT id, name, days, start_time, end_time, price_per_month, room FROM groups WHERE teacher = ? AND status = 'active'").all(teacherName);
+            const totalGroups = groups.length;
+            
+            // Count students in those groups
+            let totalStudents = 0;
+            const groupIds = groups.map(g => g.id);
+            if (groupIds.length > 0) {
+                const placeholders = groupIds.map(() => '?').join(',');
+                const studentCount = db.prepare(`SELECT COUNT(DISTINCT student_id) as count FROM group_students WHERE group_id IN (${placeholders}) AND status = 'active'`).get(...groupIds);
+                totalStudents = studentCount.count;
+            }
+            
+            // Attendance average (last 30 days) for their groups
+            let averageAttendance = 100;
+            if (groupIds.length > 0) {
+                const placeholders = groupIds.map(() => '?').join(',');
+                const att = db.prepare(`
+                    SELECT 
+                        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
+                        COUNT(*) as total
+                    FROM attendance
+                    WHERE group_id IN (${placeholders}) AND date >= date('now', '-30 days')
+                `).get(...groupIds);
+                if (att && att.total > 0) {
+                    averageAttendance = Math.round((att.present / att.total) * 100);
+                }
+            }
+            
+            // Pending homeworks or exams graded (e.g. journal entries)
+            let journalEntriesCount = 0;
+            if (groupIds.length > 0) {
+                const placeholders = groupIds.map(() => '?').join(',');
+                const journalCount = db.prepare(`SELECT COUNT(*) as count FROM journal WHERE group_id IN (${placeholders})`).get(...groupIds);
+                journalEntriesCount = journalCount.count;
+            }
+
+            return res.json({
+                isTeacher: true,
+                totalGroups,
+                totalStudents,
+                averageAttendance,
+                journalEntriesCount,
+                groups
+            });
+        }
+
         const totalLeads = db.prepare('SELECT COUNT(*) as count FROM leads').get();
         const todayLeads = db.prepare("SELECT COUNT(*) as count FROM leads WHERE date(created_at) = date('now')").get();
         const yesterdayLeads = db.prepare("SELECT COUNT(*) as count FROM leads WHERE date(created_at) = date('now', '-1 day')").get();
@@ -773,24 +878,6 @@ app.put('/api/settings', authenticateToken, (req, res) => {
     }
 });
 
-// --- CHANGE PASSWORD ---
-app.post('/api/admin/change-password', authenticateToken, async (req, res) => {
-    try {
-        const { currentPassword, newPassword } = req.body;
-        if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Both passwords required' });
-        if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-        const user = db.prepare('SELECT * FROM admin_users WHERE id = 1').get();
-        if (!user) return res.status(404).json({ error: 'Admin user not found' });
-        const valid = await bcrypt.compare(currentPassword, user.password_hash);
-        if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
-        const hash = await bcrypt.hash(newPassword, 10);
-        db.prepare('UPDATE admin_users SET password_hash = ? WHERE id = 1').run(hash);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // --- BACKUP/RESTORE ---
 app.get('/api/admin/backup', authenticateToken, (req, res) => {
     try {
@@ -1108,7 +1195,60 @@ app.get('/api/ig/overview', authenticateToken, async (req, res) => {
             return { date: d.toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric' }), delta: Math.floor(Math.abs(Math.sin(seed) * 43758.5453) % 1 * 80) + 10 };
         });
 
-        res.json({ followersCount: account.followers_count, followsCount: account.follows_count, username: account.username, profilePicture: account.profile_picture_url, totalReach, totalInteractions, engagementRate, mediaCount: account.media_count, storiesCount: stories.length, reachData, followerData, days });
+        // Calculate dynamic anomalies from reachData
+        const avgReach = reachData.length > 0 ? Math.round(totalReach / reachData.length) : 0;
+        const anomalies = [];
+        reachData.forEach((item, index) => {
+            if (item.reach > avgReach * 1.6 && avgReach > 0) {
+                anomalies.push({
+                    date: item.date,
+                    type: 'positive',
+                    reach: item.reach,
+                    message: "Keskin ko'tarilish (Rekord Qamrov! 🚀)"
+                });
+            } else if (item.reach < avgReach * 0.4 && item.reach > 0 && avgReach > 0) {
+                anomalies.push({
+                    date: item.date,
+                    type: 'negative',
+                    reach: item.reach,
+                    message: "Past faollik aniqlandi (Tushish ⚠️)"
+                });
+            }
+        });
+
+        // Dynamic trend analysis
+        let overallTrend = 'stable';
+        if (reachData.length >= 6) {
+            const half = Math.floor(reachData.length / 2);
+            const olderAvg = reachData.slice(0, half).reduce((sum, r) => sum + r.reach, 0) / half;
+            const newerAvg = reachData.slice(half).reduce((sum, r) => sum + r.reach, 0) / (reachData.length - half);
+            if (newerAvg > olderAvg * 1.05) overallTrend = 'growing';
+            else if (newerAvg < olderAvg * 0.95) overallTrend = 'declining';
+        }
+
+        // Content grade stats based on engagement rate
+        const gradeStats = {
+            avgScore: Math.min(Math.round(45 + engagementRate * 8), 98),
+            topGrade: engagementRate > 6 ? 'A+' : engagementRate > 4 ? 'A' : engagementRate > 2.5 ? 'B' : 'C'
+        };
+
+        res.json({
+            followersCount: account.followers_count,
+            followsCount: account.follows_count,
+            username: account.username,
+            profilePicture: account.profile_picture_url,
+            totalReach,
+            totalInteractions,
+            engagementRate,
+            mediaCount: account.media_count,
+            storiesCount: stories.length,
+            reachData,
+            followerData,
+            days,
+            anomalies,
+            trend: { overall: overallTrend },
+            gradeStats
+        });
     } catch (error) {
         console.error('[IG Overview]', error);
         res.status(500).json({ error: error.message });
@@ -1341,6 +1481,69 @@ app.get('/api/telegram/advanced-analytics', authenticateToken, async (req, res) 
             { name: 'Video', value: videoCount },
         ].filter(t => t.value > 0);
 
+        // Advanced Sentiment/Tone calculation based on content triggers
+        let infCount = 0, motCount = 0, qnaCount = 0, advCount = 0;
+        posts.forEach(p => {
+            const txt = (p.text || '').toLowerCase();
+            if (txt.includes('kurs') || txt.includes('guruh') || txt.includes('chegirma') || txt.includes('qabul') || txt.includes('narx') || txt.includes('skidka') || txt.includes('shoshiling')) {
+                advCount++;
+            } else if (txt.includes('?') || txt.includes('savol') || txt.includes('muammo') || txt.includes('yechim') || txt.includes('qanday')) {
+                qnaCount++;
+            } else if (txt.includes('muvaffaqiyat') || txt.includes('ilm') || txt.includes('ustoz') || txt.includes('kelajak') || txt.includes('motiv') || txt.includes('talim') || txt.includes('rivojlanish')) {
+                motCount++;
+            } else {
+                infCount++;
+            }
+        });
+
+        const sentimentData = [
+            { name: 'Informativ', value: infCount || 5 },
+            { name: 'Motivatsion', value: motCount || 3 },
+            { name: 'Savol-Javob', value: qnaCount || 2 },
+            { name: 'Reklama / E\'lon', value: advCount || 1 }
+        ].filter(s => s.value > 0);
+
+        // Optimal days of week calculation
+        const daysOfWeek = ['Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba', 'Yakshanba'];
+        const dayViews = {};
+        daysOfWeek.forEach(d => { dayViews[d] = { views: 0, count: 0 }; });
+
+        posts.forEach(p => {
+            const dayName = daysOfWeek[(p.date.getDay() + 6) % 7]; // shift Sunday to end
+            dayViews[dayName].views += p.views;
+            dayViews[dayName].count += 1;
+        });
+
+        const bestDays = daysOfWeek.map((day, idx) => {
+            const hasData = dayViews[day].count > 0;
+            const avg = hasData ? Math.round(dayViews[day].views / dayViews[day].count) : Math.round(avgViews * (0.8 + Math.sin(idx) * 0.2));
+            return {
+                day,
+                views: avg || Math.round(avgViews || 1200),
+                score: Math.min(Math.round(((avg || avgViews) / Math.max(avgViews, 1)) * 100), 130)
+            };
+        });
+
+        // Predictive simulation factors
+        const predictiveFactors = {
+            mediaWeights: {
+                text: 1.0,
+                image: imgCount > 0 ? 1.28 : 1.20,
+                video: videoCount > 0 ? 1.48 : 1.35
+            },
+            lengthFactor: {
+                short: 0.88,  // < 150 chars
+                medium: 1.18, // 150 - 500 chars
+                long: 1.06   // > 500 chars
+            },
+            hourMultiplier: {
+                morning: 1.12,  // 08:00 - 12:00
+                afternoon: 0.96, // 12:00 - 17:00
+                evening: 1.34,   // 17:00 - 22:00
+                night: 0.68     // 22:00 - 08:00
+            }
+        };
+
         // Active hours
         const hrCount = {};
         posts.forEach(p => {
@@ -1359,6 +1562,9 @@ app.get('/api/telegram/advanced-analytics', authenticateToken, async (req, res) 
             scrapedPosts: posts.length,
             historicalViews,
             postTypesData,
+            sentimentData,
+            bestDays,
+            predictiveFactors,
             activeHours,
             insights: insightsData
         });
@@ -1371,6 +1577,471 @@ app.get('/api/telegram/advanced-analytics', authenticateToken, async (req, res) 
 // ============================================================
 // ====  LEARNING CENTER CORE API  ============================
 // ============================================================
+
+// ============================================================
+// ====  HR & STAFF API  ======================================
+// ============================================================
+
+// --- STAFF ---
+app.get('/api/staff', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const rows = db.prepare('SELECT * FROM staff ORDER BY joined_at DESC').all();
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/staff', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, phone, role, salary_type, salary_amount, status } = req.body;
+        if (!name?.trim() || !phone?.trim()) {
+            return res.status(400).json({ error: 'name va phone majburiy' });
+        }
+        const info = db.prepare('INSERT INTO staff (name, phone, role, salary_type, salary_amount, status) VALUES (?, ?, ?, ?, ?, ?)')
+            .run(name, phone, role || 'staff', salary_type || 'fixed', salary_amount || 0, status || 'active');
+        const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(info.lastInsertRowid);
+        res.json(staff);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/staff/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, phone, role, salary_type, salary_amount, status } = req.body;
+        db.prepare('UPDATE staff SET name=?, phone=?, role=?, salary_type=?, salary_amount=?, status=? WHERE id=?')
+            .run(name, phone, role, salary_type, salary_amount, status, req.params.id);
+        res.json(db.prepare('SELECT * FROM staff WHERE id = ?').get(req.params.id));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/staff/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        db.prepare('DELETE FROM staff WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- TEACHERS ---
+app.get('/api/teachers', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const rows = db.prepare('SELECT * FROM teachers ORDER BY joined_at DESC').all();
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/teachers', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, phone, specialty, salary_type, salary_amount, status } = req.body;
+        if (!name?.trim() || !phone?.trim()) {
+            return res.status(400).json({ error: 'name va phone majburiy' });
+        }
+        const info = db.prepare('INSERT INTO teachers (name, phone, specialty, salary_type, salary_amount, status) VALUES (?, ?, ?, ?, ?, ?)')
+            .run(name, phone, specialty || '', salary_type || 'percentage', salary_amount || 50, status || 'active');
+        res.json(db.prepare('SELECT * FROM teachers WHERE id = ?').get(info.lastInsertRowid));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/teachers/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, phone, specialty, salary_type, salary_amount, status } = req.body;
+        db.prepare('UPDATE teachers SET name=?, phone=?, specialty=?, salary_type=?, salary_amount=?, status=? WHERE id=?')
+            .run(name, phone, specialty, salary_type, salary_amount, status, req.params.id);
+        res.json(db.prepare('SELECT * FROM teachers WHERE id = ?').get(req.params.id));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/teachers/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        db.prepare('DELETE FROM teachers WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- PAYROLL ---
+app.get('/api/payroll', authenticateToken, requireRole('admin'), (req, res) => {
+    try {
+        const rows = db.prepare(`
+            SELECT p.*, 
+                   COALESCE(t.name, s.name) as employee_name,
+                   COALESCE(t.phone, s.phone) as employee_phone
+            FROM payroll p
+            LEFT JOIN teachers t ON p.employee_type = 'teacher' AND p.employee_id = t.id
+            LEFT JOIN staff s ON p.employee_type = 'staff' AND p.employee_id = s.id
+            ORDER BY p.paid_at DESC
+        `).all();
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/payroll', authenticateToken, requireRole('admin'), (req, res) => {
+    try {
+        const { employee_type, employee_id, amount, month_for, notes } = req.body;
+        if (!employee_type || !employee_id || amount == null || !month_for) {
+            return res.status(400).json({ error: 'employee_type, employee_id, amount va month_for majburiy' });
+        }
+        const info = db.prepare('INSERT INTO payroll (employee_type, employee_id, amount, month_for, notes) VALUES (?, ?, ?, ?, ?)')
+            .run(employee_type, employee_id, amount, month_for, notes || '');
+        res.json(db.prepare('SELECT * FROM payroll WHERE id = ?').get(info.lastInsertRowid));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/payroll/:id', authenticateToken, requireRole('admin'), (req, res) => {
+    try {
+        db.prepare('DELETE FROM payroll WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
+// ====  SCHEDULING & ROOMS API  ==============================
+// ============================================================
+
+// --- ROOMS ---
+app.get('/api/rooms', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const rows = db.prepare('SELECT * FROM rooms ORDER BY name ASC').all();
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/rooms', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, capacity } = req.body;
+        const info = db.prepare('INSERT INTO rooms (name, capacity) VALUES (?, ?)').run(name, capacity || 0);
+        res.json(db.prepare('SELECT * FROM rooms WHERE id = ?').get(info.lastInsertRowid));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/rooms/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, capacity } = req.body;
+        db.prepare('UPDATE rooms SET name = ?, capacity = ? WHERE id = ?').run(name, capacity, req.params.id);
+        res.json(db.prepare('SELECT * FROM rooms WHERE id = ?').get(req.params.id));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/rooms/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        db.prepare('DELETE FROM rooms WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- SCHEDULES & CLASH DETECTION ---
+app.get('/api/schedule', authenticateToken, (req, res) => {
+    try {
+        const rows = db.prepare(`
+            SELECT s.*, 
+                   g.name as group_name,
+                   r.name as room_name,
+                   t.name as teacher_name
+            FROM schedule s
+            LEFT JOIN groups g ON s.group_id = g.id
+            LEFT JOIN rooms r ON s.room_id = r.id
+            LEFT JOIN teachers t ON s.teacher_id = t.id
+            ORDER BY s.day_of_week, s.start_time
+        `).all();
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Helper: time string overlap checker
+function isOverlapping(s1, e1, s2, e2) {
+    return s1 < e2 && s2 < e1;
+}
+
+app.post('/api/schedule', authenticateToken, (req, res) => {
+    try {
+        const { group_id, room_id, teacher_id, day_of_week, start_time, end_time } = req.body;
+
+        // Fetch all existing slots on the same day to check for conflicts
+        const slots = db.prepare('SELECT * FROM schedule WHERE day_of_week = ?').all(day_of_week);
+
+        for (const slot of slots) {
+            if (isOverlapping(start_time, end_time, slot.start_time, slot.end_time)) {
+                // Conflict 1: Room conflict
+                if (room_id && slot.room_id === Number(room_id)) {
+                    const room = db.prepare('SELECT name FROM rooms WHERE id = ?').get(room_id);
+                    return res.status(400).json({ error: `Xona band: "${room?.name || 'Xona'}" xonasi bu vaqtda band.` });
+                }
+                // Conflict 2: Teacher conflict
+                if (teacher_id && slot.teacher_id === Number(teacher_id)) {
+                    const teacher = db.prepare('SELECT name FROM teachers WHERE id = ?').get(teacher_id);
+                    return res.status(400).json({ error: `Ustoz band: O'qituvchi "${teacher?.name || 'Ustoz'}" bu vaqtda boshqa darsi bor.` });
+                }
+                // Conflict 3: Group conflict
+                if (slot.group_id === Number(group_id)) {
+                    return res.status(400).json({ error: `Guruh band: Bu guruh uchun ushbu dars vaqti mos kelmaydi.` });
+                }
+            }
+        }
+
+        const info = db.prepare(`
+            INSERT INTO schedule (group_id, room_id, teacher_id, day_of_week, start_time, end_time) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        `).run(group_id, room_id || null, teacher_id || null, day_of_week, start_time, end_time);
+
+        res.json(db.prepare('SELECT * FROM schedule WHERE id = ?').get(info.lastInsertRowid));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/schedule/:id', authenticateToken, (req, res) => {
+    try {
+        db.prepare('DELETE FROM schedule WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
+// ====  ACADEMICS & JOURNAL & EXAMS & CERTIFICATES API  ======
+// ============================================================
+
+// --- JOURNAL & GRADES ---
+app.get('/api/journal', authenticateToken, (req, res) => {
+    const { group_id } = req.query;
+    if (!group_id) return res.status(400).json({ error: 'group_id is required' });
+    try {
+        const rows = db.prepare(`
+            SELECT j.*, s.name as student_name
+            FROM journal j
+            JOIN students s ON j.student_id = s.id
+            WHERE j.group_id = ?
+            ORDER BY j.date DESC, s.name ASC
+        `).all(group_id);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/journal', authenticateToken, (req, res) => {
+    const { group_id, student_id, date, lesson_topic, grade, homework_grade, notes } = req.body;
+    if (!group_id || !student_id || !date) {
+        return res.status(400).json({ error: 'group_id, student_id, and date are required' });
+    }
+    try {
+        const existing = db.prepare('SELECT id FROM journal WHERE group_id = ? AND student_id = ? AND date = ?').get(group_id, student_id, date);
+        if (existing) {
+            db.prepare(`
+                UPDATE journal 
+                SET lesson_topic = ?, grade = ?, homework_grade = ?, notes = ?
+                WHERE id = ?
+            `).run(lesson_topic || '', grade !== undefined ? grade : null, homework_grade !== undefined ? homework_grade : null, notes || '', existing.id);
+            res.json(db.prepare('SELECT * FROM journal WHERE id = ?').get(existing.id));
+        } else {
+            const info = db.prepare(`
+                INSERT INTO journal (group_id, student_id, date, lesson_topic, grade, homework_grade, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `).run(group_id, student_id, date, lesson_topic || '', grade !== undefined ? grade : null, homework_grade !== undefined ? homework_grade : null, notes || '');
+            res.json(db.prepare('SELECT * FROM journal WHERE id = ?').get(info.lastInsertRowid));
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- EXAMS ---
+app.get('/api/exams', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    const { group_id } = req.query;
+    if (!group_id) return res.status(400).json({ error: 'group_id is required' });
+    try {
+        const rows = db.prepare(`
+            SELECT e.*, s.name as student_name
+            FROM exams e
+            JOIN students s ON e.student_id = s.id
+            WHERE e.group_id = ?
+            ORDER BY e.exam_date DESC, s.name ASC
+        `).all(group_id);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/exams', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    const { group_id, student_id, exam_name, exam_date, score, max_score, notes } = req.body;
+    if (!group_id || !student_id || !exam_name || !exam_date || score === undefined) {
+        return res.status(400).json({ error: 'Missing required exam fields' });
+    }
+    try {
+        const info = db.prepare(`
+            INSERT INTO exams (group_id, student_id, exam_name, exam_date, score, max_score, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(group_id, student_id, exam_name, exam_date, score, max_score || 100, notes || '');
+        res.json(db.prepare('SELECT * FROM exams WHERE id = ?').get(info.lastInsertRowid));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/exams/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        db.prepare('DELETE FROM exams WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- CERTIFICATES ---
+app.get('/api/certificates', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const rows = db.prepare(`
+            SELECT c.*, s.name as student_name, s.phone as student_phone
+            FROM certificates c
+            JOIN students s ON c.student_id = s.id
+            ORDER BY c.issue_date DESC
+        `).all();
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/certificates', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    const { student_id, course_id, grade_average } = req.body;
+    if (!student_id || !course_id) {
+        return res.status(400).json({ error: 'student_id and course_id are required' });
+    }
+    try {
+        // certificate_code is UNIQUE NOT NULL — with only 9000 possible codes per
+        // year, a bare random pick will start colliding as volume grows. Retry a
+        // few times against a fresh random code before giving up.
+        const existsCode = db.prepare('SELECT 1 FROM certificates WHERE certificate_code = ?');
+        let code;
+        for (let attempt = 0; attempt < 10; attempt++) {
+            const candidate = `DT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+            if (!existsCode.get(candidate)) { code = candidate; break; }
+        }
+        if (!code) {
+            return res.status(500).json({ error: "Sertifikat kodi generatsiya qilinmadi, qayta urinib ko'ring" });
+        }
+        const issueDate = new Date().toISOString().split('T')[0];
+
+        const info = db.prepare(`
+            INSERT INTO certificates (student_id, course_id, certificate_code, issue_date, grade_average, status)
+            VALUES (?, ?, ?, ?, ?, 'active')
+        `).run(student_id, course_id, code, issueDate, grade_average || 0);
+
+        res.json(db.prepare('SELECT * FROM certificates WHERE id = ?').get(info.lastInsertRowid));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/certificates/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        db.prepare('DELETE FROM certificates WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- PUBLIC CERTIFICATE VERIFICATION (No auth required) ---
+app.get('/api/certificates/verify/:code', (req, res) => {
+    const { code } = req.params;
+    try {
+        const cert = db.prepare(`
+            SELECT c.*, s.name as student_name, s.birth_date as student_birth_date
+            FROM certificates c
+            JOIN students s ON c.student_id = s.id
+            WHERE c.certificate_code = ?
+        `).get(code);
+
+        if (!cert) {
+            return res.status(404).json({ error: 'Sertifikat topilmadi yoki yaroqsiz' });
+        }
+
+        res.json(cert);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- DISCOUNTS ---
+app.get('/api/discounts', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const rows = db.prepare('SELECT * FROM discounts ORDER BY created_at DESC').all();
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/discounts', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    const { name, code = null, type = 'percentage', value = 0, status = 'active' } = req.body;
+    if (!name) {
+        return res.status(400).json({ error: "Chegirma nomi kiritilishi shart" });
+    }
+    try {
+        const result = db.prepare(`
+            INSERT INTO discounts (name, code, type, value, status)
+            VALUES (?, ?, ?, ?, ?)
+        `).run(name, code ? code.trim() : null, type, value, status);
+        res.json({ success: true, id: result.lastInsertRowid });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.patch('/api/discounts/:id/status', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!status) {
+        return res.status(400).json({ error: "Status majburiy" });
+    }
+    try {
+        db.prepare('UPDATE discounts SET status = ? WHERE id = ?').run(status, id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/discounts/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    const { id } = req.params;
+    try {
+        db.prepare('DELETE FROM discounts WHERE id = ?').run(id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // --- STUDENTS ---
 app.get('/api/students', authenticateToken, (req, res) => {
@@ -1544,7 +2215,7 @@ app.post('/api/attendance', authenticateToken, (req, res) => {
 app.get('/api/attendance/stats/:group_id', authenticateToken, (req, res) => {
     try {
         const { month } = req.query;
-        let dateFilter = month ? `AND a.date LIKE '${month}%'` : '';
+        const dateFilter = month ? 'AND a.date LIKE ?' : '';
         const stats = db.prepare(`
             SELECT s.id, s.name, s.phone,
               COUNT(CASE WHEN a.status='present' THEN 1 END) AS present,
@@ -1556,7 +2227,7 @@ app.get('/api/attendance/stats/:group_id', authenticateToken, (req, res) => {
             JOIN group_students gs ON s.id = gs.student_id AND gs.group_id = ? AND gs.status = 'active'
             LEFT JOIN attendance a ON a.student_id = s.id AND a.group_id = ? ${dateFilter}
             GROUP BY s.id ORDER BY s.name
-        `).all(req.params.group_id, req.params.group_id);
+        `).all(req.params.group_id, req.params.group_id, ...(month ? [`${month}%`] : []));
         res.json(stats);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1597,7 +2268,7 @@ app.delete('/api/payments/:id', authenticateToken, (req, res) => {
 });
 
 // Finance summary — revenue by month
-app.get('/api/finance/summary', authenticateToken, (req, res) => {
+app.get('/api/finance/summary', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
     try {
         const monthly = db.prepare(`
             SELECT strftime('%Y-%m', paid_at) AS month,
@@ -1680,7 +2351,7 @@ app.get('/api/lc-stats', authenticateToken, (req, res) => {
 });
 
 // GET /api/finance/debtors — students who haven't fully paid the given month
-app.get('/api/finance/debtors', authenticateToken, (req, res) => {
+app.get('/api/finance/debtors', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
     const month = req.query.month || new Date().toISOString().slice(0, 7);
     try {
         const rows = db.prepare(`
@@ -1704,8 +2375,131 @@ app.get('/api/finance/debtors', authenticateToken, (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// POST /api/attendance/notify-absent — Send today's absent students notification to Telegram
+app.post('/api/attendance/notify-absent', authenticateToken, async (req, res) => {
+    const { group_id, date } = req.body;
+    if (!group_id || !date) {
+        return res.status(400).json({ error: 'Guruh ID va sana majburiy' });
+    }
+
+    try {
+        // Query absent students for the group and date
+        const absentStudents = db.prepare(`
+            SELECT a.date, a.note, s.name as student_name, s.phone as student_phone, s.parent_name, s.parent_phone, g.name as group_name
+            FROM attendance a
+            JOIN students s ON a.student_id = s.id
+            JOIN groups g ON a.group_id = g.id
+            WHERE a.group_id = ? AND a.date = ? AND a.status = 'absent'
+        `).all(group_id, date);
+
+        if (absentStudents.length === 0) {
+            return res.json({ success: true, sent: false, count: 0, message: "Ushbu guruhda dars qoldirgan o'quvchilar aniqlanmadi." });
+        }
+
+        const groupName = absentStudents[0].group_name;
+        
+        // Format beautiful Uzbek message
+        let messageText = `🔔 <b>DARS QOLDIRISH BILDIRISHNOMASI</b> 🔔\n\n`;
+        messageText += `<b>Guruh:</b> ${groupName}\n`;
+        messageText += `<b>Sana:</b> ${date}\n\n`;
+        messageText += `Quyidagi o'quvchilar darsga qatnashmadi:\n`;
+        
+        absentStudents.forEach((s, i) => {
+            messageText += `\n${i + 1}. 👤 <b>${s.student_name}</b>\n`;
+            messageText += `   📞 Ota-ona: ${s.parent_name || '—'} (${s.parent_phone || s.student_phone})\n`;
+            messageText += `   📝 Izoh: ${s.note || "Sababi ko'rsatilmagan"}\n`;
+        });
+        
+        messageText += `\n⚠️ Iltimos, o'quvchilarning ota-onalari bilan bog'lanib dars qoldirish sababini aniqlang.`;
+
+        // Send telegram message
+        if (TG_BOT_TOKEN && TG_CHAT_ID) {
+            await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: TG_CHAT_ID,
+                    text: messageText,
+                    parse_mode: 'HTML',
+                }),
+            });
+            res.json({ success: true, sent: true, count: absentStudents.length, method: 'Telegram Channel' });
+        } else {
+            console.warn('Telegram sozlanmagan. Xabar yuborilmadi.');
+            res.json({ success: true, sent: false, count: absentStudents.length, message: 'Telegram bot tokeni yoki kanal ID sozlanmagan, lekin o\'quvchilar aniqlandi.', students: absentStudents });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/finance/notify-debtors — Send debtor notification to Telegram
+app.post('/api/finance/notify-debtors', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+    const month = req.body.month || new Date().toISOString().slice(0, 7);
+
+    try {
+        const debtors = db.prepare(`
+            SELECT
+                s.id, s.name, s.phone,
+                g.id as group_id, g.name as group_name, g.price_per_month,
+                gs.discount,
+                CAST(ROUND(g.price_per_month * (1.0 - gs.discount / 100.0)) AS INTEGER) as expected,
+                COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.student_id=s.id AND p.month_for=?), 0) as paid,
+                CAST(ROUND(g.price_per_month * (1.0 - gs.discount / 100.0)) AS INTEGER) -
+                COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.student_id=s.id AND p.month_for=?), 0) as debt
+            FROM students s
+            JOIN group_students gs ON gs.student_id=s.id AND gs.status='active'
+            JOIN groups g ON g.id=gs.group_id AND g.status='active'
+            WHERE s.status='active' AND g.price_per_month > 0
+            HAVING debt > 0
+            ORDER BY debt DESC, s.name
+        `).all(month, month);
+
+        if (debtors.length === 0) {
+            return res.json({ success: true, sent: false, count: 0, message: "Tanlangan oy uchun qarzdor o'quvchilar mavjud emas." });
+        }
+
+        const totalDebtAmount = debtors.reduce((sum, d) => sum + d.debt, 0);
+
+        // Format beautiful Uzbek message
+        let messageText = `⚠️ <b>QARZDORLIK BILDIRISHNOMASI</b> ⚠️\n\n`;
+        messageText += `<b>Oy:</b> ${month}\n`;
+        messageText += `<b>Jami qarzdorlar:</b> ${debtors.length} ta\n`;
+        messageText += `<b>Umumiy qarz miqdori:</b> ${totalDebtAmount.toLocaleString()} so'm\n\n`;
+        messageText += `Quyidagi o'quvchilarda to'lov qarzdorligi aniqlandi:\n`;
+        
+        debtors.forEach((d, i) => {
+            messageText += `\n${i + 1}. 👤 <b>${d.name}</b>\n`;
+            messageText += `   📚 Guruh: ${d.group_name}\n`;
+            messageText += `   📞 Telefon: ${d.phone}\n`;
+            messageText += `   💰 Kutilgan: ${d.expected.toLocaleString()} so'm | To'langan: ${d.paid.toLocaleString()} so'm\n`;
+            messageText += `   🚨 <b>Qarz: ${d.debt.toLocaleString()} so'm</b>\n`;
+        });
+
+        messageText += `\n💸 Iltimos, hisob-kitobni o'z vaqtida amalga oshirishingizni so'raymiz!`;
+
+        if (TG_BOT_TOKEN && TG_CHAT_ID) {
+            await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: TG_CHAT_ID,
+                    text: messageText,
+                    parse_mode: 'HTML',
+                }),
+            });
+            res.json({ success: true, sent: true, count: debtors.length, totalDebt: totalDebtAmount, method: 'Telegram Channel' });
+        } else {
+            console.warn('Telegram sozlanmagan. Xabar yuborilmadi.');
+            res.json({ success: true, sent: false, count: debtors.length, totalDebt: totalDebtAmount, message: 'Telegram bot tokeni yoki kanal ID sozlanmagan, lekin qarzdorlar aniqlandi.', debtors });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/finance/recent-payments — last N payments
-app.get('/api/finance/recent-payments', authenticateToken, (req, res) => {
+app.get('/api/finance/recent-payments', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
     try {
         const rows = db.prepare(`
@@ -1721,7 +2515,1114 @@ app.get('/api/finance/recent-payments', authenticateToken, (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- ADVANCED BI ANALYTICS API ---
+
+// GET /api/analytics/revenue — monthly finance overview
+app.get('/api/analytics/revenue', authenticateToken, (req, res) => {
+    try {
+        // Get payments by month
+        const payments = db.prepare(`
+            SELECT month_for as month, SUM(amount) as total_revenue
+            FROM payments
+            GROUP BY month_for
+            ORDER BY month_for ASC
+        `).all();
+
+        // Get expenses by month
+        const expenses = db.prepare(`
+            SELECT strftime('%Y-%m', date) as month, SUM(amount) as total_expenses
+            FROM expenses
+            GROUP BY month
+            ORDER BY month ASC
+        `).all();
+
+        // Get payroll by month
+        const payroll = db.prepare(`
+            SELECT month_for as month, SUM(amount) as total_payroll
+            FROM payroll
+            GROUP BY month_for
+            ORDER BY month_for ASC
+        `).all();
+
+        // Combine all unique months
+        const monthsSet = new Set();
+        payments.forEach(p => monthsSet.add(p.month));
+        expenses.forEach(e => monthsSet.add(e.month));
+        payroll.forEach(p => monthsSet.add(p.month));
+
+        const months = Array.from(monthsSet).sort();
+
+        const result = months.map(m => {
+            const rev = payments.find(p => p.month === m)?.total_revenue || 0;
+            const exp = expenses.find(e => e.month === m)?.total_expenses || 0;
+            const pay = payroll.find(p => p.month === m)?.total_payroll || 0;
+            return {
+                month: m,
+                revenue: rev,
+                expenses: exp + pay,
+                payroll: pay,
+                otherExpenses: exp,
+                profit: rev - (exp + pay)
+            };
+        });
+
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/analytics/students — student demographics and active dynamics
+app.get('/api/analytics/students', authenticateToken, (req, res) => {
+    try {
+        const totalActive = db.prepare("SELECT COUNT(*) as count FROM students WHERE status = 'active'").get().count;
+        
+        // Distribution by source
+        const sourceDistribution = db.prepare(`
+            SELECT source, COUNT(*) as count
+            FROM students
+            WHERE source IS NOT NULL AND source != ''
+            GROUP BY source
+        `).all();
+
+        // Distribution by gender
+        const genderDistribution = db.prepare(`
+            SELECT gender, COUNT(*) as count
+            FROM students
+            GROUP BY gender
+        `).all();
+
+        // Capacity utilization
+        const capacityUtilization = db.prepare(`
+            SELECT g.id as group_id, g.name as group_name, g.capacity,
+                   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id AND gs.status = 'active') as enrolled
+            FROM groups g
+            WHERE g.status = 'active'
+        `).all();
+
+        // Monthly enrollment trend
+        const monthlyEnrollments = db.prepare(`
+            SELECT strftime('%Y-%m', joined_at) as month, COUNT(*) as count
+            FROM group_students
+            GROUP BY month
+            ORDER BY month ASC
+        `).all();
+
+        res.json({
+            totalActive,
+            sourceDistribution,
+            genderDistribution,
+            capacityUtilization,
+            monthlyEnrollments
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/analytics/teachers — o'qituvchilar samaradorligi tahlili
+app.get('/api/analytics/teachers', authenticateToken, (req, res) => {
+    try {
+        const teachersInfo = db.prepare(`
+            SELECT t.id, t.name, t.specialty, t.salary_type, t.salary_amount, t.status,
+                   (SELECT COUNT(*) FROM groups g WHERE g.teacher = t.name AND g.status = 'active') as groups_count,
+                   (
+                       SELECT COUNT(*) 
+                       FROM group_students gs 
+                       JOIN groups g ON g.id = gs.group_id 
+                       WHERE g.teacher = t.name AND gs.status = 'active'
+                   ) as total_students
+            FROM teachers t
+        `).all();
+
+        res.json(teachersInfo);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// ==========================================
+// ====== MARKETING PROJECT MANAGEMENT ======
+// ==========================================
+
+// Activity Logging Helper
+const logPMActivity = (actor, action, entity_type, entity_id, detail = '') => {
+    try {
+        db.prepare(`
+            INSERT INTO pm_activity_log (actor, action, entity_type, entity_id, detail)
+            VALUES (?, ?, ?, ?, ?)
+        `).run(actor || 'Tizim', action, entity_type, entity_id, detail);
+    } catch (err) {
+        console.error('Error logging PM activity:', err);
+    }
+};
+
+// 1. PLANS API
+app.get('/api/pm/plans', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { month, status } = req.query;
+        let query = 'SELECT * FROM pm_plans WHERE 1=1';
+        const params = [];
+
+        if (month) {
+            query += ' AND month = ?';
+            params.push(month);
+        }
+        if (status) {
+            query += ' AND status = ?';
+            params.push(status);
+        }
+
+        query += ' ORDER BY month DESC, id DESC';
+        const plans = db.prepare(query).all(...params);
+
+        const parsedPlans = plans.map(plan => ({
+            ...plan,
+            goals: JSON.parse(plan.goals || '[]'),
+            content_pillars: JSON.parse(plan.content_pillars || '[]'),
+            platforms: JSON.parse(plan.platforms || '[]')
+        }));
+
+        res.json(parsedPlans);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/pm/plans', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { title, description, month, status, goals, content_pillars, platforms } = req.body;
+        if (!title || !month) {
+            return res.status(400).json({ error: 'Title and Month are required' });
+        }
+
+        const username = req.user?.username || 'admin';
+        const result = db.prepare(`
+            INSERT INTO pm_plans (title, description, month, status, goals, content_pillars, platforms, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            title,
+            description || '',
+            month,
+            status || 'draft',
+            JSON.stringify(goals || []),
+            JSON.stringify(content_pillars || []),
+            JSON.stringify(platforms || []),
+            username
+        );
+
+        logPMActivity(username, 'created', 'plan', result.lastInsertRowid, `Yangi reja yaratildi: "${title}"`);
+        res.status(201).json({ success: true, id: result.lastInsertRowid });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/pm/plans/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const plan = db.prepare('SELECT * FROM pm_plans WHERE id = ?').get(req.params.id);
+        if (!plan) return res.status(404).json({ error: 'Reja topilmadi' });
+
+        const formattedPlan = {
+            ...plan,
+            goals: JSON.parse(plan.goals || '[]'),
+            content_pillars: JSON.parse(plan.content_pillars || '[]'),
+            platforms: JSON.parse(plan.platforms || '[]')
+        };
+
+        // Fetch associated content items
+        const contentItems = db.prepare('SELECT * FROM pm_content_items WHERE plan_id = ? ORDER BY scheduled_date ASC, scheduled_time ASC').all(plan.id);
+        const parsedItems = contentItems.map(item => ({
+            ...item,
+            media_urls: JSON.parse(item.media_urls || '[]'),
+            assigned_to: JSON.parse(item.assigned_to || '[]'),
+            reference_urls: JSON.parse(item.reference_urls || '[]'),
+            performance_data: JSON.parse(item.performance_data || '{}')
+        }));
+
+        // Fetch associated tasks
+        const tasks = db.prepare('SELECT * FROM pm_tasks WHERE plan_id = ? ORDER BY due_date ASC, sort_order ASC').all(plan.id);
+
+        res.json({
+            ...formattedPlan,
+            content_items: parsedItems,
+            tasks
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/pm/plans/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { title, description, month, status, goals, content_pillars, platforms } = req.body;
+        if (!title || !month) {
+            return res.status(400).json({ error: 'Title and Month are required' });
+        }
+
+        const username = req.user?.username || 'admin';
+        db.prepare(`
+            UPDATE pm_plans
+            SET title = ?, description = ?, month = ?, status = ?, goals = ?, content_pillars = ?, platforms = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(
+            title,
+            description || '',
+            month,
+            status || 'draft',
+            JSON.stringify(goals || []),
+            JSON.stringify(content_pillars || []),
+            JSON.stringify(platforms || []),
+            req.params.id
+        );
+
+        logPMActivity(username, 'updated', 'plan', req.params.id, `Reja tahrirlandi: "${title}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/pm/plans/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const planId = req.params.id;
+        const plan = db.prepare('SELECT title FROM pm_plans WHERE id = ?').get(planId);
+        if (!plan) return res.status(404).json({ error: 'Reja topilmadi' });
+
+        // Delete plan, its content items, and tasks inside a transaction
+        const deleteTransaction = db.transaction(() => {
+            db.prepare('DELETE FROM pm_tasks WHERE plan_id = ?').run(planId);
+            db.prepare('DELETE FROM pm_content_items WHERE plan_id = ?').run(planId);
+            db.prepare('DELETE FROM pm_plans WHERE id = ?').run(planId);
+        });
+        deleteTransaction();
+
+        const username = req.user?.username || 'admin';
+        logPMActivity(username, 'deleted', 'plan', planId, `Reja va unga bog'liq barcha ma'lumotlar o'chirildi: "${plan.title}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. CONTENT ITEMS API
+app.get('/api/pm/content-items', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { plan_id, status, platform, pillar } = req.query;
+        let query = 'SELECT * FROM pm_content_items WHERE 1=1';
+        const params = [];
+
+        if (plan_id) {
+            query += ' AND plan_id = ?';
+            params.push(plan_id);
+        }
+        if (status) {
+            query += ' AND status = ?';
+            params.push(status);
+        }
+        if (platform) {
+            query += ' AND platform = ?';
+            params.push(platform);
+        }
+        if (pillar) {
+            query += ' AND pillar = ?';
+            params.push(pillar);
+        }
+
+        query += ' ORDER BY scheduled_date ASC, scheduled_time ASC';
+        const items = db.prepare(query).all(...params);
+
+        const parsedItems = items.map(item => ({
+            ...item,
+            media_urls: JSON.parse(item.media_urls || '[]'),
+            assigned_to: JSON.parse(item.assigned_to || '[]'),
+            reference_urls: JSON.parse(item.reference_urls || '[]'),
+            performance_data: JSON.parse(item.performance_data || '{}')
+        }));
+
+        res.json(parsedItems);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/pm/content-items', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const {
+            plan_id, title, content_type, platform, pillar, scheduled_date, scheduled_time,
+            status, priority, caption, scenario, script, visual_notes, hashtag_set_id,
+            media_urls, assigned_to, cover_image, reference_urls, performance_data
+        } = req.body;
+
+        if (!plan_id || !title || !scheduled_date) {
+            return res.status(400).json({ error: 'Plan ID, Title, and Scheduled Date are required' });
+        }
+        if (!db.prepare('SELECT 1 FROM pm_plans WHERE id = ?').get(plan_id)) {
+            return res.status(400).json({ error: 'Berilgan plan_id mavjud emas' });
+        }
+
+        const username = req.user?.username || 'admin';
+        const result = db.prepare(`
+            INSERT INTO pm_content_items (
+                plan_id, title, content_type, platform, pillar, scheduled_date, scheduled_time,
+                status, priority, caption, scenario, script, visual_notes, hashtag_set_id,
+                media_urls, assigned_to, cover_image, reference_urls, performance_data
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            plan_id, title, content_type || 'post', platform || 'instagram', pillar || '', scheduled_date, scheduled_time || '18:00',
+            status || 'idea', priority || 'medium', caption || '', scenario || '', script || '', visual_notes || '', hashtag_set_id || null,
+            JSON.stringify(media_urls || []), JSON.stringify(assigned_to || []), cover_image || '',
+            JSON.stringify(reference_urls || []), JSON.stringify(performance_data || {})
+        );
+
+        logPMActivity(username, 'created', 'content_item', result.lastInsertRowid, `Yangi kontent yaratildi: "${title}" (${platform})`);
+        res.status(201).json({ success: true, id: result.lastInsertRowid });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/pm/content-items/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const {
+            title, content_type, platform, pillar, scheduled_date, scheduled_time,
+            status, priority, caption, scenario, script, visual_notes, hashtag_set_id,
+            media_urls, assigned_to, cover_image, reference_urls, performance_data
+        } = req.body;
+
+        if (!title || !scheduled_date) {
+            return res.status(400).json({ error: 'Title and Scheduled Date are required' });
+        }
+
+        const username = req.user?.username || 'admin';
+        db.prepare(`
+            UPDATE pm_content_items
+            SET title = ?, content_type = ?, platform = ?, pillar = ?, scheduled_date = ?, scheduled_time = ?,
+                status = ?, priority = ?, caption = ?, scenario = ?, script = ?, visual_notes = ?, hashtag_set_id = ?,
+                media_urls = ?, assigned_to = ?, cover_image = ?, reference_urls = ?, performance_data = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(
+            title, content_type || 'post', platform || 'instagram', pillar || '', scheduled_date, scheduled_time || '18:00',
+            status || 'idea', priority || 'medium', caption || '', scenario || '', script || '', visual_notes || '', hashtag_set_id || null,
+            JSON.stringify(media_urls || []), JSON.stringify(assigned_to || []), cover_image || '',
+            JSON.stringify(reference_urls || []), JSON.stringify(performance_data || {}),
+            req.params.id
+        );
+
+        logPMActivity(username, 'updated', 'content_item', req.params.id, `Kontent yangilandi: "${title}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.patch('/api/pm/content-items/:id/status', authenticateToken, (req, res) => {
+    try {
+        const { status } = req.body;
+        if (!status) return res.status(400).json({ error: 'Status is required' });
+
+        const username = req.user?.username || 'admin';
+        
+        const updateTransaction = db.transaction(() => {
+            db.prepare('UPDATE pm_content_items SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(status, req.params.id);
+            
+            // If the content item is set to "published", auto-complete all associated tasks!
+            if (status === 'published') {
+                db.prepare(`
+                    UPDATE pm_tasks 
+                    SET status = 'done', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+                    WHERE content_item_id = ? AND status != 'done'
+                `).run(req.params.id);
+            }
+        });
+        updateTransaction();
+
+        logPMActivity(username, 'status_changed', 'content_item', req.params.id, `Kontent statusi "${status}" ga o'zgardi`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/pm/content-items/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const itemId = req.params.id;
+        const item = db.prepare('SELECT title FROM pm_content_items WHERE id = ?').get(itemId);
+        if (!item) return res.status(404).json({ error: 'Kontent element topilmadi' });
+
+        const deleteTransaction = db.transaction(() => {
+            // Delete associated tasks
+            db.prepare('DELETE FROM pm_tasks WHERE content_item_id = ?').run(itemId);
+            // Delete comments
+            db.prepare("DELETE FROM pm_comments WHERE target_type = 'content_item' AND target_id = ?").run(itemId);
+            // Delete content item
+            db.prepare('DELETE FROM pm_content_items WHERE id = ?').run(itemId);
+        });
+        deleteTransaction();
+
+        const username = req.user?.username || 'admin';
+        logPMActivity(username, 'deleted', 'content_item', itemId, `Kontent va unga bog'liq vazifalar o'chirildi: "${item.title}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Automatic Task Generation from Content Type / Templates
+app.post('/api/pm/content-items/:id/generate-tasks', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const itemId = req.params.id;
+        const item = db.prepare('SELECT * FROM pm_content_items WHERE id = ?').get(itemId);
+        if (!item) return res.status(404).json({ error: 'Kontent element topilmadi' });
+
+        // Let's determine the default checklist based on content type
+        let checklist = [];
+        if (item.content_type === 'reel') {
+            checklist = [
+                { title: `Senariy va ssenariy yakunlash: ${item.title}`, task_type: 'copywriting', priority: 'medium', days_offset: -3 },
+                { title: `Video tasvirga olish (shooting): ${item.title}`, task_type: 'shooting', priority: 'high', days_offset: -2 },
+                { title: `Videomontaj & Color Correction: ${item.title}`, task_type: 'editing', priority: 'high', days_offset: -1 },
+                { title: `Muqova dizayni (Cover art): ${item.title}`, task_type: 'design', priority: 'medium', days_offset: -1 },
+                { title: `Publish & Monitoring: ${item.title}`, task_type: 'publishing', priority: 'medium', days_offset: 0 }
+            ];
+        } else if (item.content_type === 'video') {
+            checklist = [
+                { title: `Ssenariy va Youtube Script: ${item.title}`, task_type: 'copywriting', priority: 'high', days_offset: -5 },
+                { title: `Videoni suratga olish (shooting): ${item.title}`, task_type: 'shooting', priority: 'high', days_offset: -3 },
+                { title: `Videomontaj & Audio design: ${item.title}`, task_type: 'editing', priority: 'high', days_offset: -2 },
+                { title: `YouTube Thumbnail dizayni: ${item.title}`, task_type: 'design', priority: 'high', days_offset: -1 },
+                { title: `Video yuklash, SEO sozlash va publishing: ${item.title}`, task_type: 'publishing', priority: 'medium', days_offset: 0 }
+            ];
+        } else if (item.content_type === 'story') {
+            checklist = [
+                { title: `Story dizayni va matni: ${item.title}`, task_type: 'design', priority: 'medium', days_offset: 0 },
+                { title: `Story nashr etish: ${item.title}`, task_type: 'publishing', priority: 'low', days_offset: 0 }
+            ];
+        } else { // post, carousel, article, generic
+            checklist = [
+                { title: `Post caption (matn) yozish: ${item.title}`, task_type: 'copywriting', priority: 'medium', days_offset: -2 },
+                { title: `Carousel/Post dizaynini chizish: ${item.title}`, task_type: 'design', priority: 'high', days_offset: -1 },
+                { title: `Tasdiqlash va publishing: ${item.title}`, task_type: 'publishing', priority: 'medium', days_offset: 0 }
+            ];
+        }
+
+        // Let's insert the generated tasks
+        const username = req.user?.username || 'admin';
+        const insertTransaction = db.transaction(() => {
+            // Delete existing uncompleted tasks generated for this item first to avoid duplicates if re-triggered
+            db.prepare("DELETE FROM pm_tasks WHERE content_item_id = ? AND status != 'done'").run(itemId);
+
+            const stmt = db.prepare(`
+                INSERT INTO pm_tasks (content_item_id, plan_id, title, task_type, priority, due_date, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'todo')
+            `);
+
+            // Compute due dates based on scheduled date of content item and offset
+            const baseDate = new Date(item.scheduled_date);
+            
+            for (const task of checklist) {
+                const dueDate = new Date(baseDate);
+                dueDate.setDate(baseDate.getDate() + task.days_offset);
+                const dueDateString = dueDate.toISOString().split('T')[0];
+
+                stmt.run(itemId, item.plan_id, task.title, task.task_type, task.priority, dueDateString);
+            }
+        });
+        insertTransaction();
+
+        logPMActivity(username, 'generated_tasks', 'content_item', itemId, `Kontent elementidan avtomatik vazifalar yaratildi`);
+        res.json({ success: true, message: `${checklist.length} ta vazifa avtomatik yaratildi!` });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. TASKS API
+app.get('/api/pm/tasks', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { assigned_to, status, plan_id, content_item_id, priority } = req.query;
+        let query = 'SELECT t.*, m.name as assignee_name, m.avatar_color as assignee_avatar_color, m.role as assignee_role FROM pm_tasks t LEFT JOIN pm_team_members m ON t.assigned_to = m.id WHERE 1=1';
+        const params = [];
+
+        if (assigned_to) {
+            query += ' AND t.assigned_to = ?';
+            params.push(assigned_to);
+        }
+        if (status) {
+            query += ' AND t.status = ?';
+            params.push(status);
+        }
+        if (plan_id) {
+            query += ' AND t.plan_id = ?';
+            params.push(plan_id);
+        }
+        if (content_item_id) {
+            query += ' AND t.content_item_id = ?';
+            params.push(content_item_id);
+        }
+        if (priority) {
+            query += ' AND t.priority = ?';
+            params.push(priority);
+        }
+
+        query += ' ORDER BY t.due_date ASC, t.sort_order ASC';
+        const tasks = db.prepare(query).all(...params);
+
+        res.json(tasks);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/pm/tasks', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const {
+            content_item_id, plan_id, title, description, task_type, assigned_to,
+            status, priority, due_date, due_time, estimated_hours
+        } = req.body;
+
+        if (!title) return res.status(400).json({ error: 'Title is required' });
+
+        const username = req.user?.username || 'admin';
+        const result = db.prepare(`
+            INSERT INTO pm_tasks (
+                content_item_id, plan_id, title, description, task_type, assigned_to,
+                status, priority, due_date, due_time, estimated_hours
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            content_item_id || null, plan_id || null, title, description || '', task_type || 'general', assigned_to || null,
+            status || 'todo', priority || 'medium', due_date || null, due_time || null, estimated_hours || 0
+        );
+
+        logPMActivity(username, 'created', 'task', result.lastInsertRowid, `Yangi vazifa yaratildi: "${title}"`);
+        res.status(201).json({ success: true, id: result.lastInsertRowid });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/pm/tasks/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const {
+            title, description, task_type, assigned_to, status, priority,
+            due_date, due_time, estimated_hours, actual_hours
+        } = req.body;
+
+        if (!title) return res.status(400).json({ error: 'Title is required' });
+
+        const username = req.user?.username || 'admin';
+        const completedAt = status === 'done' ? new Date().toISOString() : null;
+
+        db.prepare(`
+            UPDATE pm_tasks
+            SET title = ?, description = ?, task_type = ?, assigned_to = ?, status = ?, priority = ?,
+                due_date = ?, due_time = ?, estimated_hours = ?, actual_hours = ?, completed_at = COALESCE(?, completed_at), updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(
+            title, description || '', task_type || 'general', assigned_to || null, status || 'todo', priority || 'medium',
+            due_date || null, due_time || null, estimated_hours || 0, actual_hours || 0, completedAt,
+            req.params.id
+        );
+
+        logPMActivity(username, 'updated', 'task', req.params.id, `Vazifa tahrirlandi: "${title}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.patch('/api/pm/tasks/:id/status', authenticateToken, (req, res) => {
+    try {
+        const { status } = req.body;
+        if (!status) return res.status(400).json({ error: 'Status is required' });
+
+        const username = req.user?.username || 'admin';
+        const completedAt = status === 'done' ? new Date().toISOString() : null;
+
+        db.prepare(`
+            UPDATE pm_tasks
+            SET status = ?, completed_at = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(status, completedAt, req.params.id);
+
+        logPMActivity(username, 'status_changed', 'task', req.params.id, `Vazifa statusi "${status}" ga o'zgardi`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/pm/tasks/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const taskId = req.params.id;
+        const task = db.prepare('SELECT title FROM pm_tasks WHERE id = ?').get(taskId);
+        if (!task) return res.status(404).json({ error: 'Vazifa topilmadi' });
+
+        db.prepare('DELETE FROM pm_tasks WHERE id = ?').run(taskId);
+
+        const username = req.user?.username || 'admin';
+        logPMActivity(username, 'deleted', 'task', taskId, `Vazifa o'chirildi: "${task.title}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/pm/tasks/my-day', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        // Fetch active tasks assigned to the user or due today / overdue
+        let tasks = db.prepare(`
+            SELECT t.*, m.name as assignee_name, m.avatar_color as assignee_avatar_color, c.title as content_title
+            FROM pm_tasks t
+            LEFT JOIN pm_team_members m ON t.assigned_to = m.id
+            LEFT JOIN pm_content_items c ON t.content_item_id = c.id
+            WHERE (t.due_date = ? OR (t.due_date < ? AND t.status != 'done'))
+            ORDER BY t.priority DESC, t.due_date ASC
+        `).all(todayStr, todayStr);
+
+        res.json(tasks);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/pm/tasks/bulk-assign', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { task_ids, assigned_to } = req.body;
+        if (!task_ids || !Array.isArray(task_ids) || !assigned_to) {
+            return res.status(400).json({ error: 'Task IDs (array) and Assignee ID are required' });
+        }
+
+        const username = req.user?.username || 'admin';
+        const bulkTransaction = db.transaction(() => {
+            const stmt = db.prepare('UPDATE pm_tasks SET assigned_to = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+            for (const taskId of task_ids) {
+                stmt.run(assigned_to, taskId);
+            }
+        });
+        bulkTransaction();
+
+        logPMActivity(username, 'bulk_assigned', 'task', assigned_to, `${task_ids.length} ta vazifa yangi jamoa a'zosiga biriktirildi`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 4. TEAM MEMBERS API
+app.get('/api/pm/members', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const members = db.prepare('SELECT * FROM pm_team_members ORDER BY role ASC, name ASC').all();
+        res.json(members);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/pm/members', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, role, avatar_color, phone, email, max_daily_tasks, status } = req.body;
+        if (!name) return res.status(400).json({ error: 'Name is required' });
+
+        const username = req.user?.username || 'admin';
+        const result = db.prepare(`
+            INSERT INTO pm_team_members (name, role, avatar_color, phone, email, max_daily_tasks, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            name, role || 'member', avatar_color || '#6366f1', phone || '', email || '', max_daily_tasks || 5, status || 'active'
+        );
+
+        logPMActivity(username, 'created', 'member', result.lastInsertRowid, `Yangi jamoa a'zosi qo'shildi: "${name}" (${role})`);
+        res.status(201).json({ success: true, id: result.lastInsertRowid });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/pm/members/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, role, avatar_color, phone, email, max_daily_tasks, status } = req.body;
+        if (!name) return res.status(400).json({ error: 'Name is required' });
+
+        const username = req.user?.username || 'admin';
+        db.prepare(`
+            UPDATE pm_team_members
+            SET name = ?, role = ?, avatar_color = ?, phone = ?, email = ?, max_daily_tasks = ?, status = ?
+            WHERE id = ?
+        `).run(
+            name, role || 'member', avatar_color || '#6366f1', phone || '', email || '', max_daily_tasks || 5, status || 'active',
+            req.params.id
+        );
+
+        logPMActivity(username, 'updated', 'member', req.params.id, `Jamoa a'zosi tahrirlandi: "${name}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/pm/members/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const memberId = req.params.id;
+        const member = db.prepare('SELECT name FROM pm_team_members WHERE id = ?').get(memberId);
+        if (!member) return res.status(404).json({ error: 'Jamoa a\'zosi topilmadi' });
+
+        const deleteTransaction = db.transaction(() => {
+            // Unassign tasks
+            db.prepare('UPDATE pm_tasks SET assigned_to = NULL WHERE assigned_to = ?').run(memberId);
+            // Delete member
+            db.prepare('DELETE FROM pm_team_members WHERE id = ?').run(memberId);
+        });
+        deleteTransaction();
+
+        const username = req.user?.username || 'admin';
+        logPMActivity(username, 'deleted', 'member', memberId, `Jamoa a'zosi o'chirildi: "${member.name}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/pm/members/:id/workload', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const memberId = req.params.id;
+        const tasks = db.prepare('SELECT * FROM pm_tasks WHERE assigned_to = ?').all(memberId);
+        
+        const summary = {
+            total: tasks.length,
+            todo: tasks.filter(t => t.status === 'todo').length,
+            in_progress: tasks.filter(t => t.status === 'in_progress').length,
+            review: tasks.filter(t => t.status === 'review').length,
+            done: tasks.filter(t => t.status === 'done').length,
+            blocked: tasks.filter(t => t.status === 'blocked').length
+        };
+
+        res.json({ summary, tasks });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 5. COMMENTS API
+app.get('/api/pm/comments/:type/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const comments = db.prepare(`
+            SELECT * FROM pm_comments 
+            WHERE target_type = ? AND target_id = ? 
+            ORDER BY created_at ASC
+        `).all(req.params.type, req.params.id);
+        res.json(comments);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/pm/comments', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { target_type, target_id, content } = req.body;
+        if (!target_type || !target_id || !content) {
+            return res.status(400).json({ error: 'Target type, target ID, and comment content are required' });
+        }
+
+        const username = req.user?.username || 'admin';
+        const result = db.prepare(`
+            INSERT INTO pm_comments (target_type, target_id, author, content)
+            VALUES (?, ?, ?, ?)
+        `).run(target_type, target_id, username, content);
+
+        logPMActivity(username, 'commented', target_type, target_id, `Izoh qoldirildi`);
+        res.status(201).json({ success: true, id: result.lastInsertRowid });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/pm/comments/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const comment = db.prepare('SELECT * FROM pm_comments WHERE id = ?').get(req.params.id);
+        if (!comment) return res.status(404).json({ error: 'Izoh topilmadi' });
+
+        const username = req.user?.username || 'admin';
+        const userRole = req.user?.role || 'admin';
+
+        // Check if owner or admin
+        if (comment.author !== username && userRole !== 'admin') {
+            return res.status(403).json({ error: 'Bu izohni o\'chirishga ruxsatingiz yo\'q' });
+        }
+
+        db.prepare('DELETE FROM pm_comments WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 6. TEMPLATES API
+app.get('/api/pm/templates', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const templates = db.prepare('SELECT * FROM pm_templates ORDER BY id DESC').all();
+        const formattedTemplates = templates.map(t => ({
+            ...t,
+            task_checklist: JSON.parse(t.task_checklist || '[]')
+        }));
+        res.json(formattedTemplates);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/pm/templates', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, content_type, platform, caption_template, scenario_template, script_template, visual_notes, task_checklist } = req.body;
+        if (!name) return res.status(400).json({ error: 'Template name is required' });
+
+        const username = req.user?.username || 'admin';
+        const result = db.prepare(`
+            INSERT INTO pm_templates (name, content_type, platform, caption_template, scenario_template, script_template, visual_notes, task_checklist)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            name, content_type || 'post', platform || 'instagram', caption_template || '', scenario_template || '', script_template || '',
+            visual_notes || '', JSON.stringify(task_checklist || [])
+        );
+
+        logPMActivity(username, 'created', 'template', result.lastInsertRowid, `Yangi shablon yaratildi: "${name}"`);
+        res.status(201).json({ success: true, id: result.lastInsertRowid });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/pm/templates/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, content_type, platform, caption_template, scenario_template, script_template, visual_notes, task_checklist } = req.body;
+        if (!name) return res.status(400).json({ error: 'Template name is required' });
+
+        const username = req.user?.username || 'admin';
+        db.prepare(`
+            UPDATE pm_templates
+            SET name = ?, content_type = ?, platform = ?, caption_template = ?, scenario_template = ?, script_template = ?, visual_notes = ?, task_checklist = ?
+            WHERE id = ?
+        `).run(
+            name, content_type || 'post', platform || 'instagram', caption_template || '', scenario_template || '', script_template || '',
+            visual_notes || '', JSON.stringify(task_checklist || []),
+            req.params.id
+        );
+
+        logPMActivity(username, 'updated', 'template', req.params.id, `Shablon tahrirlandi: "${name}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/pm/templates/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const templateId = req.params.id;
+        const template = db.prepare('SELECT name FROM pm_templates WHERE id = ?').get(templateId);
+        if (!template) return res.status(404).json({ error: 'Shablon topilmadi' });
+
+        db.prepare('DELETE FROM pm_templates WHERE id = ?').run(templateId);
+
+        const username = req.user?.username || 'admin';
+        logPMActivity(username, 'deleted', 'template', templateId, `Shablon o'chirildi: "${template.name}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 7. HASHTAG SETS API
+app.get('/api/pm/hashtag-sets', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const sets = db.prepare('SELECT * FROM pm_hashtag_sets ORDER BY usage_count DESC, id DESC').all();
+        res.json(sets);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/pm/hashtag-sets', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, hashtags, platform } = req.body;
+        if (!name || !hashtags) return res.status(400).json({ error: 'Name and Hashtags are required' });
+
+        const username = req.user?.username || 'admin';
+        const result = db.prepare(`
+            INSERT INTO pm_hashtag_sets (name, hashtags, platform)
+            VALUES (?, ?, ?)
+        `).run(name, hashtags, platform || 'instagram');
+
+        logPMActivity(username, 'created', 'hashtag_set', result.lastInsertRowid, `Yangi hashtag to'plami yaratildi: "${name}"`);
+        res.status(201).json({ success: true, id: result.lastInsertRowid });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/pm/hashtag-sets/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const { name, hashtags, platform, usage_count } = req.body;
+        if (!name || !hashtags) return res.status(400).json({ error: 'Name and Hashtags are required' });
+
+        const username = req.user?.username || 'admin';
+        db.prepare(`
+            UPDATE pm_hashtag_sets
+            SET name = ?, hashtags = ?, platform = ?, usage_count = COALESCE(?, usage_count)
+            WHERE id = ?
+        `).run(name, hashtags, platform || 'instagram', usage_count ?? null, req.params.id);
+
+        logPMActivity(username, 'updated', 'hashtag_set', req.params.id, `Hashtag to'plami tahrirlandi: "${name}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/pm/hashtag-sets/:id', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const setId = req.params.id;
+        const set = db.prepare('SELECT name FROM pm_hashtag_sets WHERE id = ?').get(setId);
+        if (!set) return res.status(404).json({ error: 'Hashtag to\'plami topilmadi' });
+
+        db.prepare('DELETE FROM pm_hashtag_sets WHERE id = ?').run(setId);
+
+        const username = req.user?.username || 'admin';
+        logPMActivity(username, 'deleted', 'hashtag_set', setId, `Hashtag to'plami o'chirildi: "${set.name}"`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 8. ANALYTICS & DASHBOARD API
+app.get('/api/pm/analytics/overview', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const totalPlans = db.prepare('SELECT COUNT(*) as count FROM pm_plans').get().count;
+        const totalContent = db.prepare('SELECT COUNT(*) as count FROM pm_content_items').get().count;
+        const publishedContent = db.prepare("SELECT COUNT(*) as count FROM pm_content_items WHERE status = 'published'").get().count;
+
+        const tasksCount = db.prepare(`
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done,
+                SUM(CASE WHEN status = 'todo' THEN 1 ELSE 0 END) as todo,
+                SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+                SUM(CASE WHEN status = 'review' THEN 1 ELSE 0 END) as review
+            FROM pm_tasks
+        `).get();
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const overdueTasks = db.prepare(`
+            SELECT COUNT(*) as count 
+            FROM pm_tasks 
+            WHERE status != 'done' AND due_date < ?
+        `).get(todayStr).count;
+
+        const platformStats = db.prepare(`
+            SELECT platform, COUNT(*) as count 
+            FROM pm_content_items 
+            GROUP BY platform
+        `).all();
+
+        const pillarStats = db.prepare(`
+            SELECT pillar, COUNT(*) as count 
+            FROM pm_content_items 
+            WHERE pillar != ''
+            GROUP BY pillar
+        `).all();
+
+        const recentActivity = db.prepare(`
+            SELECT * FROM pm_activity_log 
+            ORDER BY created_at DESC 
+            LIMIT 15
+        `).all();
+
+        res.json({
+            metrics: {
+                total_plans: totalPlans,
+                total_content_items: totalContent,
+                published_content_items: publishedContent,
+                total_tasks: tasksCount.total || 0,
+                done_tasks: tasksCount.done || 0,
+                todo_tasks: tasksCount.todo || 0,
+                in_progress_tasks: tasksCount.in_progress || 0,
+                review_tasks: tasksCount.review || 0,
+                overdue_tasks: overdueTasks
+            },
+            platforms: platformStats,
+            pillars: pillarStats,
+            recent_activity: recentActivity
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/pm/analytics/team-workload', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        // phone/email/status must be selected: PMTeam.tsx's edit form is seeded from this
+        // response, and its PUT payload includes these fields unconditionally — omitting them
+        // here previously caused every edit to silently blank out phone/email and reset status.
+        const includeInactive = req.query.includeInactive === '1';
+        const team = db.prepare(
+            `SELECT id, name, role, avatar_color, phone, email, max_daily_tasks, status FROM pm_team_members` +
+            (includeInactive ? '' : ` WHERE status = 'active'`)
+        ).all();
+        
+        const workload = team.map(member => {
+            const tasksSummary = db.prepare(`
+                SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done,
+                    SUM(CASE WHEN status != 'done' THEN 1 ELSE 0 END) as active
+                FROM pm_tasks
+                WHERE assigned_to = ?
+            `).get(member.id);
+
+            // Fetch weekly load heatmap (next 7 days count)
+            const weeklyTasks = [];
+            const baseDate = new Date();
+            for (let i = 0; i < 7; i++) {
+                const dateStr = baseDate.toISOString().split('T')[0];
+                const count = db.prepare(`
+                    SELECT COUNT(*) as count 
+                    FROM pm_tasks 
+                    WHERE assigned_to = ? AND due_date = ? AND status != 'done'
+                `).get(member.id, dateStr).count;
+
+                weeklyTasks.push({ date: dateStr, count });
+                baseDate.setDate(baseDate.getDate() + 1);
+            }
+
+            return {
+                ...member,
+                total_tasks: tasksSummary.total || 0,
+                done_tasks: tasksSummary.done || 0,
+                active_tasks: tasksSummary.active || 0,
+                weekly_heatmap: weeklyTasks
+            };
+        });
+
+        res.json(workload);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/pm/activity-log', authenticateToken, requireRole('admin', 'manager'), (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        const logs = db.prepare('SELECT * FROM pm_activity_log ORDER BY created_at DESC LIMIT ?').all(limit);
+        res.json(logs);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`✅ Backend server running at http://localhost:${PORT}`);
 });
+

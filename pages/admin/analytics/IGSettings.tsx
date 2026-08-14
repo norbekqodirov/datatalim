@@ -109,7 +109,7 @@ export default function IGSettings() {
           <Instagram size={18} className="text-pink-500" />
           <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Instagram Sozlamalari</span>
         </div>
-        <h1 className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Token Sozlash</h1>
+        <h1 className={`text-2xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Token Sozlash</h1>
       </div>
 
       {/* Status */}
@@ -225,7 +225,7 @@ export default function IGSettings() {
       <div className={`rounded-2xl p-6 border ${isDark ? 'bg-slate-800/60 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
         <div className="flex items-center gap-2 mb-4">
           <Info size={16} className={isDark ? 'text-blue-400' : 'text-blue-600'} />
-          <h3 className={`font-black text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>Instagram Access Token Olish Yo'riqnomasi</h3>
+          <h3 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>Instagram Access Token Olish Yo'riqnomasi</h3>
         </div>
         <ol className="space-y-3">
           {[
@@ -236,7 +236,7 @@ export default function IGSettings() {
             { step: 5, text: "Yuqoridagi formaga tokenni joylashtiring va saqlang" },
           ].map(item => (
             <li key={item.step} className="flex items-start gap-3">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-black ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>{item.step}</span>
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>{item.step}</span>
               <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 {item.text}
                 {item.link && (
