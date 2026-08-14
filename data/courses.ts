@@ -7,6 +7,8 @@ export interface Course {
   duration: LocalizedString;
   monthlyPrice: LocalizedString;
   totalPrice: LocalizedString;
+  /** Chegirmali narx — faqat ba'zi kurslarda bo'ladi */
+  discountPrice?: LocalizedString;
   description: LocalizedString;
   coverImage?: string;
   technologies: string[];
@@ -14,6 +16,8 @@ export interface Course {
     name: LocalizedString;
     role: LocalizedString;
     image: string;
+    /** Ba'zi mentorlarda qisqacha tarjimai hol bo'ladi (ixtiyoriy) */
+    bio?: LocalizedString;
   }[];
   modules: {
     title: LocalizedString;
