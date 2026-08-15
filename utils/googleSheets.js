@@ -3,7 +3,7 @@
  */
 
 export const appendLeadToSheet = async (leadData) => {
-    const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxwS5VUaloxMOvge11raXfue8du9DKIHF-Wm-TeCBUx-Y6iC4zD_24kU_5kqP-UGuUQ/exec";
+    const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycby4T5LogVNcgHfwsnZ7-Jr2mjV6Ft219VMhbij6hgxQlVM5P1wW93JXC38FYfK3Eoo8/exec";
 
     try {
         const payload = {
