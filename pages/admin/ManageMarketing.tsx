@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../store/ThemeContext';
-import { Plus, Trash2, Copy, BarChart3, Target, ExternalLink, RefreshCw, Check } from 'lucide-react';
+import { Plus, Trash2, Copy, BarChart3, Target, ExternalLink, RefreshCw, Check, Code, Globe } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { getAuthHeaders } from '../../utils/api';
@@ -173,13 +173,14 @@ export default function ManageMarketing() {
                                             key={cat}
                                             type="button"
                                             onClick={() => setNewLinkData({ ...newLinkData, category: cat })}
-                                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
                                                 newLinkData.category === cat
                                                     ? 'bg-[#0061ff] text-white'
                                                     : isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                             }`}
                                         >
-                                            {cat === 'IT' ? '💻 IT Kurslar' : '🌍 Til Kurslari'}
+                                            {cat === 'IT' ? <Code size={15} /> : <Globe size={15} />}
+                                            {cat === 'IT' ? 'IT Kurslar' : 'Til Kurslari'}
                                         </button>
                                     ))}
                                 </div>

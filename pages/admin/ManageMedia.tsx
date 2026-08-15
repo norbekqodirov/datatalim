@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { motion } from 'framer-motion';
-import { Save, Video, Type, Image as ImageIcon, MapPin, Plus, Trash2 } from 'lucide-react';
+import { Save, Video, Type, Image as ImageIcon, MapPin, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
 import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
@@ -184,7 +184,7 @@ export default function ManageMedia() {
                 <div className="flex-1">
                   <input type="file" accept="image/*" onChange={handleAboutImageUpload} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
                   <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="text-xs font-bold text-emerald-500">✅ WebP avtomatik</span>
+                    <span className="flex items-center gap-1 text-xs font-bold text-emerald-500"><CheckCircle2 size={13} />WebP avtomatik</span>
                     {aboutSavings && <span className="text-xs font-semibold text-blue-500">{aboutSavings}</span>}
                   </div>
                 </div>
@@ -277,7 +277,7 @@ export default function ManageMedia() {
                 <div className="flex-1">
                   <input type="file" accept="image/*" onChange={(e) => handleGalleryUpload(idx, e)} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
                   <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="text-xs font-bold text-emerald-500">✅ WebP avtomatik</span>
+                    <span className="flex items-center gap-1 text-xs font-bold text-emerald-500"><CheckCircle2 size={13} />WebP avtomatik</span>
                     {gallerySavings[idx] && <span className="text-xs font-semibold text-blue-500">{gallerySavings[idx]}</span>}
                   </div>
                 </div>

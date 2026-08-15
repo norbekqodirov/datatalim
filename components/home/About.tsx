@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ArrowRight } from 'lucide-react';
+import { CheckCircle2, ArrowRight, User } from 'lucide-react';
 import { Button } from '../Button';
 import { useStore } from '../../store/useStore';
 import { useTheme } from '../../store/ThemeContext';
@@ -38,7 +38,7 @@ export const About: React.FC = () => {
                 />
               ) : (
                 <div className={`w-full aspect-[4/3] flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                  <span className={`text-6xl`}>🏫</span>
+                  <User size={72} strokeWidth={1.5} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60"></div>

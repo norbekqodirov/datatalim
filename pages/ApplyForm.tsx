@@ -3,11 +3,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTheme } from '../store/ThemeContext';
 import { sendToTelegram } from '../utils/telegram';
 import { submitLeadToAPI } from '../utils/api';
+import { trackSiteEventOncePerSession } from '../utils/analytics';
 import toast from 'react-hot-toast';
 import { Loader2, CheckCircle2, ArrowRight, BookOpen } from 'lucide-react';
 import { Logo } from '../components/BrandElements';
-import { SEO } from '../components/SEO';
-import { trackEvent } from '../utils/pixel';
 
 interface LightCourse {
     id: string;
@@ -24,15 +23,19 @@ export default function ApplyForm() {
     const [loading, setLoading] = useState(false);
     const [coursesLoading, setCoursesLoading] = useState(true);
     const [sent, setSent] = useState(false);
-    const [linkCategory, setLinkCategory] = useState<'IT' | 'Language'>('IT');
 
     const refCode = searchParams.get('ref') || sessionStorage.getItem('marketing_ref') || undefined;
 
     useEffect(() => {
-        // Lightweight fetch — faqat id va title, rasmlar yo'q
-        fetch('/api/courses-light')
+        trackSiteEventOncePerSession('ariza_view');
+    }, []);
+
+    useEffect(() => {
+        // /api/courses endi og'ir emas — coverImage fayl yo'li sifatida saqlanadi (base64 emas),
+        // shuning uchun to'liq ro'yxatni olib, faqat id/title'ni ishlatish xavfsiz va yengil.
+        fetch('/api/courses')
             .then(r => r.json())
-            .then(data => setCourses(Array.isArray(data) ? data : []))
+            .then(data => setCourses(Array.isArray(data) ? data.map((c: any) => ({ id: c.id, title: c.title })) : []))
             .catch(() => setCourses([]))
             .finally(() => setCoursesLoading(false));
     }, []);
@@ -42,44 +45,23 @@ export default function ApplyForm() {
         return course.title?.uz || '';
     };
 
-    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        let val = e.target.value.replace(/\D/g, '');
-        if (val.length > 9) val = val.slice(0, 9);
-        let formatted = '';
-        if (val.length > 0) formatted += val.substring(0, 2);
-        if (val.length > 2) formatted += ' ' + val.substring(2, 5);
-        if (val.length > 5) formatted += ' ' + val.substring(5, 7);
-        if (val.length > 7) formatted += ' ' + val.substring(7, 9);
-        setFormData({ ...formData, phone: formatted });
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const rawPhone = formData.phone.replace(/\D/g, '');
-
-        if (!formData.name.trim() || !formData.courseId) {
-            toast.error("Iltimos, ism va yo'nalishni kiriting!");
+        if (!formData.name.trim() || !formData.phone.trim() || !formData.courseId) {
+            toast.error("Iltimos, barcha maydonlarni to'ldiring!");
             return;
         }
-
-        if (rawPhone.length !== 9) {
-            toast.error("Telefon raqamni to'liq kiriting: 90 123 45 67");
-            return;
-        }
-
         setLoading(true);
 
         const selectedCourse = courses.find(c => c.id === formData.courseId);
         const courseName = selectedCourse ? getTitle(selectedCourse) : 'Boshqa';
 
-        const fullPhone = '+998' + rawPhone;
-
-        const text = `📩 <b>Yangi ariza — DATA Ta'lim Stansiyasi</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${fullPhone}\n📚 <b>Kurs:</b> ${courseName}\n🔗 <b>Manba (ref):</b> ${refCode || 'Organik'}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
+        const text = `🎯 <b>Yangi Ariza (Marketing) — DATA</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${formData.phone}\n📚 <b>Kurs:</b> ${courseName}\n🔗 <b>Manba (ref):</b> ${refCode || 'Organik'}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
 
         try {
             await submitLeadToAPI({
                 name: formData.name,
-                phone: fullPhone,
+                phone: formData.phone,
                 courseId: courseName,
                 sourceRef: refCode,
             });
@@ -151,20 +133,15 @@ export default function ApplyForm() {
                     </div>
                     <div>
                         <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Telefon raqam *</label>
-                        <div className={`flex w-full overflow-hidden rounded-xl border focus-within:ring-2 focus-within:ring-[#0061ff] transition-all bg-transparent ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
-                            <div className={`px-4 py-4 flex items-center justify-center border-r font-medium ${isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
-                                +998
-                            </div>
-                            <input
-                                type="tel"
-                                required
-                                disabled={loading}
-                                value={formData.phone}
-                                onChange={handlePhoneChange}
-                                className={`w-full px-4 py-4 outline-none bg-transparent ${isDark ? 'placeholder-slate-500' : 'placeholder-slate-400'}`}
-                                placeholder="90 123 45 67"
-                            />
-                        </div>
+                        <input
+                            type="tel"
+                            required
+                            disabled={loading}
+                            value={formData.phone}
+                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                            className={`w-full px-5 py-4 rounded-xl border focus:ring-2 focus:ring-[#0061ff] transition-all outline-none ${isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
+                            placeholder="+998 90 123 45 67"
+                        />
                     </div>
                     <div>
                         <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Yo'nalishni tanlang *</label>

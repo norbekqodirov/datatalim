@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore, TeamMember } from '../../store/useStore';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Save, X, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Loader2, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
 import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
@@ -163,7 +163,7 @@ export default function ManageTeam() {
                 <div className="flex-1">
                   <input type="file" accept="image/*" onChange={handleImageUpload} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
                   <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="text-xs font-bold text-emerald-500">✅ WebP avtomatik</span>
+                    <span className="flex items-center gap-1 text-xs font-bold text-emerald-500"><CheckCircle2 size={13} />WebP avtomatik</span>
                     {webpSavings && <span className="text-xs font-semibold text-blue-500">{webpSavings}</span>}
                   </div>
                 </div>

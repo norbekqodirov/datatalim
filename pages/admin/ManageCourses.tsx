@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { motion } from 'framer-motion';
-import { Save, Plus, Trash2, X, Edit, Loader2 } from 'lucide-react';
+import { Save, Plus, Trash2, X, Edit, Loader2, CheckCircle2 } from 'lucide-react';
 import { Course } from '../../data/courses';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
@@ -257,7 +257,7 @@ export default function ManageCourses() {
                 <div className="flex-1">
                   <input type="file" accept="image/*" onChange={handleImageUpload} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
                   <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="text-xs font-bold text-emerald-500">✅ WebP avtomatik</span>
+                    <span className="flex items-center gap-1 text-xs font-bold text-emerald-500"><CheckCircle2 size={13} />WebP avtomatik</span>
                     {webpSavings && <span className="text-xs font-semibold text-blue-500">{webpSavings}</span>}
                   </div>
                 </div>
@@ -304,7 +304,7 @@ export default function ManageCourses() {
                           <div className="flex-1">
                             <input type="file" accept="image/*" onChange={(e) => handleMentorImageUpload(mIdx, e)} className={`w-full text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:bg-[#0061ff]/10 file:text-[#0061ff]`} />
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <span className="text-xs font-bold text-emerald-500">✅ WebP</span>
+                              <span className="flex items-center gap-1 text-xs font-bold text-emerald-500"><CheckCircle2 size={13} />WebP</span>
                               {mentorWebpSavings[mIdx] && <span className="text-xs text-blue-500">{mentorWebpSavings[mIdx]}</span>}
                             </div>
                           </div>
