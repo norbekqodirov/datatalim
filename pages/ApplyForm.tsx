@@ -13,6 +13,15 @@ interface LightCourse {
     title: { uz: string; ru?: string; en?: string } | string;
 }
 
+// Til target formalari (marketing_links.category === 'Language') uchun alohida, qattiq belgilangan ro'yxat —
+// bular asosiy `courses` jadvalida yo'q, Languages.tsx sahifasidagi til kurslariga mos keladi.
+const LANGUAGE_COURSES: LightCourse[] = [
+    { id: 'english', title: 'Ingliz tili' },
+    { id: 'russian', title: 'Rus tili' },
+    { id: 'korean', title: 'Koreys tili' },
+    { id: 'german', title: 'Nemis tili' },
+];
+
 export default function ApplyForm() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -23,12 +32,24 @@ export default function ApplyForm() {
     const [loading, setLoading] = useState(false);
     const [coursesLoading, setCoursesLoading] = useState(true);
     const [sent, setSent] = useState(false);
+    const [linkCategory, setLinkCategory] = useState<'IT' | 'Language'>('IT');
 
     const refCode = searchParams.get('ref') || sessionStorage.getItem('marketing_ref') || undefined;
 
     useEffect(() => {
         trackSiteEventOncePerSession('ariza_view');
     }, []);
+
+    useEffect(() => {
+        // Target forma qaysi marketing linkdan kelganini aniqlab, IT/Til kategoriyasiga qarab kurslar ro'yxatini tanlaydi.
+        if (!refCode) return;
+        fetch(`/api/marketing-links/info/${refCode}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data?.category === 'Language') setLinkCategory('Language');
+            })
+            .catch(() => { });
+    }, [refCode]);
 
     useEffect(() => {
         // /api/courses endi og'ir emas — coverImage fayl yo'li sifatida saqlanadi (base64 emas),
@@ -45,6 +66,9 @@ export default function ApplyForm() {
         return course.title?.uz || '';
     };
 
+    const activeCourses = linkCategory === 'Language' ? LANGUAGE_COURSES : courses;
+    const activeCoursesLoading = linkCategory === 'Language' ? false : coursesLoading;
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name.trim() || !formData.phone.trim() || !formData.courseId) {
@@ -53,7 +77,7 @@ export default function ApplyForm() {
         }
         setLoading(true);
 
-        const selectedCourse = courses.find(c => c.id === formData.courseId);
+        const selectedCourse = activeCourses.find(c => c.id === formData.courseId);
         const courseName = selectedCourse ? getTitle(selectedCourse) : 'Boshqa';
 
         const text = `🎯 <b>Yangi Ariza (Marketing) — DATA</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${formData.phone}\n📚 <b>Kurs:</b> ${courseName}\n🔗 <b>Manba (ref):</b> ${refCode || 'Organik'}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
@@ -146,7 +170,7 @@ export default function ApplyForm() {
                     <div>
                         <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Yo'nalishni tanlang *</label>
                         <div className="relative">
-                            {coursesLoading ? (
+                            {activeCoursesLoading ? (
                                 <div className={`w-full px-5 py-4 rounded-xl border flex items-center gap-3 ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
                                     <Loader2 size={16} className="animate-spin" />
                                     <span className="text-sm">Kurslar yuklanmoqda...</span>
@@ -160,13 +184,13 @@ export default function ApplyForm() {
                                     className={`w-full px-5 py-4 rounded-xl border focus:ring-2 focus:ring-[#0061ff] transition-all outline-none appearance-none ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
                                 >
                                     <option value="" disabled>Kursni tanlang...</option>
-                                    {courses.map(c => (
+                                    {activeCourses.map(c => (
                                         <option key={c.id} value={c.id}>{getTitle(c)}</option>
                                     ))}
                                     <option value="other">Boshqa / Bilmadim</option>
                                 </select>
                             )}
-                            {!coursesLoading && (
+                            {!activeCoursesLoading && (
                                 <BookOpen size={16} className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                             )}
                         </div>
@@ -174,7 +198,7 @@ export default function ApplyForm() {
 
                     <button
                         type="submit"
-                        disabled={loading || coursesLoading}
+                        disabled={loading || activeCoursesLoading}
                         className="w-full bg-[#0061ff] hover:bg-[#0052cc] text-white px-5 py-4 rounded-xl font-bold flex justify-center items-center gap-2 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 mt-4"
                     >
                         {loading ? (
