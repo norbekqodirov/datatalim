@@ -17,7 +17,7 @@ export const CareerTestSection: React.FC = () => {
       {/* Background glow and floating stars */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] ${isDark ? 'bg-[#0061ff]' : 'bg-blue-50'} rounded-full blur-3xl opacity-20 pulse-glow`}></div>
-        <FloatingStars color1={isDark ? '#60efff' : '#0061ff'} color2={isDark ? '#82f4b1' : '#00b26b'} />
+        <FloatingStars color1={isDark ? '#60efff' : '#0061ff'} color2={isDark ? '#0061ff' : '#60efff'} />
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
@@ -69,8 +69,8 @@ export const CareerTestSection: React.FC = () => {
         >
           {[
             { icon: BarChart2, text: "Aniq tahlil", iconColor: "text-[#0061ff]", bgClass: "bg-blue-50 dark:bg-[#0061ff]/20" },
-            { icon: ShieldCheck, text: "Ilmiy yondashuv", iconColor: "text-[#00b26b]", bgClass: "bg-emerald-50 dark:bg-[#00b26b]/20" },
-            { icon: CheckCircle2, text: "Tezkor natija", iconColor: "text-[#6228d7]", bgClass: "bg-purple-50 dark:bg-[#6228d7]/20" }
+            { icon: ShieldCheck, text: "Ilmiy yondashuv", iconColor: "text-[#0061ff]", bgClass: "bg-blue-50 dark:bg-[#0061ff]/20" },
+            { icon: CheckCircle2, text: "Tezkor natija", iconColor: "text-[#0061ff]", bgClass: "bg-blue-50 dark:bg-[#0061ff]/20" }
           ].map((item, i) => (
             <div key={i} className={`flex items-center gap-3 p-4 rounded-2xl shadow-sm border transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${isDark ? 'bg-slate-900 border-white/5 hover:border-white/10' : 'bg-white border-slate-100 hover:border-blue-100'}`}>
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${item.bgClass} ${item.iconColor}`}>

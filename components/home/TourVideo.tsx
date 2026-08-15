@@ -39,7 +39,7 @@ export const TourVideo: React.FC = () => {
           whileInView={{ opacity: 1, scale: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className={`relative rounded-[3rem] overflow-hidden backdrop-blur-sm shadow-2xl aspect-video max-w-5xl mx-auto border-[8px] ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[color:var(--brand-shadow)]'}`}
+          className={`relative rounded-[2rem] overflow-hidden backdrop-blur-sm shadow-2xl aspect-video max-w-5xl mx-auto border-[8px] ${isDark ? 'border-slate-800 shadow-black' : 'border-white shadow-[color:var(--brand-shadow)]'}`}
           style={{ '--brand-shadow': 'rgba(0,97,255,0.1)' } as React.CSSProperties}
         >
           <div className="absolute inset-0 z-10 opacity-30 mix-blend-overlay pointer-events-none" style={{ background: 'linear-gradient(135deg, #0061ff, #60efff)' }}></div>

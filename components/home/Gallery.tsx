@@ -46,7 +46,7 @@ export const Gallery: React.FC = () => {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: idx * 0.1 }}
-                className={`relative group rounded-[2.5rem] overflow-hidden aspect-[4/3] shadow-sm border ${isDark ? 'border-white/10' : 'border-slate-100/50'}`}
+                className={`relative group rounded-[2rem] overflow-hidden aspect-[4/3] shadow-sm border ${isDark ? 'border-white/10' : 'border-slate-100/50'}`}
               >
                 <img
                   src={img}

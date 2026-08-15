@@ -65,9 +65,9 @@ export const Hero: React.FC = () => {
 
       {/* Hero star decorations */}
       <Star1 size={45} color="#0061ff" opacity={isDark ? 0.3 : 0.15} className="absolute top-[10%] left-[8%] star-float pointer-events-none z-0" />
-      <Star2 size={24} color="#00b26b" opacity={isDark ? 0.4 : 0.2} className="absolute top-[25%] right-[10%] star-float-delay-1 pointer-events-none z-0" />
+      <Star2 size={24} color="#60efff" opacity={isDark ? 0.4 : 0.2} className="absolute top-[25%] right-[10%] star-float-delay-1 pointer-events-none z-0" />
       <Star1 size={30} color={isDark ? '#60efff' : '#0061ff'} opacity={isDark ? 0.2 : 0.1} className="absolute bottom-[20%] left-[40%] star-float-delay-2 pointer-events-none z-0" />
-      <Star2 size={20} color="#ee2a7b" opacity={isDark ? 0.35 : 0.18} className="absolute bottom-[35%] right-[5%] star-float-delay-3 pointer-events-none z-0" />
+      <Star2 size={20} color="#0061ff" opacity={isDark ? 0.35 : 0.18} className="absolute bottom-[35%] right-[5%] star-float-delay-3 pointer-events-none z-0" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
 
@@ -125,7 +125,7 @@ export const Hero: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <div className="rounded-[2.5rem] overflow-hidden h-[450px] lg:h-[550px] w-full relative z-10 ml-auto lg:w-[90%] border-4 border-white/50 dark:border-white/10 shadow-2xl">
+            <div className="rounded-[2rem] overflow-hidden h-[450px] lg:h-[550px] w-full relative z-10 ml-auto lg:w-[90%] border-4 border-white/50 dark:border-white/10 shadow-2xl">
               <img
                 src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1200&auto=format&fit=crop"
                 alt="Students learning IT"
@@ -138,7 +138,7 @@ export const Hero: React.FC = () => {
 
             {/* Floating Glass Chart Card */}
             <motion.div
-              className={`absolute bottom-8 right-4 lg:right-[5%] p-5 rounded-3xl z-20 w-64 ${isDark ? 'glass-card' : 'bg-white shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-slate-100'}`}
+              className={`absolute bottom-8 right-4 lg:right-[5%] p-5 rounded-[2rem] z-20 w-64 ${isDark ? 'glass-card' : 'bg-white shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-slate-100'}`}
               animate={{ y: [0, -10, 0] }}
               transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
             >
@@ -183,7 +183,7 @@ export const Hero: React.FC = () => {
           >
             {/* Inner glow using brand color */}
             <div className="absolute top-0 right-0 w-48 h-48 rounded-bl-full opacity-40 pulse-glow" style={{ background: 'radial-gradient(circle at top right, rgba(96,239,255,0.3), transparent)' }} />
-            <div className="absolute bottom-0 left-0 w-32 h-32 rounded-tr-full opacity-30" style={{ background: 'radial-gradient(circle at bottom left, rgba(0,178,107,0.2), transparent)' }} />
+            <div className="absolute bottom-0 left-0 w-32 h-32 rounded-tr-full opacity-30" style={{ background: 'radial-gradient(circle at bottom left, rgba(0,97,255,0.25), transparent)' }} />
 
             <Star1 size={140} color="#ffffff" opacity={0.03} className="absolute -right-10 -bottom-10 rotate-slow" />
 

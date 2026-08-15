@@ -16,7 +16,7 @@ export const Testimonials: React.FC = () => {
   return (
     <div className="py-24 overflow-hidden relative" style={{ background: isDark ? '#000' : '#f8fafc' }}>
       <PatternBg color={isDark ? '#60efff' : '#0061ff'} opacity={isDark ? 0.02 : 0.03} />
-      <FloatingStars color1="#0061ff" color2="#00b26b" className="opacity-60" />
+      <FloatingStars color1="#0061ff" color2="#60efff" className="opacity-60" />
 
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         {isDark ? (
@@ -60,9 +60,9 @@ export const Testimonials: React.FC = () => {
           {videos.map((videoId, idx) => (
             <div
               key={idx}
-              className={`w-[280px] sm:w-[320px] shrink-0 aspect-[9/16] rounded-[2.5rem] overflow-hidden shadow-xl border relative group transition-transform duration-300 hover:scale-[1.02] ${isDark ? 'bg-slate-900 border-white/10 shadow-black/50' : 'bg-slate-100 border-slate-200 shadow-slate-200/50'}`}
+              className={`w-[280px] sm:w-[320px] shrink-0 aspect-[9/16] rounded-[2rem] overflow-hidden shadow-xl border relative group transition-transform duration-300 hover:scale-[1.02] ${isDark ? 'bg-slate-900 border-white/10 shadow-black/50' : 'bg-slate-100 border-slate-200 shadow-slate-200/50'}`}
             >
-              <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-20 pointer-events-none transition-transform group-hover:scale-150" style={{ background: 'linear-gradient(135deg, #00b26b, #0061ff)' }}></div>
+              <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-20 pointer-events-none transition-transform group-hover:scale-150" style={{ background: 'linear-gradient(135deg, #60efff, #0061ff)' }}></div>
               <iframe
                 className="absolute top-0 left-0 w-full h-full pointer-events-none group-hover:pointer-events-auto transition-all z-10 opacity-90 group-hover:opacity-100"
                 src={`https://www.youtube.com/embed/${videoId}?controls=1&rel=0&playsinline=1&modestbranding=1`}

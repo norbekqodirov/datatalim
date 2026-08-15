@@ -16,18 +16,18 @@ export const About: React.FC = () => {
     <div id="about" className="py-24 overflow-hidden relative" style={{ background: isDark ? '#000' : '#fff' }}>
       {/* Brand Background Elements */}
       <PatternBg color={isDark ? '#60efff' : '#0061ff'} opacity={isDark ? 0.03 : 0.02} />
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(0,178,107,0.3) 0%, transparent 70%)' }}></div>
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(96,239,255,0.3) 0%, transparent 70%)' }}></div>
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(0,97,255,0.3) 0%, transparent 70%)' }}></div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div className="relative group">
             <div className={`absolute -top-10 -left-10 w-40 h-40 rounded-full blur-3xl opacity-50 ${isDark ? 'bg-[#0061ff]' : 'bg-blue-100'}`} />
-            <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-50 ${isDark ? 'bg-[#00b26b]' : 'bg-emerald-100'}`} />
+            <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-50 ${isDark ? 'bg-[#60efff]' : 'bg-cyan-100'}`} />
 
             <Star1 size={60} color="#0061ff" opacity={isDark ? 0.2 : 0.1} className="absolute -top-16 right-10 rotate-slow pointer-events-none" />
 
-            <div className={`relative rounded-[2.5rem] overflow-hidden shadow-2xl transition-transform duration-500 group-hover:scale-[1.02] border-4 ${isDark ? 'border-white/10' : 'border-white/50'}`}>
+            <div className={`relative rounded-[2rem] overflow-hidden shadow-2xl transition-transform duration-500 group-hover:scale-[1.02] border-4 ${isDark ? 'border-white/10' : 'border-white/50'}`}>
               {siteContent.aboutImage ? (
                 <img
                   src={siteContent.aboutImage}
@@ -55,7 +55,7 @@ export const About: React.FC = () => {
           </div>
 
           <div className="relative">
-            <Star1 size={100} color="#00b26b" opacity={0.03} className="absolute -top-10 right-0 pointer-events-none rotate-slow" />
+            <Star1 size={100} color="#0061ff" opacity={0.03} className="absolute -top-10 right-0 pointer-events-none rotate-slow" />
             <h2 className={`text-4xl md:text-5xl font-black mb-6 uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {tField(siteContent.aboutTitle).split(' ').map((word: string, i: number) =>
                 i === 0 ? <span key={i} className="text-transparent bg-clip-text bg-gradient-to-r from-[#0061ff] to-[#60efff] mr-3">{word}</span> : word + ' '
