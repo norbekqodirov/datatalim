@@ -7,9 +7,15 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
+import dns from 'dns';
 import { getDB, initDB } from './db.js';
 import { fileURLToPath } from 'url';
 import { appendLeadToSheet } from '../utils/googleSheets.js';
+
+// Serverning IPv6 marshruti Telegram uchun ishlamaydi (adres tayinlangan, lekin trafik yetib bormaydi) —
+// shu sabab fetch() ikkala manzilni (v4+v6) sinab, v6 uchun to'liq connect-timeout kutib, butunlay muvaffaqiyatsiz
+// bo'lardi. IPv4'ni ustuvor qilish bu holatni oldini oladi.
+dns.setDefaultResultOrder('ipv4first');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
