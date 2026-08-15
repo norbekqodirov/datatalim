@@ -7,15 +7,14 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
-import dns from 'dns';
+import { Agent as UndiciAgent } from 'undici';
 import { getDB, initDB } from './db.js';
 import { fileURLToPath } from 'url';
 import { appendLeadToSheet } from '../utils/googleSheets.js';
 
-// Serverning IPv6 marshruti Telegram uchun ishlamaydi (adres tayinlangan, lekin trafik yetib bormaydi) —
-// shu sabab fetch() ikkala manzilni (v4+v6) sinab, v6 uchun to'liq connect-timeout kutib, butunlay muvaffaqiyatsiz
-// bo'lardi. IPv4'ni ustuvor qilish bu holatni oldini oladi.
-dns.setDefaultResultOrder('ipv4first');
+// Serverning IPv4 marshruti api.telegram.org'ga yetib bormaydi (paketlar yo'qoladi, connect 8-10s
+// osilib qoladi), IPv6 esa to'liq ishlaydi — shuning uchun bu chaqiruvni majburan IPv6 orqali yuboramiz.
+const telegramDispatcher = new UndiciAgent({ connect: { family: 6 } });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -636,6 +635,7 @@ app.post('/api/notify-telegram', leadsLimiter, async (req, res) => {
                 text: finalMessage,
                 parse_mode: 'HTML',
             }),
+            dispatcher: telegramDispatcher,
         });
 
         if (!tgResponse.ok) {
