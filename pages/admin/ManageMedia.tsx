@@ -24,6 +24,8 @@ export default function ManageMedia() {
       aboutTitle: normalize(siteContent.aboutTitle),
       aboutDescription: normalize(siteContent.aboutDescription),
       aboutQuote: normalize(siteContent.aboutQuote),
+      founderName: normalize(siteContent.founderName),
+      founderTitle: normalize(siteContent.founderTitle),
       contactAddress: normalize(siteContent.contactAddress),
       contactLandmark: normalize(siteContent.contactLandmark),
       contactSchedule: normalize(siteContent.contactSchedule),
@@ -178,7 +180,7 @@ export default function ManageMedia() {
               <textarea name="aboutQuote" value={formData.aboutQuote?.[activeLang] || ''} onChange={handleLocalizedChange} rows={2} className={`${inputClass} resize-none`} />
             </div>
             <div>
-              <label className={labelClass}>Biz haqimizda Rasmi (Yuklash)</label>
+              <label className={labelClass}>Biz haqimizda Rasmi — Asoschi surati (Yuklash)</label>
               <div className="flex gap-4 items-center">
                 {formData.aboutImage && <img src={formData.aboutImage} loading="lazy" decoding="async" className={`w-16 h-16 rounded-xl object-cover shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />}
                 <div className="flex-1">
@@ -189,6 +191,15 @@ export default function ManageMedia() {
                   </div>
                 </div>
               </div>
+              <p className={`text-xs mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Shu rasm bosh sahifadagi "Biz haqimizda" bo'limi va "Biz haqimizda" sahifasidagi asoschi kartochkasida ishlatiladi.</p>
+            </div>
+            <div>
+              <label className={labelClass}>Asoschi ismi ({activeLang.toUpperCase()})</label>
+              <input type="text" name="founderName" value={formData.founderName?.[activeLang] || ''} onChange={handleLocalizedChange} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Asoschi lavozimi ({activeLang.toUpperCase()})</label>
+              <input type="text" name="founderTitle" value={formData.founderTitle?.[activeLang] || ''} onChange={handleLocalizedChange} className={inputClass} />
             </div>
           </div>
         </div>

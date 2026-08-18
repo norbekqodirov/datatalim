@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Monitor, Users, Briefcase, Smile, Coffee, Wifi, Target, Award, CheckCircle2, BookOpen, Zap, Heart, Globe } from 'lucide-react';
+import { Monitor, Users, Briefcase, Smile, Coffee, Wifi, Target, Award, CheckCircle2, BookOpen, Zap, Heart, Globe, User } from 'lucide-react';
 import { useTheme } from '../store/ThemeContext';
+import { useStore } from '../store/useStore';
+import { useLanguage } from '../i18n';
 import { PatternBg, FloatingStars, Star1, Star2 } from '../components/BrandElements';
 
 const stats = [
@@ -46,6 +48,8 @@ const facilities = [
 
 export default function About() {
   const { isDark } = useTheme();
+  const { siteContent } = useStore();
+  const { tField } = useLanguage();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -90,16 +94,22 @@ export default function About() {
             className="relative"
           >
             <div className="absolute -inset-4 bg-gradient-to-r from-[#3f5efb] to-[#fc466b] rounded-[3.5rem] transform -rotate-3 z-0 opacity-20 blur-xl"></div>
-            <img
-              src="https://picsum.photos/seed/shahzod_founder/800/1000"
-              alt="Shahzod Sabirov - Asoschi"
-              className="relative rounded-[3rem] shadow-2xl w-full object-cover z-10 h-[500px] lg:h-[600px] border-[8px] border-white/10"
-              loading="lazy"
-              decoding="async"
-            />
+            {siteContent.aboutImage ? (
+              <img
+                src={siteContent.aboutImage}
+                alt={tField(siteContent.founderName)}
+                className="relative rounded-[3rem] shadow-2xl w-full object-cover z-10 h-[500px] lg:h-[600px] border-[8px] border-white/10"
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <div className={`relative rounded-[3rem] shadow-2xl w-full z-10 h-[500px] lg:h-[600px] border-[8px] border-white/10 flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                <User size={96} strokeWidth={1.5} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
+              </div>
+            )}
             <div className={`absolute bottom-8 left-8 right-8 p-8 rounded-3xl shadow-2xl z-20 border backdrop-blur-xl ${isDark ? 'bg-slate-900/80 border-white/10' : 'bg-white/90 border-white/50'}`}>
-              <h4 className={`text-2xl font-black mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Shahzod Sabirov</h4>
-              <p className="font-bold text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #3f5efb, #fc466b)' }}>DATA Ta'lim Stansiyasi asoschisi</p>
+              <h4 className={`text-2xl font-black mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{tField(siteContent.founderName)}</h4>
+              <p className="font-bold text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #3f5efb, #fc466b)' }}>{tField(siteContent.founderTitle)}</p>
             </div>
           </motion.div>
 

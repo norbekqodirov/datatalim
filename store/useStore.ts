@@ -74,6 +74,8 @@ export interface SiteContent {
   aboutDescription: LocalizedString;
   aboutQuote: LocalizedString;
   aboutImage: string;
+  founderName: LocalizedString;
+  founderTitle: LocalizedString;
   contactAddress: LocalizedString;
   contactLandmark: LocalizedString;
   contactPhone: string;
@@ -96,6 +98,8 @@ export const initialSiteContent: SiteContent = {
   aboutDescription: { uz: "\"DATA UNION\" — mustaqil, o‘z rivojlanish strategiyasi, qadriyatlari va maqsadlariga ega kompaniya. Biz 2019-yilda tashkil topganmiz va shu kungacha minglab yoshlarga innovatsion texnologiyalar bo‘yicha ta’lim berib kelmoqdamiz.", ru: "\"DATA UNION\" — mustaqil, o‘z rivojlanish strategiyasi, qadriyatlari va maqsadlariga ega kompaniya. Biz 2019-yilda tashkil topganmiz va shu kungacha minglab yoshlarga innovatsion texnologiyalar bo‘yicha ta’lim berib kelmoqdamiz.", en: "\"DATA UNION\" — mustaqil, o‘z rivojlanish strategiyasi, qadriyatlari va maqsadlariga ega kompaniya. Biz 2019-yilda tashkil topganmiz va shu kungacha minglab yoshlarga innovatsion texnologiyalar bo‘yicha ta’lim berib kelmoqdamiz." },
   aboutQuote: { uz: "\"Bizning maqsadimiz — yuqori malakali, ijodiy fikrlaydigan va jamiyatimizga ijobiy ta’sir qiladigan avlodni yetishtirishdir.\"", ru: "\"Bizning maqsadimiz — yuqori malakali, ijodiy fikrlaydigan va jamiyatimizga ijobiy ta’sir qiladigan avlodni yetishtirishdir.\"", en: "\"Bizning maqsadimiz — yuqori malakali, ijodiy fikrlaydigan va jamiyatimizga ijobiy ta’sir qiladigan avlodni yetishtirishdir.\"" },
   aboutImage: "",
+  founderName: { uz: "Shahzod Sabirov", ru: "Shahzod Sabirov", en: "Shahzod Sabirov" },
+  founderTitle: { uz: "DATA Ta'lim Stansiyasi asoschisi", ru: "DATA Ta'lim Stansiyasi asoschisi", en: "DATA Ta'lim Stansiyasi asoschisi" },
   contactAddress: { uz: "Xorazm viloyati, Urganch sh., V.Fayozov ko'chasi, 9-uy", ru: "Xorazm viloyati, Urganch sh., V.Fayozov ko'chasi, 9-uy", en: "Xorazm viloyati, Urganch sh., V.Fayozov ko'chasi, 9-uy" },
   contactLandmark: { uz: "Mo'ljal: Darital savdo markazi yonida", ru: "Mo'ljal: Darital savdo markazi yonida", en: "Mo'ljal: Darital savdo markazi yonida" },
   contactPhone: "+998 62 227-72-22",
@@ -189,7 +193,10 @@ export const useStore = create<AppState>()((set, get) => ({
       set({
         courses: coursesRes || initialCourses,
         team: teamRes || initialTeam,
-        siteContent: siteRes || initialSiteContent,
+        // Spread over defaults — eski saqlangan yozuvda hali mavjud bo'lmagan yangi
+        // siteContent maydonlari (masalan founderName/founderTitle) bo'sh chiqib
+        // ketmasligi uchun.
+        siteContent: siteRes ? { ...initialSiteContent, ...siteRes } : initialSiteContent,
         visibility: visRes || initialVisibility,
         isLoading: false
       });

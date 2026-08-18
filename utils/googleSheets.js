@@ -3,7 +3,7 @@
  */
 
 export const appendLeadToSheet = async (leadData) => {
-    const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycby4T5LogVNcgHfwsnZ7-Jr2mjV6Ft219VMhbij6hgxQlVM5P1wW93JXC38FYfK3Eoo8/exec";
+    const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxh8HajSOpdHBjgawBTxDRu6ufVSOXzZKpo8FjtY8Ry2bRoZy0vR474LkRrV0bo-VWL/exec";
 
     try {
         const payload = {
@@ -50,7 +50,7 @@ export const appendLeadToSheet = async (leadData) => {
  * tabiga yo'naltiradi — appendLeadToSheet bilan bir xil Web App URL ishlatiladi.
  */
 export const appendCareerTestToSheet = async (data) => {
-    const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycby4T5LogVNcgHfwsnZ7-Jr2mjV6Ft219VMhbij6hgxQlVM5P1wW93JXC38FYfK3Eoo8/exec";
+    const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxh8HajSOpdHBjgawBTxDRu6ufVSOXzZKpo8FjtY8Ry2bRoZy0vR474LkRrV0bo-VWL/exec";
 
     try {
         const payload = {

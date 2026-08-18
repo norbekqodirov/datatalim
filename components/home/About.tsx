@@ -47,9 +47,9 @@ export const About: React.FC = () => {
             <div
               className={`absolute bottom-8 left-8 right-8 backdrop-blur-xl p-6 rounded-2xl shadow-xl z-20 transition-all duration-300 hover:-translate-y-2 border ${isDark ? 'border-white/10 bg-black/60' : 'border-white/40 bg-white/80'}`}
             >
-              <h4 className={`font-black text-xl mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Shahzod Sabirov</h4>
+              <h4 className={`font-black text-xl mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{tField(siteContent.founderName)}</h4>
               <p className={`text-sm font-bold text-transparent bg-clip-text shimmer-text`} style={{ backgroundImage: 'linear-gradient(135deg, #0061ff, #60efff)' }}>
-                DATA Ta'lim Stansiyasi asoschisi
+                {tField(siteContent.founderTitle)}
               </p>
             </div>
           </div>

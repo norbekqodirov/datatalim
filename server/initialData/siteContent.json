@@ -36,6 +36,16 @@
     "en": "\"Bizning maqsadimiz — yuqori malakali, ijodiy fikrlaydigan va jamiyatimizga ijobiy ta’sir qiladigan avlodni yetishtirishdir.\""
   },
   "aboutImage": "https://picsum.photos/seed/shahzod/600/700",
+  "founderName": {
+    "uz": "Shahzod Sabirov",
+    "ru": "Shahzod Sabirov",
+    "en": "Shahzod Sabirov"
+  },
+  "founderTitle": {
+    "uz": "DATA Ta'lim Stansiyasi asoschisi",
+    "ru": "DATA Ta'lim Stansiyasi asoschisi",
+    "en": "DATA Ta'lim Stansiyasi asoschisi"
+  },
   "contactAddress": {
     "uz": "Xorazm viloyati, Urganch sh., V.Fayozov ko'chasi, 9-uy",
     "ru": "Xorazm viloyati, Urganch sh., V.Fayozov ko'chasi, 9-uy",
