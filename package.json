@@ -10,7 +10,9 @@
     "build": "vite build",
     "lint": "tsc",
     "preview": "vite preview",
-    "seed": "node server/seed.js"
+    "seed": "node server/seed.js",
+    "predeploy": "vite build",
+    "deploy": "node scripts/deploy/deploy.mjs"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
