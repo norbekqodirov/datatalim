@@ -6,7 +6,7 @@ import { Course } from '../../data/courses';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
 import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
-import { compressImageToWebP } from '../../utils/imageCompressor';
+import { uploadImageToAPIWithStats } from '../../utils/api';
 import { useLanguage } from '../../i18n';
 
 export default function ManageCourses() {
@@ -108,13 +108,9 @@ export default function ManageCourses() {
     if (file) {
       try {
         setWebpSavings(null);
-        const result = await compressImageToWebP(file);
-        setFormData(prev => ({ ...prev, coverImage: result.base64 }));
-        if (result.compressedSize < result.originalSize) {
-          const pct = Math.round((1 - result.compressedSize / result.originalSize) * 100);
-          const fmt = (b: number) => b >= 1024 * 1024 ? (b / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
-          setWebpSavings(`${fmt(result.originalSize)} → ${fmt(result.compressedSize)} (${pct}% kichiklashdi)`);
-        }
+        const result = await uploadImageToAPIWithStats(file);
+        setFormData(prev => ({ ...prev, coverImage: result.url }));
+        if (result.savingsLabel) setWebpSavings(result.savingsLabel);
       } catch (error) {
         toast.error('Rasm yuklashda xatolik yuz berdi');
       }
@@ -152,15 +148,11 @@ export default function ManageCourses() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const result = await compressImageToWebP(file);
+        const result = await uploadImageToAPIWithStats(file);
         const newMentors = [...(formData.mentors || [])];
-        newMentors[idx] = { ...newMentors[idx], image: result.base64 };
+        newMentors[idx] = { ...newMentors[idx], image: result.url };
         setFormData(prev => ({ ...prev, mentors: newMentors }));
-        if (result.compressedSize < result.originalSize) {
-          const pct = Math.round((1 - result.compressedSize / result.originalSize) * 100);
-          const fmt = (b: number) => b >= 1024 * 1024 ? (b / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
-          setMentorWebpSavings(prev => ({ ...prev, [idx]: `${fmt(result.originalSize)} → ${fmt(result.compressedSize)} (${pct}% kichiklashdi)` }));
-        }
+        if (result.savingsLabel) setMentorWebpSavings(prev => ({ ...prev, [idx]: result.savingsLabel! }));
       } catch (error) {
         toast.error('Rasm yuklashda xatolik yuz berdi');
       }

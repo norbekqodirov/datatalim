@@ -5,7 +5,7 @@ import { Save, Video, Type, Image as ImageIcon, MapPin, Plus, Trash2, CheckCircl
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
 import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
-import { compressImageToWebP } from '../../utils/imageCompressor';
+import { uploadImageToAPIWithStats } from '../../utils/api';
 
 export default function ManageMedia() {
   const { siteContent, updateSiteContent } = useStore();
@@ -38,13 +38,9 @@ export default function ManageMedia() {
     if (file) {
       try {
         setAboutSavings(null);
-        const result = await compressImageToWebP(file);
-        setFormData(prev => ({ ...prev, aboutImage: result.base64 }));
-        if (result.compressedSize < result.originalSize) {
-          const pct = Math.round((1 - result.compressedSize / result.originalSize) * 100);
-          const fmt = (b: number) => b >= 1024 * 1024 ? (b / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
-          setAboutSavings(`${fmt(result.originalSize)} → ${fmt(result.compressedSize)} (${pct}% kichiklashdi)`);
-        }
+        const result = await uploadImageToAPIWithStats(file);
+        setFormData(prev => ({ ...prev, aboutImage: result.url }));
+        if (result.savingsLabel) setAboutSavings(result.savingsLabel);
       } catch (error) {
         toast.error('Rasm yuklashda xatolik yuz berdi');
       }
@@ -55,13 +51,9 @@ export default function ManageMedia() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const result = await compressImageToWebP(file);
-        handleGalleryChange(index, result.base64);
-        if (result.compressedSize < result.originalSize) {
-          const pct = Math.round((1 - result.compressedSize / result.originalSize) * 100);
-          const fmt = (b: number) => b >= 1024 * 1024 ? (b / (1024 * 1024)).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
-          setGallerySavings(prev => ({ ...prev, [index]: `${fmt(result.originalSize)} → ${fmt(result.compressedSize)} (${pct}% kichiklashdi)` }));
-        }
+        const result = await uploadImageToAPIWithStats(file);
+        handleGalleryChange(index, result.url);
+        if (result.savingsLabel) setGallerySavings(prev => ({ ...prev, [index]: result.savingsLabel! }));
       } catch (error) {
         toast.error('Rasm yuklashda xatolik yuz berdi');
       }

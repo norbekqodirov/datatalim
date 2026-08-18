@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Pencil, Trash2, X, Save, FileText, Eye, EyeOff, Bold, Italic, Heading, Code, Link, Image, AlignLeft, Columns } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
+import { uploadImageToAPI } from '../../utils/api';
 
 // Simple markdown renderer (no external dep)
 function renderMarkdown(md: string): string {
@@ -85,19 +86,10 @@ const ManagePosts: React.FC = () => {
   const handleCoverUpload = async (file: File) => {
     setCoverUploading(true);
     try {
-      const toBase64 = (f: File) => new Promise<string>((res, rej) => {
-        const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f);
-      });
-      const base64 = await toBase64(file);
-      const resp = await fetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('adminToken')}` },
-        body: JSON.stringify({ image: base64, filename: file.name }),
-      });
-      const d = await resp.json();
-      if (d.url) { updateField('cover_image', d.url); toast.success('Rasm yuklandi!'); }
-      else toast.error('Yuklash xatoligi');
-    } catch { toast.error('Xatolik'); } finally { setCoverUploading(false); }
+      const url = await uploadImageToAPI(file);
+      updateField('cover_image', url);
+      toast.success('Rasm yuklandi!');
+    } catch { toast.error('Yuklash xatoligi'); } finally { setCoverUploading(false); }
   };
 
   const fetchPosts = async () => {
