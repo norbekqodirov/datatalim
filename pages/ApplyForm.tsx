@@ -80,15 +80,19 @@ export default function ApplyForm() {
         const selectedCourse = activeCourses.find(c => c.id === formData.courseId);
         const courseName = selectedCourse ? getTitle(selectedCourse) : 'Boshqa';
 
-        const text = `🎯 <b>Yangi Ariza (Marketing) — DATA</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${formData.phone}\n📚 <b>Kurs:</b> ${courseName}\n🔗 <b>Manba (ref):</b> ${refCode || 'Organik'}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
-
         try {
-            await submitLeadToAPI({
+            const crmData = await submitLeadToAPI({
                 name: formData.name,
                 phone: formData.phone,
                 courseId: courseName,
                 sourceRef: refCode,
             });
+
+            // Backend marketing_links jadvalidan ref_code'ni forma nomiga aylantirib beradi
+            // (resolvedSourceRef) — Telegramda xom ref-ID emas, o'sha nom ko'rsatilishi uchun shundan foydalanamiz.
+            const displayRef = crmData?.resolvedSourceRef || refCode || 'Organik';
+            const text = `🎯 <b>Yangi Ariza (Marketing) — DATA</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${formData.phone}\n📚 <b>Kurs:</b> ${courseName}\n🔗 <b>Manba (ref):</b> ${displayRef}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
+
             await sendToTelegram(text);
             setSent(true);
             toast.success('Arizangiz muvaffaqiyatli qabul qilindi!');
