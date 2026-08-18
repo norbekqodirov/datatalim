@@ -12,10 +12,12 @@ interface EnrollModalProps {
     courseName: string;
     type?: 'enroll' | 'consult';
     extraInfo?: string; // Test natijasi yoki qo'shimcha ma'lumot
+    initialName?: string; // Masalan, karyera testi intro'sida allaqachon kiritilgan ism
+    initialPhone?: string; // Formatlangan holatda, masalan "90 123 45 67" (+998 siz)
 }
 
-export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, courseName, type = 'enroll', extraInfo }) => {
-    const [formData, setFormData] = useState({ name: '', phone: '' });
+export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, courseName, type = 'enroll', extraInfo, initialName, initialPhone }) => {
+    const [formData, setFormData] = useState({ name: initialName || '', phone: initialPhone || '' });
     const [loading, setLoading] = useState(false);
     const [sent, setSent] = useState(false);
 

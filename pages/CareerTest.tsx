@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import type { ComponentType, CSSProperties } from 'react';
+import type { ComponentType, CSSProperties, ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -13,13 +13,14 @@ import {
   Hammer, Lightbulb, Brush, Megaphone, Calculator, Trees, Music, Microscope,
   Handshake, FileText, Cog, Telescope, Building2, PenTool, Database, Atom,
   Receipt, HandHeart, Library, Camera, LineChart, ClipboardCheck, User, Gauge,
-  Scale, Ruler, Layers,
+  Scale, Ruler, Layers, Phone,
 } from 'lucide-react';
 import { useTheme } from '../store/ThemeContext';
 import { PatternBg, FloatingStars } from '../components/BrandElements';
 import { SEO } from '../components/SEO';
 import { EnrollModal } from '../components/EnrollModal';
 import { trackSiteEvent } from '../utils/analytics';
+import { submitLeadToAPI, submitCareerTestResult } from '../utils/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type RiasecType = 'R' | 'I' | 'A' | 'S' | 'E' | 'C';
@@ -717,6 +718,7 @@ export default function CareerTest() {
   const { isDark } = useTheme();
   const [view, setView] = useState<View>('intro');
   const [userName, setUserName] = useState('');
+  const [userPhone, setUserPhone] = useState('');
   const [userAge, setUserAge] = useState('');
   const [userGender, setUserGender] = useState<Gender>('');
   const [stage, setStage] = useState<Stage>(1);
@@ -736,6 +738,8 @@ export default function CareerTest() {
   const [mcOrder, setMcOrder] = useState<number[][]>(() => MULTI_CHOICE.map(() => shuffledIndices(4)));
   const calcTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const transitionLockRef = useRef(false);
+  // Har bir test topshirilishida faqat bir marta avtomatik yuborilishi uchun
+  const autoSubmittedRef = useRef(false);
   // Kutilayotgan animatsiya taymerlari. Ular bekor qilinmasa, "Qayta"/"Orqaga"
   // bosilganda eski taymer allaqachon almashgan ekranning holatini o'zgartirib
   // yuboradi va AnimatePresence chiqish animatsiyasida qotib qoladi.
@@ -771,11 +775,26 @@ export default function CareerTest() {
   const ageNum = parseInt(userAge, 10);
   const ageValid = userAge.trim() !== '' && Number.isFinite(ageNum) && ageNum >= 10 && ageNum <= 90;
   const genderValid = userGender !== '';
-  const canStart = ageValid && genderValid;
+  const nameValid = userName.trim().length >= 2;
+  const rawPhone = userPhone.replace(/\D/g, '');
+  const phoneValid = rawPhone.length === 9;
+  const canStart = ageValid && genderValid && nameValid && phoneValid;
+
+  function handlePhoneChange(e: ChangeEvent<HTMLInputElement>) {
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.length > 9) val = val.slice(0, 9);
+    let formatted = '';
+    if (val.length > 0) formatted += val.substring(0, 2);
+    if (val.length > 2) formatted += ' ' + val.substring(2, 5);
+    if (val.length > 5) formatted += ' ' + val.substring(5, 7);
+    if (val.length > 7) formatted += ' ' + val.substring(7, 9);
+    setUserPhone(formatted);
+  }
 
   function startTest() {
     if (!canStart) return;
     clearPending();
+    autoSubmittedRef.current = false;
     setView('test'); setStage(1); setCurrentQ(0);
     setS1Answers({}); setS2Answers({}); setS3Answers({}); setS2Page(0);
     setFcSwap(FORCED_CHOICE.map(() => Math.random() < 0.5));
@@ -785,6 +804,7 @@ export default function CareerTest() {
 
   function restartTest() {
     clearPending();
+    autoSubmittedRef.current = false;
     setView('intro'); setResults([]); setPercentages({ R:0,I:0,A:0,S:0,E:0,C:0 });
     window.scrollTo(0, 0);
   }
@@ -841,16 +861,50 @@ export default function CareerTest() {
         schedule(() => {
           if (calcTimerRef.current) { clearInterval(calcTimerRef.current); calcTimerRef.current = null; }
           const pcts = computePercentages(s1Answers, s2Answers, newS3);
+          const finalResults = matchCourses(pcts, ageValid ? ageNum : null);
           setPercentages(pcts);
           setQuality(computeQuality(pcts, s2Answers));
-          setResults(matchCourses(pcts, ageValid ? ageNum : null));
+          setResults(finalResults);
           setView('result');
           window.scrollTo(0, 0);
           trackSiteEvent('career_test_complete');
+          submitCareerTestAuto(pcts, finalResults);
         }, 2500);
       }
     }, 350);
     schedule(() => { transitionLockRef.current = false; }, isLast ? 350 : 700);
+  }
+
+  /**
+   * Test tugashi bilan avtomatik ravishda leadni CRM'ga (+ umumiy Google Sheet)
+   * va karyera testiga xos maydonlarni (jins, yosh, top-3 kurs) alohida
+   * "Karyera Testi" Sheet tabiga yuboradi. Fon jarayoni — natijalar sahifasini
+   * bloklamaydi, xatolik bo'lsa ham foydalanuvchi natijasini ko'raveradi.
+   */
+  function submitCareerTestAuto(pcts: Record<RiasecType, number>, finalResults: CourseResult[]) {
+    if (autoSubmittedRef.current) return;
+    if (!nameValid || !phoneValid) return; // himoya: intro validatsiyasiz bu yergacha yetib kelmasligi kerak
+    autoSubmittedRef.current = true;
+
+    const fullPhone = '+998' + rawPhone;
+    const topCourseNames = finalResults.slice(0, 3).map(r => r.course.name);
+    const code = getHollandCode(pcts).join('');
+
+    submitLeadToAPI({
+      name: userName,
+      phone: fullPhone,
+      courseId: topCourseNames.join(', ') || 'Karyera testi',
+      sourceRef: 'Karyera_Testi',
+    }).catch(err => console.error('Karyera testi CRM lead xatosi:', err));
+
+    submitCareerTestResult({
+      name: userName,
+      phone: fullPhone,
+      gender: userGender,
+      age: userAge,
+      hollandCode: code,
+      courses: topCourseNames,
+    }).catch(err => console.error('Karyera testi Sheets xatosi:', err));
   }
 
   async function handleDownloadPdf() {
@@ -921,10 +975,10 @@ export default function CareerTest() {
 
             {/* Demographics */}
             <motion.div initial={{ opacity:0, y:15 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.36 }} className={`w-full max-w-2xl mb-4 rounded-2xl border p-4 backdrop-blur-xl ${isDark ? 'bg-slate-800/50 border-white/10' : 'bg-white/90 border-slate-200 shadow-sm'}`}>
-              <p className={`text-[11px] font-bold uppercase tracking-wider mb-3 text-center ${sub}`}>Hisobotni shaxsiylashtirish uchun</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <p className={`text-[11px] font-bold uppercase tracking-wider mb-3 text-center ${sub}`}>Hisobotni shaxsiylashtirish va natijangizni yuborish uchun</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Ismingiz (ixtiyoriy)</label>
+                  <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Ismingiz *</label>
                   <div className="relative">
                     <User size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                     <input
@@ -936,6 +990,22 @@ export default function CareerTest() {
                     />
                   </div>
                 </div>
+                <div>
+                  <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Telefon raqamingiz *</label>
+                  <div className="relative">
+                    <Phone size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <span className={`absolute left-9 top-1/2 -translate-y-1/2 text-sm font-medium pointer-events-none ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>+998</span>
+                    <input
+                      type="tel" inputMode="numeric" value={userPhone} onChange={handlePhoneChange}
+                      placeholder="90 123 45 67" maxLength={12}
+                      className={`w-full pl-[4.7rem] pr-3 py-2 rounded-xl border font-medium outline-none transition-all focus:ring-2 focus:ring-blue-400/40 text-sm ${
+                        isDark ? 'bg-slate-900/60 border-white/10 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Yoshingiz *</label>
                   <input
@@ -964,6 +1034,9 @@ export default function CareerTest() {
                   </div>
                 </div>
               </div>
+              <p className={`text-[10px] mt-3 text-center leading-snug ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Ma'lumotlaringiz faqat test natijasi va tavsiya etilgan kurslar bo'yicha siz bilan bog'lanish uchun ishlatiladi.
+              </p>
             </motion.div>
 
             <motion.div initial={{ opacity:0, scale:0.9 }} animate={{ opacity:1, scale:1 }} transition={{ delay:0.42 }}>
@@ -975,7 +1048,7 @@ export default function CareerTest() {
                 Testni Boshlash →
               </button>
               {!canStart && (
-                <p className={`text-xs text-center mt-2 ${sub}`}>Yosh va jinsni to'ldiring (* majburiy)</p>
+                <p className={`text-xs text-center mt-2 ${sub}`}>Ism, telefon, yosh va jinsni to'ldiring (* majburiy)</p>
               )}
             </motion.div>
           </motion.div>
@@ -1425,6 +1498,8 @@ export default function CareerTest() {
           onClose={() => setEnrollCourse(null)}
           courseName={enrollCourse.name}
           extraInfo="Karyera testi natijasi asosida tavsiya etildi"
+          initialName={userName}
+          initialPhone={userPhone}
         />
       )}
     </div>

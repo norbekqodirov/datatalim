@@ -142,6 +142,25 @@ export const submitLeadToAPI = async (leadData: { name: string; phone: string; c
     }
 };
 
+/** Karyera testi natijasini "Karyera Testi" Google Sheets tabiga yozadi (alohida, /api/leads dan tashqari). */
+export const submitCareerTestResult = async (data: {
+    name: string; phone: string; gender: string; age: string | number;
+    hollandCode: string; courses: string[];
+}) => {
+    try {
+        const response = await fetch(`${API_BASE}/career-test-result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error('Network response was not ok');
+        return await response.json();
+    } catch (error) {
+        console.error('Failed to submit career test result:', error);
+        throw error;
+    }
+};
+
 export interface TokenPayload {
   id: number;
   username: string;

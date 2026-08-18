@@ -10,7 +10,7 @@ import rateLimit from 'express-rate-limit';
 import { Agent as UndiciAgent } from 'undici';
 import { getDB, initDB } from './db.js';
 import { fileURLToPath } from 'url';
-import { appendLeadToSheet } from '../utils/googleSheets.js';
+import { appendLeadToSheet, appendCareerTestToSheet } from '../utils/googleSheets.js';
 
 // Serverning IPv4 marshruti api.telegram.org'ga yetib bormaydi (paketlar yo'qoladi, connect 8-10s
 // osilib qoladi), IPv6 esa to'liq ishlaydi — shuning uchun bu chaqiruvni majburan IPv6 orqali yuboramiz.
@@ -307,6 +307,29 @@ app.post('/api/leads', leadsLimiter, (req, res) => {
         res.json(finalResult);
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// --- CAREER TEST RESULT -> GOOGLE SHEETS (alohida tab) ---
+// Lead o'zi /api/leads orqali allaqachon CRM'ga va umumiy Sheetga tushadi;
+// bu endpoint faqat karyera testiga xos maydonlarni (jins, yosh, top-3 kurs)
+// "Karyera Testi" tabiga qo'shimcha yozish uchun ishlatiladi.
+app.post('/api/career-test-result', leadsLimiter, async (req, res) => {
+    const name = sanitize(req.body.name);
+    const phone = sanitize(req.body.phone);
+    const gender = sanitize(req.body.gender);
+    const age = sanitize(String(req.body.age ?? ''));
+    const hollandCode = sanitize(req.body.hollandCode);
+    const courses = Array.isArray(req.body.courses) ? req.body.courses.slice(0, 3).map(sanitize) : [];
+
+    if (!name || !phone) return res.status(400).json({ error: 'Name and phone are required' });
+
+    try {
+        const result = await appendCareerTestToSheet({ name, phone, gender, age, hollandCode, courses });
+        res.json(result);
+    } catch (err) {
+        console.error('Career test sheet sync error:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
