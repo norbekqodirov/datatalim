@@ -84,17 +84,23 @@ export const Contact: React.FC = () => {
     const text = `📩 <b>Yangi xabar — DATA Ta'lim Stansiyasi</b>\n\n👤 <b>Ism:</b> ${formData.name}\n📞 <b>Telefon:</b> ${fullPhone}\n💬 <b>Xabar:</b> ${formData.message || '—'}\n🔗 <b>Manba (ref):</b> ${displayRef}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
 
     const result = await sendToTelegram(text);
+    if (!result.success) {
+      // Telegram — faqat menejerlarga tezkor bildirishnoma kanali; lead CRM/Sheetsga
+      // allaqachon tushgan bo'lsa (crmData bor), bu yerda muvaffaqiyatsizlik xabar
+      // qabul qilinmagan degani emas, shuning uchun foydalanuvchiga xatolik ko'rsatmaymiz.
+      console.error('Telegram notification failed (lead is still saved to CRM):', result.error);
+    }
 
     setLoading(false);
 
-    if (result.success) {
+    if (crmData) {
       trackEvent('Lead', { source: 'Contact' });
       toast.success('Xabaringiz muvaffaqiyatli yuborildi! Tez orada siz bilan bog\'lanamiz.');
       setSent(true);
       setFormData({ name: '', phone: '', message: '' });
       setTimeout(() => setSent(false), 5000);
     } else {
-      toast.error(result.error || 'Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+      toast.error('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
     }
   };
 

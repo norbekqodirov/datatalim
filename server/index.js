@@ -12,9 +12,41 @@ import { getDB, initDB } from './db.js';
 import { fileURLToPath } from 'url';
 import { appendLeadToSheet, appendCareerTestToSheet } from '../utils/googleSheets.js';
 
-// Serverning IPv4 marshruti api.telegram.org'ga yetib bormaydi (paketlar yo'qoladi, connect 8-10s
-// osilib qoladi), IPv6 esa to'liq ishlaydi — shuning uchun bu chaqiruvni majburan IPv6 orqali yuboramiz.
-const telegramDispatcher = new UndiciAgent({ connect: { family: 6 } });
+// Serverning ba'zi tarmoq muhitlarida IPv4 orqali api.telegram.org'ga ulanish osilib qoladi/vaqti
+// tugaydi (masalan Telegram IP-diapazonlari filtrlanganda), boshqalarida esa IPv6 umuman mavjud emas.
+// Qaysi marshrut mavjud/ishlashi vaqt bilan o'zgarishi mumkinligi uchun ikkalasini ham (avval IPv6,
+// keyin standart/IPv4) sinab ko'ramiz — qaysi biri tiklansa, kodni o'zgartirmasdan o'shanga o'tadi.
+const telegramDispatcherV6 = new UndiciAgent({ connect: { family: 6 } });
+
+async function sendTelegramMessage(text) {
+    const routes = [
+        { label: 'IPv6', dispatcher: telegramDispatcherV6 },
+        { label: 'default', dispatcher: undefined },
+    ];
+    let lastError;
+    for (const route of routes) {
+        try {
+            const fetchOpts = {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: TG_CHAT_ID, text, parse_mode: 'HTML' }),
+                signal: AbortSignal.timeout(6000),
+            };
+            if (route.dispatcher) fetchOpts.dispatcher = route.dispatcher;
+
+            const tgResponse = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, fetchOpts);
+            if (!tgResponse.ok) {
+                const data = await tgResponse.json().catch(() => ({}));
+                return { success: false, error: data.description || 'Telegram xatosi' };
+            }
+            return { success: true };
+        } catch (err) {
+            console.error(`Telegram send error (${route.label} marshrut):`, err.message);
+            lastError = err;
+        }
+    }
+    return { success: false, error: lastError?.message || 'Tarmoq xatosi' };
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -638,39 +670,18 @@ app.post('/api/notify-telegram', leadsLimiter, async (req, res) => {
         return res.json({ success: true, skipped: true });
     }
 
+    // Round-robin manager assignment
+    let assignedManager = 'Menejer';
     try {
-        // Round-robin manager assignment
-        let assignedManager = 'Menejer';
-        try {
-            lastAssignedManager = lastAssignedManager === 'A' ? 'B' : 'A';
-            assignedManager = `Menejer ${lastAssignedManager}`;
-        } catch (e) {
-            console.error('Manager assignment error:', e);
-        }
-
-        const finalMessage = `${message}\n\n👥 <b>Biriktirildi:</b> ${assignedManager}`;
-
-        const tgResponse = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: TG_CHAT_ID,
-                text: finalMessage,
-                parse_mode: 'HTML',
-            }),
-            dispatcher: telegramDispatcher,
-        });
-
-        if (!tgResponse.ok) {
-            const data = await tgResponse.json();
-            return res.json({ success: false, error: data.description || 'Telegram xatosi' });
-        }
-
-        res.json({ success: true });
-    } catch (err) {
-        console.error('Telegram send error:', err);
-        res.json({ success: false, error: err.message || 'Tarmoq xatosi' });
+        lastAssignedManager = lastAssignedManager === 'A' ? 'B' : 'A';
+        assignedManager = `Menejer ${lastAssignedManager}`;
+    } catch (e) {
+        console.error('Manager assignment error:', e);
     }
+
+    const finalMessage = `${message}\n\n👥 <b>Biriktirildi:</b> ${assignedManager}`;
+    const result = await sendTelegramMessage(finalMessage);
+    res.json(result);
 });
 
 // Start server

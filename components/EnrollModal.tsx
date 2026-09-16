@@ -91,10 +91,16 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         text += `\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
 
         const result = await sendToTelegram(text);
+        if (!result.success) {
+            // Telegram — faqat menejerlarga tezkor bildirishnoma kanali; lead CRM/Sheetsga
+            // allaqachon tushgan bo'lsa (crmData bor), bu yerda muvaffaqiyatsizlik ariza
+            // qabul qilinmagan degani emas, shuning uchun foydalanuvchiga xatolik ko'rsatmaymiz.
+            console.error('Telegram notification failed (lead is still saved to CRM):', result.error);
+        }
 
         setLoading(false);
 
-        if (result.success) {
+        if (crmData) {
             trackEvent('Lead', { source: type, course: courseName });
             toast.success('Arizangiz qabul qilindi! Tez orada siz bilan bog\'lanamiz.');
             setSent(true);
@@ -104,7 +110,7 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
                 onClose();
             }, 3000);
         } else {
-            toast.error(result.error || 'Xatolik yuz berdi.');
+            toast.error('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
         }
     };
 
