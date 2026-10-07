@@ -1,0 +1,24 @@
+{
+  "format": "AES-256-GCM + ZIP, split into 40 MiB chunks",
+  "project": "datatalim",
+  "created": "2026-10-07",
+  "file_count": 799,
+  "archive_sha256": "1597dfa0bd4b0531c1760e9fb45d86fb5474c830e771f12f30506e8df27d7a84",
+  "parts": [
+    {
+      "file": "local-state.part001.enc",
+      "bytes": 41943076,
+      "sha256": "455de9c83f78058193571abd1e4769a3bfb34c58f0984e6a565a2118c1f5832f"
+    },
+    {
+      "file": "local-state.part002.enc",
+      "bytes": 41943076,
+      "sha256": "f36177a98938247e790832ac81eee7546fa7ba8c4aee45e0e0d3d55161df9a2b"
+    },
+    {
+      "file": "local-state.part003.enc",
+      "bytes": 25276197,
+      "sha256": "95869c88943f07fdea4e86ef1eb9680626335523029ebedd280e486ef09647d9"
+    }
+  ]
+}
