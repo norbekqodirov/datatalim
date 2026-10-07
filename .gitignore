@@ -40,3 +40,6 @@ build_log.txt
 
 # One-off prompt export snapshots (not project source)
 migrated_prompt_history/
+
+# Local agent configuration
+.agents/
