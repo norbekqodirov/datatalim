@@ -4,6 +4,33 @@ import { ArrowLeft, Calendar, Tag, Link2, Check } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { useTheme } from '../store/ThemeContext';
 import { useLanguage } from '../i18n';
+import DOMPurify from 'dompurify';
+
+// --- Blog HTML sanitizer (XSS himoyasi) ---
+// Faqat YouTube embed'lariga ruxsat; qolgan iframe'lar o'chiriladi.
+const YT_EMBED_RE = /^https:\/\/(www\.)?(youtube\.com|youtube-nocookie\.com)\/embed\//i;
+
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'IFRAME') {
+    const src = node.getAttribute('src') || '';
+    if (!YT_EMBED_RE.test(src)) {
+      node.parentNode?.removeChild(node);
+      return;
+    }
+    node.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation allow-popups');
+    node.setAttribute('loading', 'lazy');
+  }
+  if (node.tagName === 'A' && node.hasAttribute('href')) {
+    node.setAttribute('rel', 'noopener noreferrer');
+  }
+});
+
+const sanitizePostHtml = (html: string): string =>
+  DOMPurify.sanitize(html || '', {
+    ADD_TAGS: ['iframe'],
+    ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'target'],
+    FORBID_TAGS: ['style', 'form', 'input', 'button', 'textarea', 'select'],
+  });
 
 interface Post {
   id: number;
@@ -79,7 +106,7 @@ const BlogPost: React.FC = () => {
   }
 
   const title = getTitle(post);
-  const content = getContent(post);
+  const content = sanitizePostHtml(getContent(post));
 
   return (
     <>

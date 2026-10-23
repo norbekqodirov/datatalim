@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /paneladmindata
+
+Sitemap: https://datatalim.uz/sitemap.xml

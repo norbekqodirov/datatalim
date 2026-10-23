@@ -1,8 +1,8 @@
 // Lightweight 3D particle engine (Canvas 2D, no WebGL/three.js dependency).
-// Three formations are morphed by a 0..1 "progress" value:
-//   0.00 → chaos  (raw, unstructured data)
-//   0.50 → globe  (structure: fibonacci sphere)
-//   1.00 → star   (the DATA 4-point brand star, extruded into a 3D lens)
+// Three formations are morphed by a 0..1 "progress" value — the hero's story:
+//   0.00 → planet  (the world: wireframe globe with an orbiting data ring)
+//   0.50 → galaxy  (the world dissolves into a swirling spiral of raw data)
+//   1.00 → star    (data condenses into the DATA 4-point brand star, a 3D lens)
 
 export interface FieldOptions {
   count: number;
@@ -10,10 +10,12 @@ export interface FieldOptions {
 }
 
 interface P {
-  // chaos, globe, star positions (x,y,z interleaved)
-  c: [number, number, number];
-  g: [number, number, number];
-  s: [number, number, number];
+  g: [number, number, number]; // planet position
+  // galaxy is animated, so it's stored in polar form: radius, base angle, height
+  gr: number;
+  ga: number;
+  gy: number;
+  s: [number, number, number]; // star position
   hue: number; // 0 = blue, 1 = cyan, 2 = green
   size: number;
   phase: number;
@@ -37,36 +39,53 @@ function starRadius(theta: number, k = 0.62) {
   return 1 / Math.pow(Math.pow(c, k) + Math.pow(s, k), 1 / k);
 }
 
+const gauss = (rnd: () => number) => rnd() + rnd() + rnd() - 1.5;
+
 function build(count: number): P[] {
   const rnd = mulberry32(2019);
   const pts: P[] = [];
   const golden = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < count; i++) {
-    // chaos: dense nebula of raw data, slightly flattened
-    const gx = (rnd() + rnd() + rnd() - 1.5) * 1.35;
-    const gy = (rnd() + rnd() + rnd() - 1.5) * 1.0;
-    const gz = (rnd() + rnd() + rnd() - 1.5) * 1.2;
+  const R = 1.0;
+  const RING_TILT = 0.42;
 
-    // globe: 40% fibonacci surface + 60% on latitude/meridian rings so it reads as a wireframe
-    const R = 1.05;
+  for (let i = 0; i < count; i++) {
+    let hueBias = -1;
+
+    // ---- planet: surface + parallels + meridians + a tilted orbit ring
     let g: [number, number, number];
     const kind = rnd();
-    if (kind < 0.4) {
+    if (kind < 0.3) {
       const y = 1 - (i / (count - 1)) * 2;
       const r = Math.sqrt(1 - y * y);
       const th = golden * i;
       g = [Math.cos(th) * r * R, y * R, Math.sin(th) * r * R];
-    } else if (kind < 0.75) {
-      const lat = (Math.floor(rnd() * 7) - 3) * (Math.PI / 8); // 7 parallels
+    } else if (kind < 0.58) {
+      const lat = (Math.floor(rnd() * 7) - 3) * (Math.PI / 8);
       const lon = rnd() * TAU;
       g = [Math.cos(lat) * Math.cos(lon) * R, Math.sin(lat) * R, Math.cos(lat) * Math.sin(lon) * R];
-    } else {
-      const lon = Math.floor(rnd() * 8) * (Math.PI / 8); // 8 meridians
+    } else if (kind < 0.8) {
+      const lon = Math.floor(rnd() * 6) * (Math.PI / 6);
       const lat = rnd() * TAU;
       g = [Math.cos(lat) * Math.cos(lon) * R, Math.sin(lat) * R, Math.cos(lat) * Math.sin(lon) * R];
+    } else {
+      // orbit ring (data in transit) — slightly thick, tilted
+      const a = rnd() * TAU;
+      const rr = 1.55 + gauss(rnd) * 0.09;
+      const x = Math.cos(a) * rr;
+      const z = Math.sin(a) * rr;
+      const y = gauss(rnd) * 0.03;
+      g = [x, y * Math.cos(RING_TILT) - z * Math.sin(RING_TILT), y * Math.sin(RING_TILT) + z * Math.cos(RING_TILT)];
+      hueBias = rnd() < 0.55 ? 2 : 1;
     }
 
-    // star: 70% on the outline (crisp silhouette), 30% filling the body
+    // ---- galaxy: 3-arm logarithmic spiral disk with a bright core
+    const arm = Math.floor(rnd() * 3);
+    const t = Math.pow(rnd(), 0.75);
+    const gr = 0.08 + t * 1.75;
+    const ga = (arm * TAU) / 3 + gr * 2.4 + gauss(rnd) * (0.16 + 0.2 * (1 - t));
+    const gy = gauss(rnd) * 0.12 * (1.2 - t);
+
+    // ---- star: 70% on the outline (crisp silhouette), 30% filling the body
     const a = rnd() * TAU;
     const edge = rnd() < 0.7;
     const sr = starRadius(a) * (edge ? 1 - rnd() * 0.04 : Math.sqrt(rnd()) * 0.96);
@@ -79,11 +98,13 @@ function build(count: number): P[] {
 
     const hr = rnd();
     pts.push({
-      c: [gx, gy, gz],
       g,
+      gr,
+      ga,
+      gy,
       s: [sx, sy, sz],
-      hue: hr < 0.62 ? 0 : hr < 0.92 ? 1 : 2,
-      size: 1.1 + rnd() * 1.5,
+      hue: hueBias >= 0 ? hueBias : hr < 0.6 ? 0 : hr < 0.92 ? 1 : 2,
+      size: 1.1 + rnd() * 1.6,
       phase: rnd() * TAU,
     });
   }
@@ -92,7 +113,7 @@ function build(count: number): P[] {
 
 // fillStyle strings pre-built per hue × 21 alpha steps (no string allocation per particle)
 const buildStyles = (rgb: string[]) => rgb.map((c) => Array.from({ length: 21 }, (_, q) => `rgba(${c},${(q / 20).toFixed(2)})`));
-const STYLES_DARK = buildStyles(['0,97,255', '96,239,255', '0,178,107']);
+const STYLES_DARK = buildStyles(['40,120,255', '96,239,255', '0,210,120']);
 const STYLES_LIGHT = buildStyles(['0,82,217', '0,140,170', '0,150,90']);
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -182,50 +203,52 @@ export class ParticleField {
     this.sdim += (this.dim - this.sdim) * (still ? 1 : 0.06);
 
     const p = clamp01(this.sp);
-    // morph weights: chaos→globe over [0, .5], globe→star over [.5, 1]
+    // morph weights: planet→galaxy over [0, .5], galaxy→star over [.5, 1]
     const m1 = ease(clamp01(p / 0.5));
     const m2 = ease(clamp01((p - 0.5) / 0.5));
 
-    // rotation: spins slower as structure emerges, then settles facing the viewer
-    const spin = time * (0.22 - 0.12 * m2);
-    const rotY = spin * (1 - m2) + (Math.sin(time * 0.6) * 0.35) * m2 + this.mx * 0.5;
-    const rotX = -0.25 * (1 - m2) + this.my * 0.35 + Math.sin(time * 0.4) * 0.06;
+    // camera: planet spins on its axis; galaxy is seen from above at an angle; star faces viewer
+    const spin = time * 0.25;
+    const rotY = spin * (1 - m2) + Math.sin(time * 0.6) * 0.3 * m2 + this.mx * 0.45;
+    const rotX = -0.22 * (1 - m1) + 0.95 * m1 * (1 - m2) + this.my * 0.3 + Math.sin(time * 0.4) * 0.05;
     const cy = Math.cos(rotY), sy = Math.sin(rotY);
     const cx = Math.cos(rotX), sx = Math.sin(rotX);
 
     const minDim = Math.min(w, h);
-    const scale = minDim * (0.31 + 0.02 * m1);
+    const scale = minDim * (0.27 + 0.06 * m1 - 0.02 * m2);
     const ox = w * this.sax;
-    const oy = h * (0.5 - 0.09 * m1); // lift the shape so captions below stay clear
-    const focal = 3.2;
+    const oy = h * (0.5 - 0.09 * clamp01(p * 4)); // lift the shape once captions appear below
+    const focal = 3.4;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    // soft core glow behind the formation, strongest once structure appears
-    const glowR = scale * (1.5 + 0.3 * m2);
+
+    // soft core glow behind the formation
+    const glowR = scale * (1.7 - 0.2 * m2);
     const glow = ctx.createRadialGradient(ox, oy, 0, ox, oy, glowR);
-    const ga = (this.dark ? 0.16 : 0.08) * (0.35 + 0.65 * m1);
+    const ga = (this.dark ? 0.2 : 0.1) * this.sdim * (1 + 0.4 * m1 * (1 - m2));
     glow.addColorStop(0, `rgba(0,97,255,${ga.toFixed(3)})`);
-    glow.addColorStop(0.55, `rgba(96,239,255,${(ga * 0.25).toFixed(3)})`);
+    glow.addColorStop(0.5, `rgba(96,239,255,${(ga * 0.22).toFixed(3)})`);
     glow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, w, h);
 
     ctx.globalCompositeOperation = this.dark ? 'lighter' : 'source-over';
-
     const styles = this.dark ? STYLES_DARK : STYLES_LIGHT;
 
     const pts = this.pts;
     for (let i = 0; i < pts.length; i++) {
       const pt = pts[i];
-      // drift gives the chaos state life; fades out as structure forms
-      const drift = (1 - m1) * 0.08;
-      const dx = Math.sin(time * 0.7 + pt.phase) * drift;
-      const dy = Math.cos(time * 0.5 + pt.phase * 1.3) * drift;
 
-      let x = pt.c[0] + dx + (pt.g[0] - pt.c[0] - dx) * m1;
-      let y = pt.c[1] + dy + (pt.g[1] - pt.c[1] - dy) * m1;
-      let z = pt.c[2] + (pt.g[2] - pt.c[2]) * m1;
+      // galaxy position for this frame: differential rotation (inner arms turn faster)
+      const ang = pt.ga + time * (0.55 / (pt.gr + 0.35));
+      const qx = Math.cos(ang) * pt.gr;
+      const qz = Math.sin(ang) * pt.gr;
+      const qy = pt.gy;
+
+      let x = pt.g[0] + (qx - pt.g[0]) * m1;
+      let y = pt.g[1] + (qy - pt.g[1]) * m1;
+      let z = pt.g[2] + (qz - pt.g[2]) * m1;
       x += (pt.s[0] - x) * m2;
       y += (pt.s[1] - y) * m2;
       z += (pt.s[2] - z) * m2;
@@ -241,10 +264,10 @@ export class ParticleField {
       const py = oy - y1 * scale * persp;
       if (px < -10 || px > w + 10 || py < -10 || py > h + 10) continue;
 
-      const depth = clamp01((z2 + 1.6) / 3.2); // 0 near → 1 far
-      const twinkle = 0.75 + 0.25 * Math.sin(time * 2 + pt.phase);
-      const alpha = Math.min(1, (this.dark ? 1 : 0.85) * (1 - depth * 0.6) * twinkle * this.sdim);
-      const size = pt.size * persp * (1 + m2 * 0.25);
+      const depth = clamp01((z2 + 1.8) / 3.6); // 0 near → 1 far
+      const twinkle = 0.78 + 0.22 * Math.sin(time * 2.2 + pt.phase);
+      const alpha = Math.min(1, (this.dark ? 1 : 0.85) * (1 - depth * 0.65) * twinkle * this.sdim);
+      const size = pt.size * persp;
 
       ctx.fillStyle = styles[pt.hue][Math.round(alpha * 20)];
       ctx.fillRect(px - size / 2, py - size / 2, size, size);

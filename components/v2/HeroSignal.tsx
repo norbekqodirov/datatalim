@@ -50,7 +50,7 @@ export const HeroSignal: React.FC = () => {
       return;
     }
     fieldRef.current = field;
-    field.anchorX = desktop ? 0.7 : 0.5;
+    field.anchorX = desktop ? 0.73 : 0.5;
     field.dim = desktop ? 1 : 0.38;
 
     const onResize = () => {
@@ -97,7 +97,7 @@ export const HeroSignal: React.FC = () => {
     const f = fieldRef.current;
     if (!f || reduced) return;
     f.progress = formationAt(v);
-    f.anchorX = desktop && v < 0.14 ? 0.7 : 0.5;
+    f.anchorX = desktop && v < 0.14 ? 0.73 : 0.5;
     // on narrow screens the cloud sits behind the headline: keep it quiet until the text leaves
     f.dim = !desktop && v < 0.14 ? 0.38 : 1;
   });

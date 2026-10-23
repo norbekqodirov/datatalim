@@ -1,10 +1,9 @@
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+export default defineConfig(() => {
   return {
     server: {
       port: 3000,
@@ -21,19 +20,24 @@ export default defineConfig(({ mode }) => {
       }
     },
     plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.VITE_ADMIN_PASSWORD': JSON.stringify(env.VITE_ADMIN_PASSWORD),
-      // VITE_TELEGRAM_BOT_TOKEN va VITE_TELEGRAM_CHAT_ID deliberately removed
-      // Telegram xabar yuborish backendda amalga oshadi (/api/notify-telegram)
-    },
+    // Eslatma: bu yerda sir (API kalit, parol) `define` orqali bundle'ga INJECT QILINMAYDI.
+    // Telegram xabar yuborish backendda amalga oshadi (/api/notify-telegram).
     build: {
       rollupOptions: {
         output: {
           manualChunks(id) {
             const n = id.replace(/\\/g, '/');
-            if (!n.includes('node_modules')) return;
+            if (!n.includes('/node_modules/')) return;
+            // React yadrosi (har sahifada kerak)
+            if (
+              n.includes('/node_modules/react/') ||
+              n.includes('/node_modules/react-dom/') ||
+              n.includes('/node_modules/react-router/') ||
+              n.includes('/node_modules/react-router-dom/') ||
+              n.includes('/node_modules/scheduler/')
+            ) {
+              return 'vendor-react';
+            }
             // Animation library (no React deps in core)
             if (
               n.includes('/framer-motion/') ||
@@ -43,7 +47,7 @@ export default defineConfig(({ mode }) => {
             ) {
               return 'vendor-motion';
             }
-            // Charts (recharts + d3 + react-is which recharts needs)
+            // Charts (recharts + d3 + ularning yordamchi paketlari)
             if (
               n.includes('/recharts/') ||
               n.includes('/d3-') ||
@@ -60,13 +64,14 @@ export default defineConfig(({ mode }) => {
             if (
               n.includes('/lucide-react/') ||
               n.includes('/react-hot-toast/') ||
-              n.includes('/qrcode') ||
               n.includes('/goober/')
             ) {
               return 'vendor-ui';
             }
-            // All other node_modules (react, react-dom, router, zustand, etc) together
-            return 'vendor';
+            // Qolgan hamma paket (jspdf, html2canvas, canvg, dompurify, qrcode, zustand ...) ataylab
+            // chunk'ga biriktirilmaydi: Rollup ularni o'zini import qilgan (lazy) chunk'ga qo'shadi, shunda
+            // PDF kutubxonalari bosh sahifaning modulepreload ro'yxatiga tushmaydi.
+            return undefined;
           }
         }
       }

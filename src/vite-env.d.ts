@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-    readonly VITE_TELEGRAM_BOT_TOKEN: string
-    readonly VITE_TELEGRAM_CHAT_ID: string
-    readonly VITE_ADMIN_PASSWORD?: string
+    // Frontend'ga faqat ochiq (public) qiymatlar tushadi. Sirlar (token, parol) bu yerda bo'lmasligi kerak:
+    // Telegram token/chat id faqat serverda (server/index.js), admin paroli esa bazada.
+    readonly VITE_FB_PIXEL_ID?: string
     // more env variables...
 }
 

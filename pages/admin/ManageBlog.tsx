@@ -4,6 +4,19 @@ import toast from 'react-hot-toast';
 import { useTheme } from '../../store/ThemeContext';
 import { uploadImageToAPI } from '../../utils/api';
 
+// URL xavfsizligi: faqat http(s), mailto, nisbiy yo'l va #anchor; javascript:/data: bloklanadi.
+// Kirish matni allaqachon & < > dan escape qilingan, bu yerda qo'shtirnoqlar ham escape qilinadi.
+function safeUrl(raw: string): string {
+  const url = raw.trim().replace(/&amp;/g, '&');
+  // Boshqaruv belgilari va bo'shliqlar orqali "java\nscript:" kabi aylanib o'tishni oldini olish
+  const compact = url.replace(/[\u0000- \u007f-\u009f]/g, '');
+  if (/^(https?:|mailto:|tel:|\/(?!\/)|#)/i.test(compact) || !/^[a-z][a-z0-9+.-]*:/i.test(compact)) {
+    return url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  return '#';
+}
+const escAttr = (v: string): string => v.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
 // Simple markdown renderer (no external dep)
 function renderMarkdown(md: string): string {
   return md
@@ -15,8 +28,9 @@ function renderMarkdown(md: string): string {
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/~~(.+?)~~/g, '<s>$1</s>')
     .replace(/`(.+?)`/g, '<code style="background:rgba(99,102,241,0.15);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:0.9em">$1</code>')
-    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color:#3b82f6;text-decoration:underline">$1</a>')
-    .replace(/!\[(.+?)\]\((.+?)\)/g, '<img src="$2" alt="$1" style="max-width:100%;border-radius:8px;margin:8px 0">')
+    // Rasm avval (![alt](url)), keyin havola; qiymatlar escape qilinadi va xavfli URL bloklanadi
+    .replace(/!\[(.*?)\]\((.+?)\)/g, (_m, alt, src) => `<img src="${safeUrl(src)}" alt="${escAttr(alt)}" style="max-width:100%;border-radius:8px;margin:8px 0">`)
+    .replace(/\[(.+?)\]\((.+?)\)/g, (_m, text, href) => `<a href="${safeUrl(href)}" rel="noopener noreferrer" target="_blank" style="color:#3b82f6;text-decoration:underline">${text}</a>`)
     .replace(/^- (.+)$/gm, '<li style="margin:2px 0;padding-left:4px">$1</li>')
     .replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:8px 0;padding-left:20px">${m}</ul>`)
     .replace(/\n\n/g, '</p><p style="margin:8px 0">')
@@ -134,13 +148,15 @@ const ManagePosts: React.FC = () => {
       slug: form.slug || generateSlug(form.title_uz),
     };
     try {
-      if (editingPost) {
-        await fetch(`/api/posts/${editingPost.id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(payload) });
-        toast.success('Post yangilandi');
-      } else {
-        await fetch('/api/posts', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
-        toast.success('Post qo\'shildi');
+      const res = editingPost
+        ? await fetch(`/api/posts/${editingPost.id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(payload) })
+        : await fetch('/api/posts', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(res.status === 409 ? 'Bu slug allaqachon mavjud' : data.error || 'Saqlab bo\'lmadi');
+        return;
       }
+      toast.success(editingPost ? 'Post yangilandi' : 'Post qo\'shildi');
       setModalOpen(false);
       fetchPosts();
     } catch { toast.error('Xatolik yuz berdi'); }
@@ -149,7 +165,8 @@ const ManagePosts: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (!confirm('Rostdan o\'chirmoqchimisiz?')) return;
     try {
-      await fetch(`/api/posts/${id}`, { method: 'DELETE', headers: headers() });
+      const res = await fetch(`/api/posts/${id}`, { method: 'DELETE', headers: headers() });
+      if (!res.ok) { toast.error('O\'chirib bo\'lmadi'); return; }
       toast.success('Post o\'chirildi');
       fetchPosts();
     } catch { toast.error('Xatolik'); }

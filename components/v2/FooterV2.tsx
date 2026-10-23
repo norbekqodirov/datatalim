@@ -4,7 +4,7 @@ import { Instagram, Send, ArrowUpRight } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { Logo } from '../BrandElements';
-import { uz } from './utils';
+import { uz, useMotionReduced, setMotionReduced } from './utils';
 import './v2.css';
 
 const SOCIAL = [
@@ -16,6 +16,7 @@ export const FooterV2: React.FC = () => {
   const { siteContent, courses } = useStore();
   const { t, tField } = useLanguage();
   const year = new Date().getFullYear();
+  const reduced = useMotionReduced();
 
   const pages = [
     { to: '/kurslar', name: t('nav.courses') },
@@ -100,7 +101,17 @@ export const FooterV2: React.FC = () => {
 
         <div className="mt-8 pt-6 flex flex-col sm:flex-row gap-3 justify-between text-sm ink-3" style={{ borderTop: '1px solid var(--line)' }}>
           <span>© {year} DATA Taʼlim Stansiyasi. {t('footer.rights')}</span>
-          <span className="mono text-[0.75rem]">Urganch · Xorazm · Oʻzbekiston</span>
+          <span className="flex items-center gap-5">
+            <button
+              type="button"
+              onClick={() => setMotionReduced(!reduced)}
+              aria-pressed={reduced}
+              className="hover:underline underline-offset-4 cursor-pointer"
+            >
+              {reduced ? 'Animatsiyani yoqish' : 'Harakatni kamaytirish'}
+            </button>
+            <span className="mono text-[0.75rem]">Urganch · Xorazm · Oʻzbekiston</span>
+          </span>
         </div>
       </div>
     </footer>

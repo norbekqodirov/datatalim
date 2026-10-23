@@ -13,6 +13,8 @@
     content="DATA ta'lim, IT kurslar, dasturlash kurslari, grafik dizayn, SMM kurs, Urganch, Xorazm, o'quv markaz, karyera test, buxgalteriya, videografiya, mobilografiya, robototexnika" />
   <meta name="author" content="DATA Ta'lim Stansiyasi" />
   <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#000000" />
+  <!-- canonical har sahifada <SEO>/Helmet orqali beriladi (statik canonical '/' barcha sahifalarda ikkilanib qolardi) -->
 
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
@@ -22,21 +24,67 @@
   <meta property="og:url" content="https://datatalim.uz" />
   <meta property="og:site_name" content="DATA Ta'lim Stansiyasi" />
   <meta property="og:locale" content="uz_UZ" />
+  <meta property="og:image" content="https://datatalim.uz/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="DATA Ta'lim Stansiyasi" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="DATA Ta'lim Stansiyasi — Zamonaviy kasblarni o'rganing" />
+  <meta name="twitter:description"
+    content="IT va zamonaviy kasblar bo'yicha sifatli ta'lim. Dasturlash, dizayn, marketing va boshqa kurslar." />
+  <meta name="twitter:image" content="https://datatalim.uz/og-image.png" />
 
   <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml"
-    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
 
+  <!-- Structured data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": ["EducationalOrganization", "LocalBusiness"],
+    "name": "DATA Ta'lim Stansiyasi",
+    "url": "https://datatalim.uz",
+    "logo": "https://datatalim.uz/apple-touch-icon.png",
+    "image": "https://datatalim.uz/og-image.png",
+    "description": "Xorazm viloyatidagi IT va zamonaviy kasblar o'quv markazi: dasturlash, grafik dizayn, SMM, buxgalteriya va boshqa kurslar.",
+    "foundingDate": "2019",
+    "telephone": "+998622277222",
+    "email": "dataunionuz@gmail.com",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "V.Fayozov ko'chasi, 9-uy",
+      "addressLocality": "Urganch",
+      "addressRegion": "Xorazm viloyati",
+      "addressCountry": "UZ"
+    },
+    "openingHoursSpecification": [
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        "opens": "09:00",
+        "closes": "18:00"
+      }
+    ],
+    "sameAs": [
+      "https://instagram.com/data_talim_stansiyasi",
+      "https://t.me/data_talim_stansiyasi"
+    ]
+  }
+  </script>
 
   <!-- Google Fonts — preconnect + non-blocking load -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style"
-    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap"
     onload="this.onload=null;this.rel='stylesheet'">
   <noscript>
     <link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap">
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap">
   </noscript>
 
   <link rel="stylesheet" href="/index.css">
@@ -45,16 +93,22 @@
 <body>
   <div id="root">
     <!-- Loading indicator: JS yuklanguncha ko'rinadi, React mount bo'lganda avtomatik o'chadi -->
-    <div
-      style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0f172a;font-family:system-ui,-apple-system,sans-serif">
+    <div class="dt-loader">
       <div style="text-align:center">
-        <div
-          style="width:48px;height:48px;border:3px solid rgba(255,255,255,0.1);border-top-color:#60efff;border-radius:50%;animation:dtSpin 0.8s linear infinite;margin:0 auto">
-        </div>
-        <p style="margin-top:20px;color:#94a3b8;font-size:14px;font-weight:500;letter-spacing:0.5px">Yuklanmoqda...</p>
+        <div class="dt-spinner"></div>
+        <p class="dt-loader-text">Yuklanmoqda...</p>
       </div>
     </div>
     <style>
+      /* Yorug' rejim (standart) */
+      .dt-loader { display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;font-family:system-ui,-apple-system,sans-serif }
+      .dt-spinner { width:48px;height:48px;border:3px solid rgba(15,23,42,0.1);border-top-color:#0061ff;border-radius:50%;animation:dtSpin 0.8s linear infinite;margin:0 auto }
+      .dt-loader-text { margin-top:20px;color:#64748b;font-size:14px;font-weight:500;letter-spacing:0.5px }
+      @media (prefers-color-scheme: dark) {
+        .dt-loader { background:#0f172a }
+        .dt-spinner { border-color:rgba(255,255,255,0.1);border-top-color:#60efff }
+        .dt-loader-text { color:#94a3b8 }
+      }
       @keyframes dtSpin {
         to {
           transform: rotate(360deg)

@@ -2,14 +2,35 @@
  * Google Apps Script (Web App) orqali Google Sheets ga ma'lumotlarni yuborish utilitasi.
  */
 
+// Apps Script URL: avval env (GOOGLE_SCRIPT_URL / VITE_GOOGLE_SCRIPT_URL), bo'lmasa eski qattiq yozilgan
+// manzil (deploy buzilmasligi uchun zaxira). Env berilmagan bo'lsa bir marta ogohlantiramiz.
+const FALLBACK_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxh8HajSOpdHBjgawBTxDRu6ufVSOXzZKpo8FjtY8Ry2bRoZy0vR474LkRrV0bo-VWL/exec";
+const SHEETS_TIMEOUT_MS = 8000;
+let warnedMissingUrl = false;
+const getScriptUrl = () => {
+    const fromEnv = process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL;
+    if (fromEnv) return fromEnv;
+    if (!warnedMissingUrl) {
+        warnedMissingUrl = true;
+        console.warn("⚠️  GOOGLE_SCRIPT_URL env o'rnatilmagan — kodda yozilgan zaxira manzil ishlatilmoqda.");
+    }
+    return FALLBACK_SCRIPT_URL;
+};
+
+// Google Sheets matnni formulaga aylantirmasligi uchun (=, +, -, @ bilan boshlansa) boshiga ' qo'yiladi
+const safeCell = (value) => {
+    const str = value === undefined || value === null ? '' : String(value);
+    return /^[=+\-@\t\r]/.test(str) ? "'" + str : str;
+};
+
 export const appendLeadToSheet = async (leadData) => {
-    const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxh8HajSOpdHBjgawBTxDRu6ufVSOXzZKpo8FjtY8Ry2bRoZy0vR474LkRrV0bo-VWL/exec";
+    const GOOGLE_SCRIPT_URL = getScriptUrl();
 
     try {
         const payload = {
-            name: leadData.name,
+            name: safeCell(leadData.name),
             phone: leadData.phone,
-            courseId: leadData.course_id || '-',
+            courseId: safeCell(leadData.course_id || '-'),
             sourceRef: leadData.source_ref || 'Umumiy'
         };
 
@@ -20,7 +41,8 @@ export const appendLeadToSheet = async (leadData) => {
             headers: {
                 'Content-Type': 'text/plain;charset=utf-8',
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(SHEETS_TIMEOUT_MS),
         });
 
         if (!response.ok) {
@@ -50,19 +72,19 @@ export const appendLeadToSheet = async (leadData) => {
  * tabiga yo'naltiradi — appendLeadToSheet bilan bir xil Web App URL ishlatiladi.
  */
 export const appendCareerTestToSheet = async (data) => {
-    const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxh8HajSOpdHBjgawBTxDRu6ufVSOXzZKpo8FjtY8Ry2bRoZy0vR474LkRrV0bo-VWL/exec";
+    const GOOGLE_SCRIPT_URL = getScriptUrl();
 
     try {
         const payload = {
             type: 'career_test',
-            name: data.name,
+            name: safeCell(data.name),
             phone: data.phone,
             gender: data.gender === 'male' ? 'Erkak' : data.gender === 'female' ? 'Ayol' : '-',
             age: data.age || '-',
             hollandCode: data.hollandCode || '-',
-            course1: data.courses?.[0] || '-',
-            course2: data.courses?.[1] || '-',
-            course3: data.courses?.[2] || '-',
+            course1: safeCell(data.courses?.[0] || '-'),
+            course2: safeCell(data.courses?.[1] || '-'),
+            course3: safeCell(data.courses?.[2] || '-'),
         };
 
         const response = await fetch(GOOGLE_SCRIPT_URL, {
@@ -70,7 +92,8 @@ export const appendCareerTestToSheet = async (data) => {
             headers: {
                 'Content-Type': 'text/plain;charset=utf-8',
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(SHEETS_TIMEOUT_MS),
         });
 
         if (!response.ok) {

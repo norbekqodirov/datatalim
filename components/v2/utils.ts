@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useReducedMotion } from 'framer-motion';
 
 /**
  * Uzbek Latin microtypography: turns ASCII/curly apostrophes after o/g into the
@@ -52,21 +51,41 @@ export function optimizedCover(src: string | undefined): string {
 }
 
 /**
- * Reduced-motion preference with a preview override: `?motion=on` forces the full
- * scroll/3D experience for this tab (handy when the OS has animations switched off),
- * `?motion=off` clears it. Without an override the OS setting is respected.
+ * Motion preference for the v2 storytelling scenes.
+ * Full motion is the default (scroll-linked scenes are driven by the visitor's own
+ * scrolling). Visitors can opt out with the footer toggle or `?motion=off`, which is
+ * remembered; `?motion=on` clears the opt-out.
  */
+const MOTION_KEY = 'v2-motion';
+const MOTION_EVENT = 'v2-motion-change';
+
+export function setMotionReduced(reduced: boolean) {
+  try {
+    if (reduced) localStorage.setItem(MOTION_KEY, 'off');
+    else localStorage.removeItem(MOTION_KEY);
+  } catch {
+    /* storage unavailable — the choice just won't persist */
+  }
+  window.dispatchEvent(new Event(MOTION_EVENT));
+}
+
+function readMotionReduced(): boolean {
+  try {
+    const q = new URLSearchParams(window.location.search).get('motion');
+    if (q === 'off') localStorage.setItem(MOTION_KEY, 'off');
+    if (q === 'on') localStorage.removeItem(MOTION_KEY);
+    return localStorage.getItem(MOTION_KEY) === 'off';
+  } catch {
+    return false;
+  }
+}
+
 export function useMotionReduced(): boolean {
-  const system = useReducedMotion();
-  const [forced] = useState(() => {
-    try {
-      const q = new URLSearchParams(window.location.search).get('motion');
-      if (q === 'on') sessionStorage.setItem('v2-motion', 'on');
-      if (q === 'off') sessionStorage.removeItem('v2-motion');
-      return sessionStorage.getItem('v2-motion') === 'on';
-    } catch {
-      return false;
-    }
-  });
-  return forced ? false : !!system;
+  const [reduced, setReduced] = useState(readMotionReduced);
+  useEffect(() => {
+    const on = () => setReduced(readMotionReduced());
+    window.addEventListener(MOTION_EVENT, on);
+    return () => window.removeEventListener(MOTION_EVENT, on);
+  }, []);
+  return reduced;
 }

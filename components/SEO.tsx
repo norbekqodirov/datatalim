@@ -1,6 +1,11 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 
+// Asosiy domen (datatalim_nginx.conf server_name bilan bir xil)
+export const SITE_URL = 'https://datatalim.uz';
+export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.png`;
+const LOGO_URL = `${SITE_URL}/apple-touch-icon.png`;
+
 interface SEOProps {
     title: string;
     description?: string;
@@ -15,12 +20,16 @@ export const SEO: React.FC<SEOProps> = ({
     title,
     description = "Zamonaviy kasblarni biz bilan o'rganing. Dasturlash, Muhandislik, Grafik Dizayn va boshqa dolzarb sohalar.",
     keywords = "IT kurslar, dasturlash o'rganish, IT akademiya, grafik dizayn, python, frontend, data talim",
-    image = "https://talim.datatalim.uz/logo.png",
-    url = "https://talim.datatalim.uz",
+    image = DEFAULT_OG_IMAGE,
+    url,
     type = 'website',
     jsonLd,
 }) => {
     const fullTitle = `${title} | DATA Ta'lim Stansiyasi`;
+    // url berilmasa joriy sahifaning kanonik manzili (query va hash'siz) ishlatiladi
+    const canonicalUrl = url || (typeof window !== 'undefined' ? `${SITE_URL}${window.location.pathname}` : SITE_URL);
+    // 'course' Open Graph'da mavjud tur emas, 'website' sifatida beriladi
+    const ogType = type === 'course' ? 'website' : type;
 
     return (
         <Helmet>
@@ -29,17 +38,18 @@ export const SEO: React.FC<SEOProps> = ({
             <meta name="title" content={fullTitle} />
             <meta name="description" content={description} />
             <meta name="keywords" content={keywords} />
+            <link rel="canonical" href={canonicalUrl} />
 
             {/* Open Graph / Facebook */}
-            <meta property="og:type" content={type} />
-            <meta property="og:url" content={url} />
+            <meta property="og:type" content={ogType} />
+            <meta property="og:url" content={canonicalUrl} />
             <meta property="og:title" content={fullTitle} />
             <meta property="og:description" content={description} />
             {image && <meta property="og:image" content={image} />}
 
             {/* Twitter */}
             <meta property="twitter:card" content="summary_large_image" />
-            <meta property="twitter:url" content={url} />
+            <meta property="twitter:url" content={canonicalUrl} />
             <meta property="twitter:title" content={fullTitle} />
             <meta property="twitter:description" content={description} />
             {image && <meta property="twitter:image" content={image} />}
@@ -61,8 +71,8 @@ export function organizationSchema(): Record<string, unknown> {
         '@context': 'https://schema.org',
         '@type': 'EducationalOrganization',
         name: "DATA Ta'lim Stansiyasi",
-        url: 'https://talim.datatalim.uz',
-        logo: 'https://talim.datatalim.uz/logo.png',
+        url: SITE_URL,
+        logo: LOGO_URL,
         description:
             "Zamonaviy kasblarni biz bilan o'rganing. Dasturlash, Muhandislik, Grafik Dizayn va boshqa dolzarb sohalar.",
         sameAs: [],
@@ -86,7 +96,7 @@ export function courseSchema(course: {
         provider: {
             '@type': 'EducationalOrganization',
             name: course.provider || "DATA Ta'lim Stansiyasi",
-            url: 'https://talim.datatalim.uz',
+            url: SITE_URL,
         },
         ...(course.url && { url: course.url }),
         ...(course.image && { image: course.image }),
@@ -160,7 +170,7 @@ export function articleSchema(post: {
             name: "DATA Ta'lim Stansiyasi",
             logo: {
                 '@type': 'ImageObject',
-                url: 'https://talim.datatalim.uz/logo.png',
+                url: LOGO_URL,
             },
         },
     };

@@ -1,0 +1,839 @@
+[
+ {
+  "summary": "Read-only backend audit of server/index.js, server/db.js, utils/api.ts, utils/telegram.ts, utils/googleSheets.js and store/useStore.ts. No .env files were read. The biggest problems are: a 3.7 MB courses blob that is re-parsed and sent uncompressed with no cache headers on every first paint, a hardcoded JWT fallback secret with a known default admin password, and a GET-strip/PUT-save cycle that can wipe stored images. After those come weak validation, upload and rate-limit gaps, and no backups.",
+  "findings": [
+   {
+    "title": "Courses blob is about 3.7 MB, re-parsed and walked on every public GET",
+    "severity": "critical",
+    "where": "server/index.js:571-605; server/data.db app_data.courses (3,710,683 chars)",
+    "detail": "GET /api/courses does JSON.parse on the full row plus a recursive cleanObj walk on every request. There is no ETag, no Cache-Control and no in-memory cache. The base64 data:image values (5 in courses) and picsum links (18 in courses, 6 in team, 7 in site_content) are only blanked in the response and stay in the DB. No compression middleware is in the code and datatalim_nginx.conf has no gzip directive. The nginx /api/ block sets no cache. The sync parse blocks the single Node event loop for every visitor.",
+    "fix": "Migrate stored base64 to files under /uploads via sharp and save the URLs back. Cache the cleaned object per key in memory and invalidate it in PUT. Send Cache-Control: public, max-age=60, stale-while-revalidate=300 plus an ETag from updated_at. Add the compression package or nginx gzip/brotli for application/json."
+   },
+   {
+    "title": "First paint waits on a 4-way blocking fetch with no split of heavy data",
+    "severity": "high",
+    "where": "store/useStore.ts:196-222, App.tsx:119-123, utils/api.ts:16-35, pages/ApplyForm.tsx:57",
+    "detail": "initializeStore sets isLoading true and awaits Promise.all of courses (about 3.7 MB), team, site_content and visibility, so the slowest request gates the loaded state. fetchFromAPI sends the Authorization header on public calls and has no timeout or retry. Errors return null and silently fall back to initialCourses, so a failed load looks like valid data. ApplyForm re-fetches /api/courses a second time. The guard at store:199 re-fetches forever whenever courses is empty.",
+    "fix": "Render from bundled defaults immediately and revalidate in the background with a localStorage copy keyed by updated_at. Add a small GET /api/bootstrap and a lazy per-course detail route. Use AbortSignal.timeout. Do not send auth headers on public GETs. Reuse the store in ApplyForm."
+   },
+   {
+    "title": "Hardcoded JWT secret fallback and known default admin password",
+    "severity": "critical",
+    "where": "server/index.js:59-64; server/db.js:172-178",
+    "detail": "If JWT_SECRET is unset the server still starts with the literal 'data-talim-super-secret-key-2026', which is in git, so anyone can forge an admin token. db.js seeds admin with ADMIN_DEFAULT_PASSWORD or 'admin123' and prints the password in the log at line 177.",
+    "fix": "process.exit(1) when JWT_SECRET is missing or shorter than 32 characters. Generate a random one-time admin password at seed time and print it once, or require the env var. Force a password change on first login. Remove the password from the log line."
+   },
+   {
+    "title": "Public GET strips images and the admin saves the stripped result back, destroying data",
+    "severity": "high",
+    "where": "server/index.js:582-596 and 608-626; utils/api.ts:16; store/useStore.ts:196",
+    "detail": "GET blanks every data:image string and every picsum URL. The admin panel loads through the same endpoint and then PUTs the whole array, so any stripped image is overwritten with an empty string on the next unrelated edit. This matches the recent 'images vanish after save' fix (d118dd5) and is its likely root cause.",
+    "fix": "Remove the stripping after migrating base64 to files. Short term, strip only when no valid admin token is present, or add an authenticated ?raw=1 admin read."
+   },
+   {
+    "title": "PUT /api/:key has no schema validation, size handling or concurrency control",
+    "severity": "high",
+    "where": "server/index.js:104, 608-626",
+    "detail": "Any JSON (null, string, object) is stored under the key, and a bad value breaks the public site and /api/stats (lines 379-380 call .length). The 5mb express.json limit (line 104) is close to the 3.7 MB courses blob, so saves will soon fail with an HTML 413. Two admin tabs overwrite each other (last write wins), there are no revisions, and the catch at line 623 logs nothing.",
+    "fix": "Validate per key with zod (arrays, max lengths). Require an updated_at version and return 409 on conflict. Keep a revisions table of the last 20 values. console.error the cause."
+   },
+   {
+    "title": "No trust proxy, open CORS, no helmet, and unlimited public routes",
+    "severity": "high",
+    "where": "server/index.js:78-100, 103, 220, 235, 465-498",
+    "detail": "app.set('trust proxy') is missing although nginx proxies to Express, so express-rate-limit sees only 127.0.0.1 and all visitors share one bucket. Five failed logins from anyone lock the admin out for 15 minutes, and 20 enroll attempts per minute globally block all real users. cors() allows every origin. There is no helmet. /api/track/click and the public GET routes have no limiter, so clicks can be inflated.",
+    "fix": "app.set('trust proxy', 1). Add helmet. Restrict CORS to the site origins. Add limiters on /api/track/click and public reads. Key the login limiter on IP plus username."
+   },
+   {
+    "title": "Upload accepts any file type and size, serves it from the site origin, and falls back to the raw original",
+    "severity": "high",
+    "where": "server/index.js:114-124, 629-661",
+    "detail": "multer has no fileFilter and no limits.fileSize, and the extension comes from file.originalname. An authenticated user can upload .html or .svg that is then served from /uploads on the site origin (stored XSS). When sharp fails, the catch returns the unprocessed original as success. There is no .rotate(), so EXIF orientation is lost, and only one 1920 px size is made, so card thumbnails download full-size images. Replaced images are never deleted, so the uploads folder grows without bound. The sync fs calls block the event loop.",
+    "fix": "Add limits (10 MB) and a fileFilter for image/jpeg, png, webp, avif. Choose the extension from the verified mime type. On sharp failure delete the file and return 415. Use sharp().rotate().resize().webp() with 480, 960 and 1920 widths and sharp.concurrency(1). Add an orphan cleanup job. Serve /uploads with X-Content-Type-Options: nosniff."
+   },
+   {
+    "title": "No cache headers on /uploads and nginx proxies images through Node",
+    "severity": "medium",
+    "where": "server/index.js:105; datatalim_nginx.conf:46-52",
+    "detail": "express.static has no maxAge or immutable although filenames are unique and never change. nginx proxies /uploads to Node instead of serving the folder directly, so every image request wastes Node time and misses the 1y cache that other assets get.",
+    "fix": "In nginx use location ^~ /uploads/ with alias to server/uploads, expires 1y and Cache-Control public, immutable. In Express use express.static(dir, { maxAge: '365d', immutable: true })."
+   },
+   {
+    "title": "No database indexes; analytics_events grows without limit",
+    "severity": "medium",
+    "where": "server/db.js:19-58 (no CREATE INDEX); server/index.js:251-262, 369-462",
+    "detail": "There are no indexes. /api/stats runs about 14 queries using date(created_at) in WHERE and GROUP BY on leads and analytics_events, which are non-sargable full scans. analytics_events gets one row per visit with no retention or dedupe. lead_activities.lead_id and enrollments.lead_id are unindexed with no foreign keys. leads.phone is not unique or indexed, so duplicates pile up.",
+    "fix": "Add indexes on leads(created_at), leads(status), leads(phone), analytics_events(type, created_at) and lead_activities(lead_id). Compare created_at >= date('now') instead of wrapping the column. Roll events up into a daily table and delete raw rows after 90 days. Cache /api/stats for 60 s."
+   },
+   {
+    "title": "No busy_timeout or foreign keys on connections, and no automated backup of data.db",
+    "severity": "high",
+    "where": "server/db.js:11-15; server/index.js:127, 554-565; scripts/deploy",
+    "detail": "getDB sets WAL only: no busy_timeout, no synchronous=NORMAL and no foreign_keys=ON. initDB and seed scripts open extra connections, so concurrent writes can fail with SQLITE_BUSY. There is no scheduled backup. The backup endpoint dumps only 6 tables as JSON (lead_scores, lead_activities, enrollments, admin_users, analytics_events are missing), loads everything into one response, and there is no restore route. data.db, -wal and -shm are git-ignored, so the live data exists in one place.",
+    "fix": "Add busy_timeout = 5000, synchronous = NORMAL and foreign_keys = ON. Run a nightly db.backup() or VACUUM INTO with 14-day retention and copy it off the server. Include all tables or stream the .db file in the endpoint."
+   },
+   {
+    "title": "Blog routes leak drafts and full bodies, and crash on bad input",
+    "severity": "high",
+    "where": "server/index.js:475-533",
+    "detail": "GET /api/posts is public and returns SELECT * with full content in 3 languages for every post. Drafts are hidden only by the optional ?published=1 flag, so omitting it returns unpublished posts to anyone. POST throws on missing title_uz (b.title_uz.toLowerCase), the slug is empty for non-ASCII titles, and a duplicate slug gives a 500 instead of 409. PUT dereferences existing without a null check (line 516). Post HTML is stored unsanitized, which is a stored-XSS risk if the client renders it as HTML.",
+    "fix": "Public list should select only id, slug, title_*, excerpt_*, cover_image, category, published_at with LIMIT and WHERE is_published=1; move the full list to an authenticated route. Validate with zod and return 400/404/409. Transliterate slugs and add numeric suffixes. Sanitize HTML on write. Add Cache-Control: public, max-age=60."
+   },
+   {
+    "title": "Lead intake has weak validation and no duplicate protection; sanitize() truncates and strips unsafely",
+    "severity": "high",
+    "where": "server/index.js:71-75, 291-343",
+    "detail": "Only name and phone presence is checked. The +998 regex exists only in scoring, so garbage phones are stored and pushed to Telegram and Sheets. sanitize() strips tags with a regex and cuts every string to 500 characters. There is no dedupe on phone and course, no honeypot, and no Origin check, so double-clicks and bots create many leads. source_ref and courseId are not validated. scoreLead uses server-local getHours(), not Asia/Tashkent, and created_at is UTC text.",
+    "fix": "Normalize the phone to +998XXXXXXXXX and reject others. Look up an existing (phone, course_id, day) lead and return it. Add a honeypot and minimum-fill-time check. HTML-escape instead of strip. Use per-field max lengths. Score using an explicit timezone."
+   },
+   {
+    "title": "notify-telegram is an unauthenticated open relay that blocks the response",
+    "severity": "high",
+    "where": "server/index.js:21-49, 664-685; utils/telegram.ts:12-25",
+    "detail": "Anyone can POST arbitrary text to the school's Telegram chat (limited only by the shared leadsLimiter). The message is client-built, not derived from the saved lead. The handler awaits up to two 6 s attempts (about 12 s) before responding. A non-ok Telegram HTTP response returns immediately without trying the second route (lines 38-41). A network failure after Telegram already accepted the message can send it twice. lastAssignedManager is process memory, so it resets on restart. sanitize() truncation can cut HTML mid-tag and make parse_mode HTML fail.",
+    "fix": "Remove the public endpoint. Send the notification from inside POST /api/leads in the background with a server-built, HTML-escaped message. Derive the manager from lead.id % 2 or persist it. Respond immediately."
+   },
+   {
+    "title": "Google Sheets sync: hardcoded script URL, no timeout, no retry, lost rows",
+    "severity": "medium",
+    "where": "utils/googleSheets.js:5, 51; server/index.js:335-337, 349-366",
+    "detail": "The Apps Script URL is hardcoded as a fallback in two places and is public in git, so anyone can append rows. fetch has no timeout. A failed append is only logged, the lead is not marked unsynced, and there is no retry. /api/career-test-result awaits Google so the user waits. No shared secret authenticates the server to the script. The server imports from the frontend utils/ folder and reads VITE_ names at runtime.",
+    "fix": "Remove the fallback URL and read it only from env. Add a secret token checked in Apps Script. Add AbortSignal.timeout(8000). Add synced_at and sync_error columns on leads and a retry job every few minutes. Make career-test-result fire-and-forget."
+   },
+   {
+    "title": "Error responses leak internals; no global error handler, structured logs, health check or graceful shutdown",
+    "severity": "medium",
+    "where": "server/index.js:154, 182, 206, 215 and others; end of file (no error middleware)",
+    "detail": "More than 15 handlers return raw err.message (SQLite or JS error text) to clients. Several catches (603, 624) log nothing. There is only console.log, with no request id or access log. Malformed JSON bodies get Express's default HTML error page. There is no /api/health, no SIGTERM handling (db never closed, WAL not checkpointed) and no JSON 404 for unknown /api paths.",
+    "fix": "Add one error middleware that logs with pino and returns { error: 'Server error', id }. Add pino-http, pm2-logrotate and GET /api/health. Handle SIGTERM with server.close() and db.close(). Add a JSON 404 for /api/*."
+   },
+   {
+    "title": "Generic /api/:key route shadows later GETs and mixes unrelated content shapes",
+    "severity": "medium",
+    "where": "server/index.js:567-626",
+    "detail": "It works only because specific routes are declared before it; any new single-segment GET added after it (for example /api/health) is swallowed and answers 'Invalid key'. app_data also holds ig_settings and settings keys that are unreachable. faqs has only a GET, testimonials has no routes at all, and enrollments, lead_scores and lead_activities are only partly used.",
+    "fix": "Use explicit typed routes or register /api/:key last with a strict key regex. Keep a registry of key to zod schema. Remove or finish the dead tables."
+   },
+   {
+    "title": "Marketing links: Math.random ref codes, unvalidated redirect target, unchecked click counter and delete",
+    "severity": "medium",
+    "where": "server/index.js:186-247",
+    "detail": "Ref codes use Math.random() and a UNIQUE collision returns a 500 without retry. target_url accepts any string and /api/track/click returns it to the client, which is an open-redirect vector (javascript: or external URLs). Click increments happen before the existence check and are not deduped. DELETE returns success even when nothing was deleted. The stored counters leads_count and clicks can drift.",
+    "fix": "Use crypto.randomBytes with a retry loop. Validate target_url as a relative path or an allowlisted https host. Look up first, update after, and return 404 when changes is 0. Derive counts from queries."
+   },
+   {
+    "title": "Login and password handling: user enumeration timing, sync bcrypt, change-password hardcodes id 1, no revocation",
+    "severity": "medium",
+    "where": "server/index.js:130-156, 536-551; utils/api.ts:181-190",
+    "detail": "A missing user returns before any bcrypt work while a wrong password takes about 70 ms, which leaks valid usernames. bcrypt.compareSync blocks the event loop. change-password uses WHERE id = 1 instead of req.user.id and does not invalidate existing tokens. Tokens last 8 h and cannot be revoked. The JWT has no role, yet the client defaults to 'admin' when role is missing.",
+    "fix": "Always run async bcrypt.compare against a dummy hash for unknown users. Use req.user.id. Add a token_version check. Pin jwt.verify to algorithms ['HS256']. Remove the default 'admin' role fallback."
+   },
+   {
+    "title": "Admin client keeps the JWT in localStorage and hard-redirects on any 401/403, losing edits",
+    "severity": "low",
+    "where": "utils/api.ts:3-8, 19-27, 44-47, 96-101",
+    "detail": "The token in localStorage is readable by any XSS. saveToAPI and upload redirect with window.location.href, discarding unsaved admin edits. Public fetchFromAPI calls send the Authorization header, so a visitor with a stale admin token can trigger the clear-session branch on the landing page. Lead submit and base64-to-File conversion have no timeout.",
+    "fix": "Use an httpOnly SameSite=Strict cookie, send the header only from admin pages, and show a re-login modal instead of a hard redirect."
+   },
+   {
+    "title": "Node blocks on sync work; nginx has no gzip and a mismatched body-size limit",
+    "severity": "medium",
+    "where": "server/index.js:104, 650; datatalim_nginx.conf:33-41",
+    "detail": "fs.unlinkSync and statSync run inside an async handler, and the 3.7 MB JSON parse plus bcrypt sync calls block all requests. nginx allows 20M bodies on /api but Express caps JSON at 5mb. The API location sets Connection 'upgrade', which disables upstream keepalive, and it has no proxy timeouts, no gzip and no brotli.",
+    "fix": "Use fs.promises and async bcrypt. Set Connection '' for /api/. Enable gzip (and brotli if available) for text and JSON. Align body limits."
+   },
+   {
+    "title": "/api/stats parses the full course and team blobs just to count them, with duplicate queries",
+    "severity": "low",
+    "where": "server/index.js:369-462 (especially 377-380, 420-422)",
+    "detail": "totalCourses and totalTeam come from JSON.parse of the 3.7 MB courses value on each dashboard load. totalLinks and totalMarketing run the same query twice. eventCount's dateFilter argument is unused. Results are not cached.",
+    "fix": "Use json_array_length(value) in SQL, drop the duplicate queries, and cache the response for 30-60 s."
+   },
+   {
+    "title": "Analytics events endpoint is unauthenticated, undeduped and records no dimensions",
+    "severity": "low",
+    "where": "server/index.js:249-262",
+    "detail": "Event types are whitelisted, but there is no session or IP dedupe, no bot filtering and no path, referrer, utm or device stored, and the shared rate-limit bucket (see trust proxy) applies. Funnel numbers (site_visit, ariza_view) are therefore unreliable.",
+    "fix": "Dedupe site_visit per session with a client flag and a server-side daily IP+UA hash. Store path, referrer and utm. Skip known bots."
+   },
+   {
+    "title": "Stale migration code and timestamp handling in db.js",
+    "severity": "low",
+    "where": "server/db.js:60-77",
+    "detail": "The try/catch SELECT-then-ALTER migrations for leads.status and notes are redundant because CREATE TABLE already has the columns, and a failed SELECT for another reason triggers a wrong ALTER. There is no PRAGMA user_version migration tracking. CURRENT_TIMESTAMP is UTC text without a Z, which clients may parse as local time.",
+    "fix": "Introduce PRAGMA user_version with a numbered migration list, and store timestamps as ISO strings with Z or epoch ms."
+   }
+  ]
+ },
+ {
+  "summary": "Read-only security audit of D:\\Project\\data-talim (branch redesign-v2). The main problems are:\n- Rate limits are keyed to the proxy IP, so they are shared by all visitors.\n- The default JWT secret and default admin passwords are hardcoded.\n- Admin auth is a client-side flag with the JWT in localStorage.\n- Three public endpoints write data without auth.\n- Uploads have no validation.\n- There is no helmet and no security headers or CSP.\n- Blog HTML is rendered unsanitized.\n- The VPS password and the SQLite database were committed in git history.\nThe code uses parameterized SQL everywhere; the one interpolated table name (backup) is a fixed list. No secret values are printed here. I did not read .env files.",
+  "findings": [
+   {
+    "title": "Rate limiters see only the proxy IP: one shared bucket for all visitors, so login lockout and lead-form DoS",
+    "severity": "high",
+    "where": "server/index.js:78-100 (limiters), no app.set('trust proxy'); datatalim_nginx.conf:41-48 sets no X-Forwarded-For",
+    "detail": "Express sits behind nginx at localhost:4000. nginx does not send X-Forwarded-For or X-Real-IP, and Express has no 'trust proxy', so req.ip is 127.0.0.1 for every request. The loginLimiter (5 per 15 min) is therefore global: an attacker can send 5 bad logins and lock the real admin out for 15 minutes, repeatedly. leadsLimiter (20/min) is also global. 20 junk POSTs/min to /api/leads can block every real student application, and the same bucket covers /api/notify-telegram and /api/career-test-result. Brute-force protection per attacker does not exist, because each guess only drains the shared bucket.",
+    "fix": "In nginx /api/ add proxy_set_header X-Real-IP $remote_addr; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto $scheme;. In index.js add app.set('trust proxy', 1) before the limiters. Also key the login limiter on ip+username and add a longer-term lockout."
+   },
+   {
+    "title": "Hardcoded fallback JWT secret: forgeable admin tokens if JWT_SECRET is missing",
+    "severity": "critical",
+    "where": "server/index.js:59-64",
+    "detail": "JWT_SECRET falls back to the literal string 'data-talim-super-secret-key-2026', which is in the git history and source. If the VPS .env.local lacks JWT_SECRET (the server only console.warns), anyone can sign a token {id:1,username:'admin'} and get full access to PUT /api/:key, posts, uploads, backup (all leads PII), change-password and marketing links. No exp or algorithm pinning is needed.",
+    "fix": "Fail closed: if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) { console.error(...); process.exit(1); }. Verify with jwt.verify(token, secret, { algorithms: ['HS256'] }) and sign with { algorithm: 'HS256' }. Rotate the secret on the server now."
+   },
+   {
+    "title": "Default admin credentials seeded: admin / admin123 (or admin), password printed to log",
+    "severity": "critical",
+    "where": "server/db.js:176-182; server/seed.js:32-44",
+    "detail": "On an empty admin_users table, initDB creates 'admin' with ADMIN_DEFAULT_PASSWORD or 'admin123', and logs 'password: admin123'. seed.js uses 'admin'. After any DB reset or restore on a new machine (the transfer/ flow), the site goes live with a guessable admin login, and the login limiter is bypassable (finding 1). change-password enforces only 6 characters.",
+    "fix": "Require ADMIN_DEFAULT_PASSWORD from env, or generate a random one and print it once to stdout, never a fixed default. Remove the password from the log line. Raise the minimum length to 12 and add a force-change flag. Verify the production admin password is not admin/admin123."
+   },
+   {
+    "title": "Admin 'authentication' in the SPA is a client-side localStorage flag; JWT stored in localStorage",
+    "severity": "medium",
+    "where": "App.tsx:44-63; pages/admin/Login.tsx:59-61; utils/api.ts:3-8",
+    "detail": "ProtectedRoute trusts localStorage.adminAuth==='true' and a client timestamp, so anyone can set these in devtools and see the admin UI shell. Data is still protected server-side by the JWT, so this is mainly UX, not a bypass. The real risk is the 8h JWT sitting in localStorage (adminToken): any XSS (findings 8 and 9) steals it, and there is no revocation or logout endpoint. Session timeout (2h) and JWT expiry (8h) are inconsistent. The client-side lockout in Login.tsx:6-7,29-31,66-77 is bypassable by clearing localStorage.",
+    "fix": "Issue the JWT as an HttpOnly, Secure, SameSite=Strict cookie (cookie-parser), with a CSRF token or Origin check on writes. Have ProtectedRoute call GET /api/admin/me to verify. Add POST /api/admin/logout and a short expiry (1h) with a refresh token. Treat the server limiter as the only lockout."
+   },
+   {
+    "title": "Unauthenticated endpoint relays arbitrary text into the school's Telegram chat",
+    "severity": "high",
+    "where": "server/index.js:664-685, 71-75",
+    "detail": "POST /api/notify-telegram needs no auth and no CSRF/Origin check and sends the caller's 'message' to the owner's Telegram chat under the bot's identity, with parse_mode HTML. Only <...> tags are stripped and the message is cut at 500 chars. Attackers can spam, phish (the managers trust the bot) or inject fake leads. The limiter is global (finding 1) and also drives the round-robin manager state. sanitize() is a regex tag-stripper, not an HTML escaper, so & entities and unbalanced input can make Telegram reject or mangle the message.",
+    "fix": "Remove this endpoint. Send the Telegram notification server-side inside POST /api/leads and /api/career-test-result from structured, validated fields, with the values escaped via an escapeHtml helper. If it must stay, require a Turnstile/hCaptcha token and a per-IP limit."
+   },
+   {
+    "title": "Public lead and career-test forms have no validation, captcha or dedup; PII goes to a public Google Apps Script URL",
+    "severity": "medium",
+    "where": "server/index.js:291-343, 349-366; utils/googleSheets.js:6,53",
+    "detail": "The phone number is never validated (only trimmed and truncated to 500 chars), so junk leads, bots and CRM poisoning are possible (scoreLead even rewards a correct +998 format but does not enforce it). sourceRef is user-controlled and increments marketing_links.leads_count for any ref_code, so stats can be inflated. The Apps Script web-app URL is hardcoded in source as a fallback and sent unauthenticated name+phone data. Anyone who has the URL (it is in git and in the repo) can POST fake rows into the sheet directly, bypassing the backend. /api/career-test-result writes to the sheet without creating a lead and without any link to a real session.",
+    "fix": "Validate phone with /^\\+998\\d{9}$/, name with length limits, and an allow-list for courseId. Add honeypot or Turnstile and a dedup window (same phone within 10 min). Move GOOGLE_SCRIPT_URL to env only, with no hardcoded fallback. Add a shared secret field that the Apps Script checks (a token in the payload verified in the script)."
+   },
+   {
+    "title": "Public click/analytics endpoints write data without auth or limiter",
+    "severity": "medium",
+    "where": "server/index.js:235-247 (/api/track/click has no limiter), 251-262",
+    "detail": "POST /api/track/click is unauthenticated and un-throttled. Anyone can loop it to inflate clicks for any ref_code or hammer SQLite writes (a synchronous better-sqlite3 call blocks the Node event loop). /api/analytics/track has a limiter but it is global (finding 1), and the event count is trivially forgeable, which pollutes the dashboard funnel. There is no existence check on ref before UPDATE, and the response returns target_url.",
+    "fix": "Add a limiter to /api/track/click, validate ref against /^[A-Za-z0-9]{6}$/, dedupe per IP+ref within a window, and treat these numbers as non-authoritative. Insert via batched queue if traffic grows."
+   },
+   {
+    "title": "Blog content rendered with dangerouslySetInnerHTML and no sanitization (stored XSS -> admin token theft)",
+    "severity": "high",
+    "where": "pages/BlogPost.tsx:160 (content from post.content_*, lines 49-51)",
+    "detail": "Public blog pages inject the raw content_uz/ru/en HTML from the DB. Content is only protected by who can write it (the admin JWT), but the admin's JWT lives in localStorage on the same origin. A script in a post (pasted from a competitor, a compromised admin session, or finding 2/3) runs for every visitor and for the admin when previewing, and can read localStorage.adminToken and call /api/admin/backup (all lead PII). The API (POST/PUT /api/posts, index.js:500-523) stores content unvalidated.",
+    "fix": "Sanitize at render time with DOMPurify (npm i dompurify; DOMPurify.sanitize(content, {USE_PROFILES:{html:true}})) and also on write on the server (sanitize-html). Add the CSP from finding 12. Better, store markdown and render with a safe renderer."
+   },
+   {
+    "title": "Admin markdown preview builds HTML with unescaped attribute values (javascript: links, attribute injection)",
+    "severity": "medium",
+    "where": "pages/admin/ManageBlog.tsx:8-26 and 362",
+    "detail": "renderMarkdown escapes only & < >. It then inserts $2 into href=\"$2\" and src=\"$2\" without quoting or scheme checks: [x](javascript:alert(1)) or [x](\" onmouseover=\"...) becomes live script. Note also that the image regex (line 19) runs after the link regex, so ![a](u) is first mis-parsed as a link. Executes in the admin origin with access to adminToken.",
+    "fix": "Use DOMPurify on the output (and allow only http/https/mailto/relative URLs), or replace with a vetted library (marked + DOMPurify). Escape \" and ' in attributes and reorder the image rule before the link rule."
+   },
+   {
+    "title": "Upload endpoint: no fileFilter, no size limit, client-controlled extension, original kept on sharp failure",
+    "severity": "high",
+    "where": "server/index.js:115-124, 629-661",
+    "detail": "multer is created with only a diskStorage: no limits.fileSize, no fileFilter and no MIME/magic-byte check. The stored extension comes from path.extname(file.originalname), and if sharp fails, the catch branch (lines 655-660) keeps the original file and serves it from /uploads via express.static, so an authenticated user can upload .html, .svg or .js content that is served on the site's own origin (same-origin stored XSS, or hosting phishing pages under datatalim.uz). Path traversal is not possible (the name is server-generated) but disk-fill is: nginx allows 20M per request, and the number of uploads is unlimited.",
+    "fix": "multer({ storage, limits:{ fileSize: 8*1024*1024, files:1 }, fileFilter:(req,f,cb)=> /^image\\/(jpeg|png|webp|gif|avif)$/.test(f.mimetype) ? cb(null,true) : cb(new Error('bad type')) }). Use memoryStorage, validate with sharp().metadata(), and always write a server-chosen .webp. On failure delete the file and return 415 instead of keeping the original. Serve /uploads with X-Content-Type-Options: nosniff and Content-Disposition for non-images."
+   },
+   {
+    "title": "No helmet / security headers anywhere (Express and nginx); no CSP, HSTS, X-Frame-Options, nosniff",
+    "severity": "high",
+    "where": "server/index.js (no helmet; package.json has no helmet dependency); datatalim_nginx.conf (no add_header security lines); vercel.json; index.html",
+    "detail": "None of Strict-Transport-Security, Content-Security-Policy, X-Frame-Options/frame-ancestors, X-Content-Type-Options, Referrer-Policy or Permissions-Policy is set. The admin panel at /paneladmindata can be framed (clickjacking). X-Powered-By: Express is exposed. nginx add_header directives exist only for Cache-Control. A CSP is the main defence against findings 8 and 9.",
+    "fix": "Add helmet() in Express (and app.disable('x-powered-by')). In nginx server{} add: add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always; add_header X-Content-Type-Options nosniff always; add_header X-Frame-Options DENY always (or CSP frame-ancestors 'none'); add_header Referrer-Policy strict-origin-when-cross-origin always; add_header Content-Security-Policy \"default-src 'self'; img-src 'self' data: https:; script-src 'self' https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://www.facebook.com; frame-src https://www.youtube.com; object-src 'none'; base-uri 'self'\" always;. Note that nginx add_header in a location block overrides server-level ones, so repeat them in each location or use an include file. Mirror in vercel.json 'headers'."
+   },
+   {
+    "title": "Wide-open CORS and no CSRF/Origin protection on state-changing public endpoints",
+    "severity": "medium",
+    "where": "server/index.js:103",
+    "detail": "app.use(cors()) allows any origin for all routes. Auth is by Bearer header, so cross-site reads of admin routes are not directly possible, but any website can drive the unauthenticated writers (/api/leads, /api/notify-telegram, /api/track/click, /api/analytics/track) from visitors' browsers, which is useful for spam and for evading per-IP limits (each visitor has their own IP, once finding 1 is fixed). If the token is moved to a cookie (finding 4) the wide CORS becomes dangerous.",
+    "fix": "cors({ origin: ['https://datatalim.uz','https://www.datatalim.uz'], methods:['GET','POST','PUT','DELETE'], credentials:false }). Allow localhost:3000 only when NODE_ENV!=='production'."
+   },
+   {
+    "title": "Backend leaks internal error messages to clients",
+    "severity": "low",
+    "where": "server/index.js:154, 183, 206, 230, 260, 341, 364, 486, 497, 508, 521, 531, 549, 563",
+    "detail": "Many handlers return res.status(500).json({ error: err.message }); SQLite messages expose table/column names and constraint details (e.g. UNIQUE constraint failed: posts.slug). Login catch (line 154) also returns it. Express 5 also has no global error handler.",
+    "fix": "Log err server-side and return a generic { error: 'Server error' }. Add a final app.use((err, req, res, next) => ...) handler that does the same. Map UNIQUE violations to 409."
+   },
+   {
+    "title": "Public GET /api/posts returns unpublished drafts to anyone",
+    "severity": "medium",
+    "where": "server/index.js:475-498",
+    "detail": "GET /api/posts without ?published=1 returns every row, including drafts (is_published=0), and GET /api/posts/:slug returns a draft by slug. Unreleased marketing content and internal notes in drafts are publicly readable. The 'published' filter is client-chosen.",
+    "fix": "Make the public routes always filter WHERE is_published=1. Add a separate authenticateToken route (/api/admin/posts) for the admin list, and 404 on unpublished slugs for non-admins."
+   },
+   {
+    "title": "Post create/update endpoints are unvalidated and can crash or corrupt data",
+    "severity": "low",
+    "where": "server/index.js:500-523",
+    "detail": "POST: b.title_uz.toLowerCase() throws on a missing title (500). The slug can be arbitrary (no uniqueness handling and no charset check, which matters because it is used in URLs and canonical tags). PUT: existing may be undefined, so existing.is_published throws a TypeError (500) for an unknown id. There are no length limits (5mb JSON body), and the cover_image URL is not validated (it can be a javascript:/external tracking URL). The ids in req.params are not checked to be integers.",
+    "fix": "Validate with a schema (zod): slug /^[a-z0-9-]{1,100}$/, string length caps, cover_image must start with /uploads/ or https://. Return 404 when existing is missing."
+   },
+   {
+    "title": "Generic PUT /api/:key accepts any JSON up to 5 MB as site content; GET strips data but there is no schema validation; route ordering fragile",
+    "severity": "medium",
+    "where": "server/index.js:568-626, 104",
+    "detail": "With a valid token, an admin (or an attacker with a forged or stolen token) can replace courses/team/site_content/visibility with arbitrary structures. The frontend renders these (course links, image URLs, video ids, social URLs), so malicious URLs (javascript:, tracking pixels) or malformed JSON can break the public site (DoS of the landing page) or phish students. There is no versioning or audit trail, so a bad PUT permanently overwrites the data. The wildcard GET /api/:key sits after all specific routes; any new /api/xyz GET added later below it would be shadowed (and conversely, adding it below leaves it unreachable).",
+    "fix": "Validate each key's shape (zod) and URL schemes (https/relative only). Keep the previous value in an app_data_history table (last 10 versions) so the school can roll back. Lower the body limit to ~1 MB for these routes."
+   },
+   {
+    "title": "VPS SSH host/user/password were committed to git history (since moved to env)",
+    "severity": "critical",
+    "where": "git history: commits before f8bb654/aca25d1 in scripts/deploy/*.mjs and scripts/utils/*.mjs ('.connect({host, port:22, username, password})' pattern); current code uses scripts/utils/sshConfig.mjs",
+    "detail": "git log -p shows the literal SSH credentials in older versions of the deploy scripts. They are now removed from HEAD, but remain in history and in any clone or fork of github.com/norbekqodirov/datatalim. If the password was never rotated, anyone with repo access (or who ever cloned it) holds root-level access to the production VPS that stores the database and .env. Password-only SSH is also used by every deploy script (sshConfig.mjs:21-25).",
+    "fix": "Rotate the VPS password and any secrets that lived on the server (JWT_SECRET, Telegram bot token via BotFather /revoke) now. Switch SSH to key-based auth and set PasswordAuthentication no, PermitRootLogin no. Optionally purge history with git filter-repo / BFG and force-push, but rotation is the real fix. Keep the repo private."
+   },
+   {
+    "title": "SQLite database with leads PII and admin password hashes was committed to git history",
+    "severity": "high",
+    "where": "git history: server/data.db added in 4dc53b4/f8bb654, removed in aca25d1; .gitignore:29-31 now ignores it",
+    "detail": "Earlier commits tracked server/data.db (leads: names and phone numbers, marketing links, lead_activities, admin bcrypt hash, possibly the default 'admin123' hash). A leaked or public clone exposes student PII (privacy-law exposure in Uzbekistan) and allows offline cracking of the admin hash. The same history also holds Instagram analytics snapshots (.ig_cache) with API data.",
+    "fix": "Treat the DB snapshot as leaked: change the admin password to a long random one, and rotate the Instagram/Graph token if one was cached. Purge with git filter-repo --path server/data.db --invert-paths if the repo is or was public, then force-push and ask collaborators to re-clone."
+   },
+   {
+    "title": "Encrypted copy of env files, databases and uploads is committed in the repo (transfer/) with the key stored in a predictable place",
+    "severity": "medium",
+    "where": "transfer/local-state.part00{1,2,3}.enc, transfer/manifest.json, transfer/README.md:3-9, commit 2c4bfa3",
+    "detail": "About 120 MB of AES-256-GCM data containing the .env.local files, SQLite databases (leads PII) and uploads is in git, forever (history is immutable). Security rests entirely on the single key file 'Project-Transfer-Key-2026-10-07.txt' in Documents; the README tells the user where it is and how it is named. If that key is ever leaked, synced to cloud, or attacked (if it is password-derived), every secret and the PII in the repo is exposed, and the ciphertext cannot be withdrawn. The commit also adds a 120 MB bloat to every clone.",
+    "fix": "Move the archive out of git (private cloud storage / encrypted USB) and purge it from history. If it must stay, make sure the repo is private, the key is a random 256-bit value stored only in a password manager, and the secrets inside are rotated after the move. Add transfer/*.enc to .gitignore."
+   },
+   {
+    "title": "vite.config.ts 'define' injects GEMINI_API_KEY and VITE_ADMIN_PASSWORD into any client code that references them",
+    "severity": "medium",
+    "where": "vite.config.ts:25-27; src/vite-env.d.ts:6; scripts/deploy/deploy.yml.template:34-35",
+    "detail": "define replaces process.env.GEMINI_API_KEY, process.env.API_KEY and process.env.VITE_ADMIN_PASSWORD with their literal values at build time. Current source does not reference them (grep found none, and the built dist/assets/index-*.js contains neither name), so nothing leaks today. But it is a loaded gun: any future import of an SDK that reads process.env.API_KEY, or one line of code reading the admin password, ships the secret to every visitor. The CI template also passes the admin password to the build as a secret. The old client-side password flow is dead code that suggests the password once lived in the bundle (check that VITE_ADMIN_PASSWORD is not a real password still used on the server).",
+    "fix": "Delete these three define entries, the VITE_ADMIN_PASSWORD type in src/vite-env.d.ts, and the two secrets from deploy.yml.template. Never prefix secrets with VITE_ (also VITE_TELEGRAM_BOT_TOKEN/VITE_TELEGRAM_CHAT_ID in server/index.js:67-68 are server secrets with a client-exposed prefix; rename to TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID so a future import.meta.env use cannot leak them)."
+   },
+   {
+    "title": "Change-password is hardwired to user id=1, has no per-user binding or rate limit, and does not invalidate old tokens",
+    "severity": "medium",
+    "where": "server/index.js:536-551",
+    "detail": "The handler ignores req.user.id and always updates admin_users WHERE id=1, so a token for any other admin user would change user 1's password (and it checks the wrong user's current password). It is not behind loginLimiter, so a stolen token allows unlimited guessing of the current password. Existing JWTs stay valid for up to 8 hours after a password change, so a stolen token survives a password reset. bcrypt cost is 10 (acceptable, but 12 is current guidance), and bcrypt.compareSync/hashSync block the event loop in login and seeding (login at line 143).",
+    "fix": "Use req.user.id, add a limiter, store a token_version column in admin_users, include it in the JWT and check it in authenticateToken so a password change revokes all tokens. Use async bcrypt.compare in login and cost 12."
+   },
+   {
+    "title": "Backup endpoint exports full leads PII as a plain JSON response; no download audit, no restore validation",
+    "severity": "low",
+    "where": "server/index.js:554-565",
+    "detail": "GET /api/admin/backup dumps all of app_data, marketing_links, leads, faqs, testimonials and posts in one response (it accepts the same JWT as everything else). Combined with findings 2 and 4, one stolen or forged token yields every student's name and phone. The table name is interpolated into SQL (line 559), but it comes from a hard-coded array, so it is not injectable. Not included: admin_users (good). The server does not log who downloaded it.",
+    "fix": "Require re-entering the password for backup (step-up auth), log the access with timestamp and IP, and send Cache-Control: no-store. Keep the hard-coded table list."
+   },
+   {
+    "title": "/uploads served by Express with default static options; nginx proxies it without nosniff and with a regex image-cache that can shadow",
+    "severity": "low",
+    "where": "server/index.js:105; datatalim_nginx.conf:19-24, 54-57",
+    "detail": "express.static serves any file type under uploads (incl. .html/.svg/.js from finding 10) with no X-Content-Type-Options and no Content-Disposition. nginx's image-extension regex location (line 19) sits above the ^~ /uploads/ proxy; the comment shows this has already broken once (404 on uploads). There is also no client_max_body_size at server level (only in /api/), so the default 1 MB applies to /uploads POSTs if routed there, and large request bodies on / are not bounded; and no limit_req_zone for any path, so nginx offers no second layer of rate limiting.",
+    "fix": "Add nosniff and a restrictive CSP for /uploads (add_header Content-Security-Policy \"default-src 'none'; img-src 'self'\"). Define limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s; and limit_req zone=api burst=20 nodelay; in location /api/. Serve uploads directly from disk with alias for speed."
+   },
+   {
+    "title": "Admin route is security-by-obscurity and the SPA fallback exposes the admin bundle",
+    "severity": "low",
+    "where": "App.tsx:160-165 (/paneladmindata), datatalim_nginx.conf:36-39",
+    "detail": "The admin panel relies on a hidden path. The admin chunks (Login, Dashboard, ManageBlog...) are built into public dist/assets, so the admin code and API surface are fully readable by anyone. That is acceptable if the API is secure, but it makes the unauthenticated-endpoint and default-credential findings easier to find. nginx also serves the admin UI to any IP.",
+    "fix": "Restrict /paneladmindata and /api/admin/* to trusted IPs or HTTP basic auth in nginx (location ^~ /paneladmindata { allow <office-ip>; deny all; try_files ... }), or at least add a second factor (TOTP) to the admin login."
+   },
+   {
+    "title": "Dependencies and CI are unaudited: no lockfile audit, helmet/validation libs missing, CI template pushes straight to the VPS with a password",
+    "severity": "low",
+    "where": "package.json; scripts/deploy/deploy.yml.template:60-70; .github/ (no workflows)",
+    "detail": "No npm audit gate, no dependency update bot, and the deploy template uses VPS_PASSWORD from GitHub Secrets for SSH. The project vendors lots of third-party .claude/skills scripts into git (.claude/skills/**/scripts/*.py|sh|ps1, plus .claude/settings.local.json) that include shell hooks (gate-stop.sh, inject-plan.sh); they run with the developer's permissions if Claude Code loads them. The extra .claude/worktrees folders contain stale copies of vite.config.ts and telegram.ts that reference the old client-side Telegram token.",
+    "fix": "Add npm audit --omit=dev to CI and enable Dependabot. Use an SSH key stored as a deploy secret (no password). Review the vendored skill scripts with skill-inspector, as your CLAUDE.md requires, and remove .claude/worktrees from the repo and disk after confirming nothing is lost."
+   }
+  ]
+ },
+ {
+  "summary": "Landing SEO/kontent audit (faqat o'qish). Asosiy muammolar: (1) sayt sof client-side SPA, prerender/SSR yo'q, sitemap.xml va robots.txt yo'q, nginx/vercel hamma noma'lum yo'lni 200 + index.html qaytaradi (soft-404); (2) uchta turli domen (datatalim.uz, talim.datatalim.uz) kanonik/OG/JSON-LD da aralashgan, og:image yo'q, favicon emoji, canonical/hreflang yo'q; (3) structured data helperlari yozilgan, lekin hech qaysi sahifada ishlatilmagan; (4) ru/en maydonlarida o'zbekcha matn (hero, about, founder, kurs ma'lumotlari), dizaynda soxta ko'rsatkichlar (2000+, 75%, 98%, 3 000 000 UZS, dummy chart, pravatar, unsplash), 3 xil mos kelmaydigan statistika; (5) pozitsiyalash eskirgan: 'Zamonaviy kasblarni biz bilan o'rganing' — DATA/AI/innovatsion texnologiya/IT/media/digital markaz sifatida bilinmaydi. Pastda eng muhim topilmalar va Apple uslubidagi hikoyaviy bo'lim tartibi/matn yo'nalishi (findings oxirida).",
+  "findings": [
+   {
+    "title": "SPA to'liq client-side: Google/Telegram/ijtimoiy botlar bo'sh sahifa ko'radi",
+    "severity": "critical",
+    "where": "index.html:body (#root 'Yuklanmoqda...'), App.tsx:127 (BrowserRouter), package.json (prerender yo'q), datatalim_nginx.conf:13,30, vercel.json",
+    "detail": "Barcha kontent JS dan keyin chiqadi, Helmet meta teglari faqat JS ishlagandan keyin qo'yiladi. OG/Telegram/WhatsApp havola preview botlari JS bajarmaydi, ya'ni har bir sahifa (kurs, blog) uchun faqat index.html dagi bitta umumiy meta ko'rinadi. Kontent (kurslar, FAQ, narxlar) serverdan API orqali keladi (useStore), shuning uchun statik HTML da ham yo'q.",
+    "fix": "vite-plugin-ssr/vike yoki 'vite-react-ssg' / prerender (puppeteer) bilan kamida /, /kurslar, /kurslar/:id, /biz-haqimizda, /karyera-testi, /jamoa, /blog sahifalarini build vaqtida statik HTML ga aylantiring; kurs/blog uchun server tomonda meta-injection (nginx sub_filter yoki Express route) qiling. Hero matni va H1 ni index.html ichiga ham <noscript> sifatida qo'ying."
+   },
+   {
+    "title": "sitemap.xml va robots.txt umuman yo'q",
+    "severity": "high",
+    "where": "public/ (faqat images/ bor), datatalim_nginx.conf:13,30, vercel.json rewrites",
+    "detail": "public/robots.txt va public/sitemap.xml mavjud emas. nginx 'try_files ... /index.html' va vercel '/(.*) -> /index.html' tufayli /robots.txt va /sitemap.xml so'rovi HTML qaytaradi (200). Google robots.txt sifatida HTML ni oladi, admin yo'li /paneladmindata ham indekslash uchun ochiq.",
+    "fix": "public/robots.txt: 'User-agent: *\\nDisallow: /paneladmindata\\nDisallow: /ariza\\nDisallow: /apply\\nSitemap: https://datatalim.uz/sitemap.xml'. sitemap.xml ni build vaqtida coursesData + blog postlardan yarating (scripts/generate-sitemap.mjs) va hreflang alternates qo'shing. nginx da 'location = /robots.txt' va '/sitemap.xml' ni statik fayl sifatida bering."
+   },
+   {
+    "title": "Domen chalkashligi: datatalim.uz va talim.datatalim.uz aralash",
+    "severity": "high",
+    "where": "index.html (og:url=https://datatalim.uz), components/SEO.tsx:19-20, 62-63, 76, 127, 162 (talim.datatalim.uz); datatalim_nginx.conf:3 (server_name datatalim.uz)",
+    "detail": "index.html og:url datatalim.uz, SEO.tsx default url/image/logo/JSON-LD talim.datatalim.uz, nginx faqat datatalim.uz ni xizmat qiladi. Ya'ni og:image, logo (talim.datatalim.uz/logo.png) mavjud bo'lmagan hostga ishora qiladi (logo.png ham public/ da yo'q) va canonical signal ikkiga bo'lingan.",
+    "fix": "Bitta SITE_URL konstantasi (import.meta.env.VITE_SITE_URL = https://datatalim.uz) va SEO.tsx, index.html, sitemap, JSON-LD hammasida shuni ishlating. Har sahifada <link rel='canonical'> qo'shing."
+   },
+   {
+    "title": "og:image yo'q (index.html), SEO.tsx dagi default rasm 404",
+    "severity": "high",
+    "where": "index.html (Open Graph blok: og:image/twitter teglari yo'q), components/SEO.tsx:18",
+    "detail": "index.html da og:image va twitter:card umuman yo'q. SEO.tsx default image 'https://talim.datatalim.uz/logo.png' public/ da mavjud emas -> Telegram/Instagram/LinkedIn da havola rasmsiz, kulrang ko'rinadi. Uzbekistonda asosiy tarqatish kanali Telegram ekani hisobga olinsa, bu konversiyaga bevosita zarar.",
+    "fix": "1200x630 OG rasm (brend ranglari #0061ff/#60efff, 'DATA Ta'lim Stansiyasi — DATA, AI, IT, Media') yarating, public/og-image.jpg ga qo'ying, index.html ga og:image, og:image:width/height/alt, twitter:card=summary_large_image qo'shing; kurs/blog uchun alohida OG."
+   },
+   {
+    "title": "Favicon emoji (📊), apple-touch-icon, manifest, theme-color yo'q",
+    "severity": "medium",
+    "where": "index.html (<link rel='icon' ... <text>📊</text>)",
+    "detail": "Brend logotipi o'rniga data-URI emoji. Google qidiruvida favicon 'default globe' yoki emoji ko'rinishi mumkin; telefon bosh ekraniga qo'shganda ikonka yo'q. theme-color, manifest.webmanifest, apple-touch-icon mavjud emas.",
+    "fix": "Brendning yulduz belgisidan (BrandElements Star1) SVG + 32/180/192/512 PNG favicon yarating; <link rel='icon' href='/favicon.svg'>, apple-touch-icon, manifest, <meta name='theme-color' content='#0061ff'>."
+   },
+   {
+    "title": "Structured data helperlari yozilgan, lekin hech joyda ishlatilmagan",
+    "severity": "high",
+    "where": "components/SEO.tsx:59-175 (organizationSchema, courseSchema, faqSchema, breadcrumbSchema, articleSchema); pages/Home.tsx:21-24 (<SEO> jsonLd uzatmaydi); components/home/FAQ.tsx (faqSchema chaqirilmaydi); pages/CourseDetail.tsx, Blog*.tsx (SEO umuman yo'q)",
+    "detail": "grep: jsonLd propi faqat SEO.tsx ichida. Natijada Google rich result, Knowledge panel, Course carousel, FAQ imkoniyatlari nol. organizationSchema da sameAs: [] bo'sh, telephone/address/geo/openingHours yo'q, logo mavjud bo'lmagan URL.",
+    "fix": "Home.tsx da @graph: EducationalOrganization + LocalBusiness (address Urganch, V.Fayozov 9, telephone +998622277222, openingHours Mo-Su 09:00-18:00, geo, sameAs Instagram/Telegram/YouTube) + WebSite + FAQPage (FAQ.tsx savollaridan). CourseDetail da courseSchema + offers (narx UZS) + BreadcrumbList. BlogPost da articleSchema. SEO komponent faqat bitta jsonLd obyekt qabul qiladi, uni massivga kengaytiring."
+   },
+   {
+    "title": "hreflang va til URL'lari yo'q: uz/ru/en bir URL, til localStorage da",
+    "severity": "high",
+    "where": "i18n.ts:157-166 (lang useState + localStorage), index.html:2 (lang='uz' qat'iy), components/SEO.tsx (hreflang/canonical yo'q)",
+    "detail": "Til almashganda faqat React state o'zgaradi; URL bir xil, shuning uchun Google ru/en variantlarini hech qachon ko'rmaydi. Boshlang'ich yuklashda document.documentElement.lang faqat setLang chaqirilganda yangilanadi, localStorage da 'ru' bo'lsa ham html lang='uz' qoladi (accessibility + SEO nomuvofiqligi). Bundan tashqari ru/en asosiy kontenti aslida o'zbekcha (keyingi band).",
+    "fix": "Tillarni yo'l prefiksi bilan ajrating (/ru/, /en/, default uz prefikssiz), SEO.tsx da <link rel='alternate' hreflang='uz|ru|en|x-default'> va canonical chiqaring, html lang ni boshlang'ich useState dan sinxronlang. Agar ru/en tayyor bo'lmasa, vaqtincha til almashtirgichni yashiring va faqat uz ni indekslang (noindex ru/en)."
+   },
+   {
+    "title": "ru/en maydonlarida o'zbekcha matn (hero, about, founder, address, kurslar)",
+    "severity": "high",
+    "where": "store/useStore.ts:88-102 (heroTitle/Subtitle/Description, aboutTitle/Description/Quote, founderTitle, contactAddress/Landmark/Schedule hammasi ru/en = uz nusxasi); data/courses.ts:36-39 ('2 oy' ru/en da ham); components/home/About.tsx:70-73,95 (checklist va 'Batafsil ma'lumot' tarjimasiz); Hero.tsx:147,151,200,217,242; Footer.tsx:13-16,160,190-191; Contact.tsx:194",
+    "detail": "Rus yoki ingliz tilini tanlagan foydalanuvchi eng muhim hero matnini o'zbekcha ko'radi, nav/CTA esa rus/inglizcha: aralash til sahifasi ishonchni buzadi. Hero H1 uchun 3 til bir xil. Kurs davomiyligi va narxlar ham tarjimasiz.",
+    "fix": "Hero/about/founder/address/schedule uchun haqiqiy ru/en matnlarni yozing (quyida takliflar). Hard-coded satrlarni (About checklist, Hero kartalar, Footer statistikasi, 'Xabar yuborildi!') t() / tField ga o'tkazing. courses.ts da duration/price uchun {uz:'2 oy', ru:'2 мес.', en:'2 months'} generatsiya qiling."
+   },
+   {
+    "title": "Soxta/hard-coded statistika va 3 ta bir-biriga zid raqam to'plami",
+    "severity": "high",
+    "where": "components/home/Hero.tsx:49-51,148,166,199,216,241; components/layout/Footer.tsx:13-16",
+    "detail": "Hero: 2000+ ('O'quvchi sig'imi'), 75% ish bilan ta'minlangan, 98% mamnun ota-onalar, '3 000 000 UZS o'rtacha daromad', '1500+' yorlig'i grafikda. Footer: 2000+ O'quvchilar, 500+ Bitiruvchilar, 15+ Kurslar, 98%. About matni: 'minglab yoshlar'. Manbasiz, adminda tahrirlanmaydi (Hero.tsx va Footer.tsx ichida qotirilgan), 'sig'imi' (capacity) va 'o'quvchilar' (students) aralashgan. Daromad kartasi 'Bitiruvchilar' yorlig'i bilan daromad va'dasi — da'vo sifatida isbotsiz (reklama qonuni/ishonch xavfi). Rasmiy da'vo dalilsiz = ishonch yo'qotilishi.",
+    "fix": "Raqamlarni siteContent.stats (admin tahrirlanadigan, {value,label}) ga ko'chiring, faqat tekshirilgan raqamlarni qoldiring (masalan '2019 dan beri', haqiqiy bitiruvchilar soni, kurslar soni = coursesData.length). 75%/98%/daromad kartasi dalil (hisobot sanasi/manba) bo'lmasa olib tashlang. Dummy BarChart va recharts importini butunlay olib tashlang."
+   },
+   {
+    "title": "Soxta avatarlar (pravatar) va begona stock rasm (unsplash) hero da",
+    "severity": "high",
+    "where": "components/home/Hero.tsx:130 (images.unsplash.com photo-1522202176988...), :194 (i.pravatar.cc/100?img=11..14); Hero.tsx:228 (transparenttextures.com cubes.png)",
+    "detail": "Hero asosiy rasmi chet el stock surati ('Students learning IT'), ijtimoiy isbot sifatida 4 ta tasodifiy begona yuzlar 'Student' alt bilan 2000+ yonida ko'rsatilmoqda: bu yolg'on ijtimoiy isbot. Uchta tashqi domen (unsplash, pravatar, transparenttextures) qo'shimcha DNS/TLS va LCP kechikishi, hero rasmi loading='lazy' (above-the-fold LCP uchun xato). Tashqi servis o'chsa hero buziladi.",
+    "fix": "Real markaz/o'quvchi fotosuratlari (public/images/hero-*.webp, 1600w, AVIF/WebP, fetchpriority='high', lazy emas) ishlating; pravatar avatarlarini real bitiruvchilar surati yoki umuman olib tashlang; cubes.png ni inline SVG pattern bilan almashtiring. Alt: 'Urganchdagi DATA Ta'lim Stansiyasida kompyuter sinfida dars'."
+   },
+   {
+    "title": "Hero H1 pozitsiyalash: umumiy ('Zamonaviy kasblarni biz bilan o'rganing'), DATA/AI/IT/media/digital yo'q",
+    "severity": "high",
+    "where": "store/useStore.ts:88-90 (heroTitle/heroSubtitle/heroDescription), index.html:<title>,<meta description>, pages/Home.tsx:23",
+    "detail": "H1 faqat 'Zamonaviy kasblarni biz bilan o'rganing.' Foydalanuvchi AI, ma'lumotlar tahlili, IT, media, digital yo'nalishlarini birinchi ekranda ko'rmaydi. Bu 'DATA' brendining ma'nosini (Data/AI/innovatsiya) yo'qotadi va umumiy 'o'quv markaz' bilan farqlanmaydi. Title: 'DATA Ta'lim Stansiyasi — Zamonaviy kasblarni o'rganing | IT va Kreativ ta'lim markazi' — 80+ belgi, kesiladi. Home.tsx description: 'dizayn, va moliya bepul ta'lim grantlari mavjud' — grammatik xato, 'bepul grantlar' da'vosi boshqa joyda tasdiqlanmagan. keywords meta Google e'tiborga olmaydi. 'Eng yirik' (index.html description) isbotsiz superlativ.",
+    "fix": "H1 yo'nalishi: 'Kelajak kasblari. DATA bilan boshlang.' + pastki satr 'AI, ma'lumotlar, dasturlash, media va digital: Urganchdagi innovatsion ta'lim markazi'. Title (<=60): 'DATA Ta'lim Stansiyasi — AI, IT va Digital kurslar | Urganch'. Description (<=155): 'Urganchda AI, dasturlash, grafik dizayn, SMM va videografiya kurslari. Noldan amaliy loyihalar, sertifikat va ishga yo'naltirish. Bepul konsultatsiya.'"
+   },
+   {
+    "title": "Sarlavhalar iyerarxiyasi: stat kartalarda H3 (H2 siz), H3 sifatida raqamlar",
+    "severity": "medium",
+    "where": "components/home/Hero.tsx:199,216,241 (<h3> raqam), Courses.tsx:126/185, Testimonials.tsx:46, Facilities.tsx:60,83, Footer.tsx:~90 <h3>",
+    "detail": "Hero da H1 dan keyin <h3> raqamlar H2 siz keladi; raqamlar sarlavha emas. H1 'uppercase' CSS bilan; H1 matni ichida shimmer span (gradient text) accessibility (kontrast) ni pasaytiradi. About/Contact/FAQ/Gallery sarlavhalari H2 — yaxshi; lekin Courses H2 faqat bor, kurs kartalari H3 emasligini tekshirish kerak. Footer ham H3 ishlatadi.",
+    "fix": "Hero stat raqamlarini <p>/<dl> (div role='group') qiling, H2 'DATA raqamlarda' kiriting yoki raqamlar uchun H3 ni olib tashlang. Har bo'lim H2, kartalar H3. Faqat bitta H1 qolsin (hozir shunday, yaxshi)."
+   },
+   {
+    "title": "Alt matnlar umumiy/ingliz tilida yoki bo'sh gallery uchun render yo'q",
+    "severity": "medium",
+    "where": "components/home/About.tsx:34 ('About DATA'), Gallery.tsx:53 ('Gallery image N'), Hero.tsx:131,194 ('Students learning IT','Student'); components/home/Gallery.tsx:41-42 (bo'sh '' elementlar null qaytaradi); store/useStore.ts:117-124 (galleryImages hammasi '')",
+    "detail": "Alt matnlari tavsifsiz, ingliz tilida, tilga qarab o'zgarmaydi (uz saytda). Galereya boshlang'ich holatda 6 ta bo'sh satr: admin rasm yuklamaguncha bo'lim sarlavhasi bor, rasmlar yo'q (bo'sh bo'lim). About rasmi bo'lmasa User ikonka stub ko'rinadi (qo'pol 'placeholder').",
+    "fix": "Alt ni tField bilan lokalizatsiya qiling va tavsiflang ('DATA o'quv markazi: iMac jihozlangan sinf xonasi'). Dekorativ rasmlarga alt='' qo'ying. Galereya bo'sh bo'lsa butun bo'limni render qilmang (visibility.gallery && images.some(Boolean)). About uchun real default rasm."
+   },
+   {
+    "title": "Karyera testi va kurslar uchun ishonch signallari yo'q (sertifikat, hamkorlar, bitiruvchi loyihalar, sharhlar matni)",
+    "severity": "medium",
+    "where": "components/home/Testimonials.tsx:14,60-73 (faqat 3 YouTube iframe, matnsiz), pages/Home.tsx (hamkor kompaniyalar/akkreditatsiya bo'limi yo'q), components/home/About.tsx:69-74",
+    "detail": "'O'quvchilar fikri' faqat 3 ta YouTube video (marquee ichida har biri 2 marta render qilinadi -> 6 iframe, YouTube embed auto-yuklaydi: og'ir, LCP/INP yomonlashadi). Matnli sharh, ism, kurs, natija (qaerda ishlayapti) yo'q; hamkor kompaniya logotiplari yo'q, litsenziya/ro'yxatdan o'tish raqami, o'qituvchi tajribasi, bitiruvchi portfolio yo'q. About dagi 'Xalqaro standartlar', 'Kuchli mutaxassislar' umumiy gaplar, dalilsiz.",
+    "fix": "Testimonial kartalar: foto + ism + 'Kurs -> hozirgi ish joyi' + 1-2 gap sitata; videolar poster rasm (lite-youtube-embed) bilan, bosilganda yuklansin. 'Bitiruvchilar ishlayotgan joylar' logo qatori, litsenziya, real o'quvchi loyihalari (portfolio grid), 'Birinchi dars bepul' kafolati, ustozlar tajribasi."
+   },
+   {
+    "title": "CTA lar zaif va konversiya yo'li uzoq: asosiy CTA 'Kasbni aniqlash' (test), 'Kursga yozilish' hero da yo'q",
+    "severity": "medium",
+    "where": "components/home/Hero.tsx:101-112, i18n.ts:27-28; components/Navbar/Contact.tsx forma; Home.tsx bo'lim tartibi",
+    "detail": "Hero da 2 ta CTA: 'Kasbni aniqlash' (test, tepa-funnel) va 'Kurslarni ko'rish'. Telefon/Telegram/'Bepul sinov darsi' to'g'ridan-to'g'ri CTA yo'q; ariza formasi (Contact) sahifaning eng oxirida (11-bo'lim). Mobil uchun sticky 'Qo'ng'iroq / Telegram' tugmasi yo'q. Tugma matnlari fe'l+foyda emas ('Batafsil ma'lumot').",
+    "fix": "Hero: birlamchi CTA 'Bepul sinov darsiga yozilish' (EnrollModal), ikkilamchi 'Karyera testini yechish'. Sticky mobil pastki panel (Qo'ng'iroq | Telegram | Yozilish). Har bo'lim oxirida mikro-CTA. Telegram bot/deeplink (t.me/data_talim_stansiyasi?start=landing) orqali UTM kuzatuv qo'shing."
+   },
+   {
+    "title": "Analitika/UTM/konversiya kuzatuvi va Maxfiylik sahifasi yo'q",
+    "severity": "medium",
+    "where": "components/layout/Footer.tsx:190-191 (href='#' Maxfiylik siyosati va Foydalanish shartlari), Footer.tsx:~103-104 (Facebook, YouTube href='#'), index.html (GA/Meta Pixel/Yandex Metrika yo'q)",
+    "detail": "Footer da ishlamaydigan 4 ta '#' havola (maxfiylik, shartlar, Facebook, YouTube): buzilgan ishonch signali; forma shaxsiy ma'lumot (telefon) yig'adi, lekin maxfiylik sahifasi yo'q. Hech qanday analitika kodi topilmadi: konversiya o'lchanmaydi.",
+    "fix": "/maxfiylik va /shartlar sahifalarini yarating yoki '#' havolalarini olib tashlang. Mavjud bo'lmagan ijtimoiy tarmoqlarni yashiring. Yandex Metrika (O'zbekistonda keng) + GA4 + Meta Pixel (consent bilan), forma submit va CTA bosishlarini maqsad (goal) sifatida yozing."
+   },
+   {
+    "title": "Kurs bo'limi: narxlar tilga bog'lanmagan, kategoriya kartalari va sxemada Course/Offer yo'q",
+    "severity": "medium",
+    "where": "data/courses.ts:7-12,36-39 (monthlyPrice/totalPrice/discountPrice LocalizedString ammo matn), components/home/Courses.tsx:21-76 (4 kategoriya, rang gradientlari), pages/CourseDetail.tsx (SEO yo'q)",
+    "detail": "Narx va davomiylik qat'iy matn ('2 oy', raqam+valyuta matn ichida), mashina o'qiy oladigan emas, filtrlash/Offer sxemasi uchun yaroqsiz. CourseDetail va About/Blog sahifalarida <SEO> chaqirilmaydi (grep: faqat Home, Courses, Team, Languages, CareerTest) -> bu sahifalarda title/description eskirgan (index.html dagi umumiy). Kurs URL slug 'foundation' kabi, kalit so'zsiz.",
+    "fix": "Kurs modeliga priceUZS:number, durationMonths:number qo'shing, matn ko'rinishini format qiling. CourseDetail, About, Blog, BlogPost sahifalariga <SEO> + courseSchema/articleSchema. Slug: /kurslar/python-ai-dasturlash kabi."
+   },
+   {
+    "title": "Core Web Vitals: hero og'ir (framer-motion + recharts + 6 YouTube iframe + 3 CDN), Poppins faqat 'latin' qo'llab-quvvatlash",
+    "severity": "medium",
+    "where": "components/home/Hero.tsx:5-6 (recharts+framer-motion hero da), Testimonials.tsx:60-73, index.html (Google Fonts Poppins 7 vazn)",
+    "detail": "Recharts faqat soxta chart uchun bo'lib, bundleni oshiradi (taxminan 100KB+ gzip emas, lekin sezilarli). Poppins 300-900 (7 vazn) yuklanadi; kirill va o'zbek lotin belgilari (o', g', ʻ, ’) Poppins latin-ext ni talab qiladi, ya'ni qo'shimcha so'rov. 6 ta YouTube iframe bir paytda. Hero da animate initial opacity:0 -> LCP kechikishi (kontent JS dan keyin ham fade bilan).",
+    "fix": "Recharts ni olib tashlang, hero animatsiyani CSS bilan, YouTube ni facade bilan, shriftni 3 vazn + variable font (self-host, woff2, font-display swap, preload). Hero LCP rasmiga fetchpriority='high'."
+   },
+   {
+    "title": "Home.tsx description grammatik xatosi va bo'limlar tartibi konversiya hikoyasiga mos emas",
+    "severity": "medium",
+    "where": "pages/Home.tsx:21-39",
+    "detail": "Tartib: Hero, About, TourVideo, Courses, Testimonials, CareerTest, Facilities, Team, FAQ, Gallery, Contact. 'Biz haqimizda' va video kurslardan oldin turibdi (kompaniya haqida gapirish kurslardan oldin), sharhlar kurslar bilan Facilities o'rtasida, Gallery FAQ dan keyin (bo'sh bo'lishi mumkin). Hikoya chizig'i (muammo -> yechim -> dalil -> harakat) yo'q.",
+    "fix": "Quyidagi Apple-uslubidagi tartibga o'ting (pastda)."
+   },
+   {
+    "title": "Nginx/Vercel: noma'lum URL lar 200 + index.html (soft-404), www/non-www va canonical hosting nomuvofiq",
+    "severity": "low",
+    "where": "datatalim_nginx.conf:13,30; vercel.json (hamma yo'lni index.html ga qayta yozadi)",
+    "detail": "Mavjud bo'lmagan sahifalar (masalan /kurslar/yoq) 200 qaytaradi, Google 'soft 404' deb hisoblaydi. React tarafida NotFound sahifasi bor-yo'qligini (App.tsx) tekshirish kerak va HTTP status 404 qaytmaydi. Ikki deploy maqsadi (nginx va Vercel) bir vaqtda qo'llab-quvvatlanyapti.",
+    "fix": "Prerender qilingan marshrutlar uchun nginx da aniq location, qolganlar uchun 404.html; SPA fallback da noindex meta NotFound sahifasiga. Bitta asosiy hosting tanlang va redirect www -> non-www ni doimiy 301 qiling."
+   },
+   {
+    "title": "Brend nomlanishi nomuvofiq: 'DATA UNION', 'DATA Ta'lim Stansiyasi', 'DATA', email dataunionuz",
+    "severity": "low",
+    "where": "store/useStore.ts:98 ('DATA UNION' kompaniya), 101-102 (founderTitle), SEO.tsx:35 (fullTitle), index.html title, Footer.tsx:172",
+    "detail": "About matni 'DATA UNION' deydi, qolgan hamma joyda 'DATA Ta'lim Stansiyasi'; email dataunionuz@gmail.com (Gmail, korporativ domen emas). Brend nomi Google Knowledge/Schema uchun bitta bo'lishi kerak, Gmail manzili ishonchni pasaytiradi. Ta'sis yili 2019 faqat shu matnda, hero/schema da yo'q.",
+    "fix": "Bitta rasmiy nom ('DATA Ta'lim Stansiyasi', 'DATA Union' guruh brendi sifatida alohida tushuntirilsin), info@datatalim.uz kabi domen email, Organization schema da foundingDate:2019, alternateName:'DATA Union'."
+   }
+  ]
+ },
+ {
+  "summary": "Muhim topilmalar: (1) vendor chunk 1.1MB, jspdf/html2canvas/canvg/dompurify unga qo'shilib, har sahifada modulepreload bilan yuklanadi; (2) recharts (338KB) Hero'dagi bitta dekorativ chart uchun Home bilan yuklanadi; (3) Hero LCP rasmi loading=lazy + tashqi Unsplash, framer-motion opacity:0 bilan yashirilgan; (4) nginx'da gzip/brotli yo'q, `location /` hamma narsani no-store qiladi, Express static kesh yo'q; (5) 8.8MB ishlatilmaydigan PNG; (6) Poppins 7 vazn render-blocking emas, lekin og'ir. useTracking spinneri faqat ?ref= bo'lganda ishlaydi (max 500ms) — reja taxminidagidan kam xavfli. Fayllar o'zgartirilmadi, .env o'qilmadi. Qatorlar taxminiy (grep/sed asosida).",
+  "findings": [
+   {
+    "title": "vendor chunk 1.1MB: jspdf+html2canvas+canvg+dompurify har sahifada preload",
+    "severity": "critical",
+    "where": "vite.config.ts:55-60 (manualChunks 'return vendor'); dist/index.html modulepreload vendor-BjhwPUH0.js; pages/CareerTest.tsx:498",
+    "detail": "CareerTest dynamic import('jspdf') qiladi, lekin manualChunks barcha qolgan node_modules'ni bitta 'vendor'ga yig'ib, jspdf/html2canvas/canvg/dompurify'ni ham shu yerga tiqadi (dist/assets/vendor-BjhwPUH0.js = 1,099,313 bayt; ichida jsPDF 88, html2canvas 23 marta uchraydi). index.html uni <link rel=modulepreload> qiladi, ya'ni landing ochilganda PDF kutubxonasi ham yuklanadi. Taxminan 300-350KB gzip ortiqcha, LCP va INP (parse/execute) ga bevosita zarar.",
+    "fix": "manualChunks'ga jspdf, html2canvas, canvg, dompurify, core-js uchun alohida 'vendor-pdf' qaytaring yoki bu paketlarni manualChunks'dan butunlay chiqarib, Rollup dynamic import'ga ixtiyor bering. Umumiy 'return vendor' o'rniga faqat react/react-dom/react-router'ni 'vendor-react'ga yig'ing. Kutilgan: kritik JS ~1.1MB -> ~250-300KB."
+   },
+   {
+    "title": "Hero LCP rasmi loading=lazy, tashqi Unsplash, prioritet yo'q",
+    "severity": "critical",
+    "where": "components/home/Hero.tsx:129-135",
+    "detail": "Ekrandagi eng katta rasm (h-[450px]/[550px]) loading=\"lazy\" decoding=\"async\", manba https://images.unsplash.com/...?q=80&w=1200 (uchinchi tomon domen: alohida DNS/TLS, preconnect yo'q, nginx keshi o'z nazoratida emas). Ota-element motion.div initial opacity:0 scale .95 bilan 0.6s+0.2s kechikib paydo bo'ladi. Fetch kechikadi, LCP elementi animatsiya tugaguncha ko'rinmaydi. Mobil 4G'da LCP taxminan +1-2s.",
+    "fix": "Rasmni lokal /images/hero.webp (+ AVIF) qilib, 800/1200 srcset va sizes bilan bering; loading=\"eager\" fetchpriority=\"high\"; width/height yoki aspect-ratio qo'ying; index.html'ga <link rel=preload as=image fetchpriority=high imagesrcset=...>; LCP konteynerda opacity:0 initial'ni olib tashlang (faqat transform/fade 150ms)."
+   },
+   {
+    "title": "recharts (338KB) faqat Hero'dagi 1 dekorativ bar-chart uchun landing bilan yuklanadi",
+    "severity": "high",
+    "where": "components/home/Hero.tsx:6,155-164; dist/assets/vendor-charts-DYV3fIHC.js = 337,682 bayt",
+    "detail": "Hero statik 'dummyData' bilan 7 ta ustunli mini diagramma chizadi. Hero Home chunk'iga statik import qilingani uchun vendor-charts ham landing'da yuklanadi va ResponsiveContainer ResizeObserver ishga tushiradi (INP/TBT). Admin sahifalarida recharts to'g'ri lazy, landing'da esa mutlaqo ortiqcha. ~100KB gzip.",
+    "fix": "Chartni 20 qatorli inline SVG yoki bir nechta <div style={{height}}> ustun bilan almashtiring (CSS transition bilan, dizayn bir xil qoladi). Kutilgan: -338KB JS, landing'dan recharts butunlay chiqadi."
+   },
+   {
+    "title": "nginx'da gzip/brotli yoqilmagan, 'location /' hamma narsaga no-store",
+    "severity": "high",
+    "where": "datatalim_nginx.conf (gzip/brotli grep: 0 natija); datatalim_nginx.conf:29-31",
+    "detail": "Saytlar konfiguratsiyasida gzip/brotli yo'q (global nginx.conf'da yoqilgan bo'lishi mumkin, tekshirilmagan, serverdan tasdiqlash kerak). Yoqilmagan bo'lsa 1.1MB+338KB+CSS 133KB siqilmay ketadi (~1.8MB o'rniga ~450KB). Bundan tashqari 'location /' va .html uchun no-store: /api/ ham alohida, lekin SPA fallback hamma yo'lga no-store, ya'ni index.html har safar to'liq so'raladi (kichik, lekin bfcache ham o'chadi).",
+    "fix": "server blokiga: gzip on; gzip_comp_level 6; gzip_types text/css application/javascript application/json image/svg+xml; (yoki ngx_brotli). index.html uchun 'no-cache' (no-store emas) + ETag, bfcache'ga imkon beradi. /assets/ uchun immutable allaqachon bor, yaxshi."
+   },
+   {
+    "title": "Express static /uploads uchun kesh sarlavhasi yo'q, nginx ^~ /uploads proxy ham kesh qo'shmaydi",
+    "severity": "high",
+    "where": "server/index.js:105; datatalim_nginx.conf:46-50",
+    "detail": "express.static default'da Cache-Control: public, max-age=0 beradi, ya'ni admin yuklagan barcha rasmlar (kurs, jamoa, blog, about) har tashrifda qayta tekshiriladi (304). Nginx proxy_cache ham yo'q, rasmlar Node orqali xizmat qiladi. Uploads fayl nomi unikal bo'lgani uchun immutable xavfsiz.",
+    "fix": "app.use('/uploads', express.static(dir, { maxAge: '365d', immutable: true })) yoki nginx location ^~ /uploads/ ichida 'alias /var/www/.../server/uploads/; expires 1y; add_header Cache-Control \"public, immutable\";' (Node'ni chetlab o'tadi, tezroq)."
+   },
+   {
+    "title": "Yuklangan rasmlar faqat bitta o'lchamda (1920px WebP q85), srcset yo'q",
+    "severity": "medium",
+    "where": "server/index.js:628-657",
+    "detail": "sharp barcha rasmni 1920px kengligida saqlaydi. Jamoa avatari (64-96px) yoki kurs kartasi (~400px) ham 1920px fayl yuklaydi (har biri 100-300KB). Lokal fayl-kesh yo'q, srcset yo'q. sharp xatosi bo'lsa original (juda katta) fayl qoladi.",
+    "fix": "Yuklashda 3 o'lcham (480/960/1920) + AVIF/WebP yarating (-w480.webp), komponentlarda srcset/sizes ishlating. Fallback'da ham max 2560px cheklang."
+   },
+   {
+    "title": "public/images/courses ichida 14 ta ishlatilmaydigan PNG (8.8MB) dist va deploy'ga kiradi",
+    "severity": "medium",
+    "where": "public/images/courses/*.png (ai-media.png 748KB va b.); data/courses.ts coverImage: 14 ta bo'sh \"\", 1 ta videografiya.webp",
+    "detail": "data/courses.ts'da faqat videografiya.webp (62KB) ishlatiladi, 14 PNG (526-748KB, jami ~8.8MB) hech qayerda havola qilinmaydi, lekin dist/ ga nusxalanadi va serverga uploadlanadi. CWV'ga to'g'ridan-to'g'ri ta'sir yo'q, lekin deploy vaqti/disk bo'sh isrof, agar admin keyin ularni ulasa 700KB PNG kartada LCP'ni buzadi.",
+    "fix": "Ishlatilmasa o'chiring yoki WebP/AVIF (~40-70KB, 800px) ga aylantirib, kurslarga coverImage sifatida ulang. 14 ta kurs hozir rasmsiz, gradient fallback ishlatiladimi tekshirish kerak."
+   },
+   {
+    "title": "Pravatar va transparenttextures tashqi so'rovlari (Hero)",
+    "severity": "medium",
+    "where": "components/home/Hero.tsx:194, 228",
+    "detail": "4 ta i.pravatar.cc/100?img=N so'rovi (soxta avatarlar, 3-tomon domen, ishonchsiz va TTFB nomaълум) va https://www.transparenttextures.com/patterns/cubes.png fon rasmi (opacity-10, deyarli ko'rinmaydi) har landing yuklanishida alohida DNS+TLS ochadi. Pravatar ishonch masalasi ham: soxta 'o'quvchi' rasmlari.",
+    "fix": "Avatarlarni haqiqiy o'quvchi/jamoa rasmlari (lokal, 56x56 WebP) bilan almashtiring yoki gradient initsiallar; cubes.png o'rniga inline SVG/CSS pattern (data-URI) qiling. 5 ta tashqi so'rov kamayadi."
+   },
+   {
+    "title": "Poppins 7 vazn (300-900) Google Fonts orqali, self-host emas",
+    "severity": "medium",
+    "where": "index.html:32-41",
+    "detail": "Poppins:wght@300;400;500;600;700;800;900 — CSS so'rovi fonts.googleapis.com'dan (+ fonts.gstatic.com), 7 ta alohida woff2 fayl (Latin + latin-ext, har biri ~7-10KB, jami ~60-120KB). preload-as-style + onload trick render-blocking'ni oldini oladi (yaxshi), lekin 2 ta uchinchi-tomon origin, font almashishi (FOUT) CLS beradi, chunki fallback metrikalari Poppins'ga mos emas. Bundan tashqari <link rel=stylesheet href=/index.css> ham bor (index.tsx import ham qiladi), dev'da ikki marta kiritiladi.",
+    "fix": "Poppins'ni @fontsource yoki fontsource-variable orqali self-host qiling, faqat ishlatiladigan 4 vazn (400/500/600/700) latin + latin-ext, <link rel=preload as=font crossorigin> bilan 1-2 kritik vazn; font-display:swap + size-adjust/ascent-override bilan fallback. index.html'dan <link href=/index.css> o'chiring (dublikat)."
+   },
+   {
+    "title": "Global `font-family: ... !important` va `*` selektori",
+    "severity": "medium",
+    "where": "index.css:9-18",
+    "detail": "`* { font-family: Poppins }` universal selektor har elementga qo'llanadi (style recalc narxi), uning ustiga `body, button, input, ..., span, p, a, div, li, option { font-family: ... !important }` ikkinchi marta !important bilan. Tailwind'ning font-mono/font-serif (code bloklar, BlogPost kodi `font-family:monospace` inline) ni majburan Poppins'ga o'zgartiradi: monospace kod buziladi. Perf ta'siri kichik, lekin saqlash va override qilish imkoniyatini yo'qotadi.",
+    "fix": "Bitta qoida qoldiring: `html { font-family: var(--font-sans) }` (Tailwind @theme allaqachon --font-sans beradi), `button,input,select,textarea { font: inherit }`. Ikkala !important bloki va `*` ni olib tashlang."
+   },
+   {
+    "title": "html.dark !important override tizimi (~35 qoida) Tailwind `dark:` o'rniga",
+    "severity": "medium",
+    "where": "index.css:25-170 (html.dark .bg-white, .text-slate-900 ... !important); ThemeContext; komponentlarda isDark ? ... : ... ternarylari",
+    "detail": "Dark mode uch usulda bir vaqtda: (a) html.dark .bg-white{!important} utility override, (b) komponentlarda isDark ternary (Navbar'da 39 ta isDark/dark qatori), (c) .dark class. Specificity urushi, kutilmagan ranglar (har qanday .bg-white avtomatik qora bo'ladi, ixtiyoriy joyda ham), tema almashganda butun DOM'da style recalc. Dark mode faqat useEffect ichida class qo'shadi, ya'ni birinchi chizishda (isDark state boshlang'ich to'g'ri bo'lsa ham) html.dark class React mount'dan keyin keladi: light->dark flash (FOUC) va CLS-ga o'xshash miltillash. Index.html'da inline pre-paint skript yo'q.",
+    "fix": "index.html <head>ga 6 qatorli inline skript qo'shing (localStorage/prefers-color-scheme -> document.documentElement.classList.add('dark')), bu miltillashni yo'qotadi. Keyin bosqichma-bosqich !important override'larni CSS o'zgaruvchilari (--bg, --fg, --border) bilan almashtiring, @custom-variant dark ishlating."
+   },
+   {
+    "title": "backdrop-blur-xl / blur(24px) glass tizimi hamma joyda (GPU/INP)",
+    "severity": "medium",
+    "where": "index.css:268-310 (.glass, .glass-card blur(24px)); components/home/*.tsx (Contact.tsx:178, TourVideo, Navbar va b.); pages/About.tsx:60,179,238,323",
+    "detail": "Landing sahifasida o'nlab ekranda ko'rinuvchi glass elementlar (blur 12-24px) har skroll kadrida qayta composite qilinadi; ayniqsa mobil/past quvvatli qurilmalarda kadr tushishi va INP kechikishi. Bundan tashqari .glass-card transition: all 0.4s va hover translateY layout-siz, lekin 'all' hamma xossalarni animatsiya qiladi.",
+    "fix": "blur'ni 24px -> 8-12px ga tushiring, katta sectionlarda (About.tsx kartalari) backdrop-filter o'rniga yarim-shaffof bg. Faqat navbar/modalda qoldiring. transition: all -> transform, box-shadow, border-color. @media (max-width:768px) da blur'ni o'chiring."
+   },
+   {
+    "title": "Home'dagi barcha 11 section statik import qilingan, below-the-fold lazy emas",
+    "severity": "medium",
+    "where": "pages/Home.tsx:3-14; dist/assets/Home-CRMnzFrD.js = 65KB",
+    "detail": "Hero dan Contact'gacha hamma section Home chunk'ida bitta paket bo'lib parse qilinadi, shu jumladan fold ostidagi TourVideo, Gallery, FAQ, Testimonials, Contact, CareerTestSection. 65KB (~18KB gzip) o'zi katta emas, lekin recharts kabi og'ir bog'liqliklar Hero'dan keladi (yuqoridagi topilma). whileInView animatsiyalar yaxshi (IntersectionObserver), lekin hamma motion.div bir vaqtda mount bo'ladi.",
+    "fix": "Hero + About'ni statik qoldiring, qolganini React.lazy + IntersectionObserver (yoki content-visibility:auto; contain-intrinsic-size) bilan yuklang. content-visibility:auto section'larga qo'shilsa render ishi ~30-40% kamayadi."
+   },
+   {
+    "title": "useTracking spinneri: faqat ?ref= bo'lganda 500ms gacha butun PublicLayout'ni to'sadi",
+    "severity": "low",
+    "where": "hooks/useTracking.ts:8-11,63-68; App.tsx:80-87",
+    "detail": "Taxmindan farqli: isChecking boshlang'ich qiymati `!!searchParams.get('ref')`, ya'ni oddiy tashrifda false va spinner yo'q. Lekin reklama havolalari (?ref=...) ga kelgan trafik (aynan marketing trafigi) uchun Navbar+Footer+Outlet 500ms gacha butunlay yashiriladi va LCP shuncha kechikadi; fetch javobi kelmasa timeout 500ms. Bu aynan pullik trafikda LCP'ni +0.5s qiladi. Kod izohi 'render INSTANTLY' deydi, lekin amalda bloklaydi.",
+    "fix": "isChecking'ni butunlay olib tashlang: tracking fetch'ni fire-and-forget qiling (navigator.sendBeacon yoki keepalive fetch), sahifani darrov render qiling. Redirect kerak bo'lsa, targetUrl javobi kelganda navigate qiling, spinner kerak emas."
+   },
+   {
+    "title": "Meta Pixel React mount'dan keyin, har yuklashda initPixel va har route'da PageView",
+    "severity": "low",
+    "where": "App.tsx:108-125; utils/pixel.ts:15-41",
+    "detail": "fbevents.js (~60-70KB, connect.facebook.net) PixelTracker useEffect'ida async qo'shiladi (render-blocking emas, yaxshi), lekin kritik yo'lda JS vaqtini oladi va Pixel ID default fallback '1177610010373853' koddan qattiq yozilgan. PageView location bo'yicha har route o'zgarishida yuboriladi, lekin fbq('init') faqat bir marta, shuning uchun birinchi fbq('track','PageView') init'dan oldin navbatga tushadi (to'g'ri). Muammo: skript hech qachon idle'gacha kechiktirilmagan.",
+    "fix": "initPixel'ni requestIdleCallback (timeout 3s) yoki birinchi foydalanuvchi interaksiyasidan keyin ishga tushiring. INP/TBT biroz yaxshilanadi. Pixel ID'ni faqat env orqali oling."
+   },
+   {
+    "title": "initializeStore: 4 ta alohida API so'rovi, birinchi chizishda faqat boshlang'ich (91KB) data/courses.ts",
+    "severity": "medium",
+    "where": "store/useStore.ts:178-205; data/courses.ts (91,715 bayt); dist index-tDoCaua0.js 126KB",
+    "detail": "Landing ochilganda 4 ta parallel /api/{courses,team,site_content,visibility} so'rovi ketadi, ularning har biri alohida Node+SQLite chaqiruvi, javobda HTTP kesh sarlavhasi yo'q (server app.get('/api/:key') kesh bermaydi, nginx /api/ proxy_cache yo'q). Shu bilan birga data/courses.ts (91KB, 14 kurs matnlari) asosiy bundle ichiga (store orqali) kiritilgan va faqat boshlang'ich holat sifatida ishlatiladi, ya'ni API javobi kelgunicha eski matn ko'rinadi, keyin almashadi: kontent sakrashi (CLS) va ikki baravar yuklash. Auth sarlavhasi bilan GET ham public so'rovni keshlanmaydigan qiladi (getAuthHeaders).",
+    "fix": "Bitta /api/bootstrap endpoint (4 ta javobni birlashtiring) + Cache-Control: public, max-age=60, stale-while-revalidate=300 + ETag. Public GET'larga Authorization sarlavhasini qo'shmang. data/courses.ts ni build vaqtida qisqartirilgan JSON'ga o'tkazing yoki dynamic import qiling. Home birinchi chizishda skeleton/aspect-ratio ishlatsin."
+   },
+   {
+    "title": "Framer-motion (126KB) asosiy yo'lda; Hero'da hamma blok initial opacity:0",
+    "severity": "medium",
+    "where": "components/home/Hero.tsx:80,124,180,208,224 (initial={{opacity:0,...}}); dist vendor-motion-x4z-wwew.js = 126,230 bayt, index.html modulepreload",
+    "detail": "Hero'dagi 5 ta blok (matn, rasm, 3 ta stat kartasi) SSR/pre-render'siz opacity:0 dan boshlanadi, JS yuklanib animatsiya ishga tushmaguncha butun fold ko'rinmaydi. Natijada bo'sh ekran davomiyligi LCP'ga qo'shiladi. vendor-motion modulepreload qilinadi, ya'ni kritik yo'lda ~40KB gzip.",
+    "fix": "LazyMotion + domAnimation (-~25KB) va `m` komponent ishlating; fold ustidagi (Hero matni, h1) uchun CSS animatsiya (@keyframes fadeIn allaqachon bor, index.css) ishlating, motion faqat fold ostida. h1 ni opacity:0 dan boshlamang."
+   },
+   {
+    "title": "Ko'rsatkichli skrol listenerlar va 120s rotate-slow/pulse-glow cheksiz animatsiyalar",
+    "severity": "low",
+    "where": "components/ScrollProgress.tsx:17, BackToTop.tsx:14, layout/Navbar.tsx:52 (passive scroll); index.css:370-385 (rotate-slow, pulse-glow, star-float infinite); components/home/Hero.tsx:18 (setInterval 16ms)",
+    "detail": "Uch alohida scroll listener (passive, yaxshi) har birida setState bo'lishi mumkin, har skroll kadrida React re-render. Hero useCountUp setInterval ~60Hz setState bilan sanaydi (1.8s davomida ~110 re-render). Sonsiz rotate-slow/pulse-glow/star-float animatsiyalar ekran tashqarisida ham ishlaydi, batareya/GPU sarfi.",
+    "fix": "Scroll holatini bitta rAF-throttled hook/IntersectionObserver sentinel bilan birlashtiring; ScrollProgress uchun CSS scroll-timeline yoki transform ref (setState'siz). Count-up uchun requestAnimationFrame + ref.textContent. Cheksiz animatsiyalarga prefers-reduced-motion va IntersectionObserver pause qo'shing."
+   },
+   {
+    "title": "Rasmlarda width/height va <picture> yo'q; fallback rasmlar picsum.photos",
+    "severity": "medium",
+    "where": "components/home/About.tsx:36, Gallery.tsx:56, Team.tsx:38, pages/About.tsx:97,343-346 (picsum.photos), Hero.tsx:130",
+    "detail": "Ko'p <img> teglarida width/height atributlari yo'q (faqat Tailwind class), shuning uchun rasm kelgunicha joy zaxiralanmaydi bo'lsa, CLS. pages/About.tsx:343-346 da 4 ta galereya rasmi https://picsum.photos/seed/... (tashqi, tasodifiy, keshlanmaydigan). Bu worktree nusxasida ham bor (asosiy About.tsx'da qayta tekshirish kerak). Hero statlari kartochkalarida aspect-ratio yo'q.",
+    "fix": "Hamma <img>'ga width/height yoki aspect-ratio; fold ostidagilariga loading=lazy decoding=async (allaqachon ko'pida bor); picsum o'rniga lokal rasmlar."
+   },
+   {
+    "title": "Qidiruv/Helmet va GlobalSearch/BackToTop/Toaster birinchi chizishda mount qilinadi",
+    "severity": "low",
+    "where": "App.tsx:127-132 (PixelTracker, ScrollProgress, Toaster, BackToTop, GlobalSearch), components/GlobalSearch.tsx",
+    "detail": "GlobalSearch (data/courses import orqali kurslarni indekslaydi), Toaster va BackToTop landing LCP uchun kerak emas, lekin asosiy index bundle (126KB) ga kiritilgan va hammasi birinchi render'da mount bo'ladi. react-helmet-async har route'da <head>'ni qayta yozadi.",
+    "fix": "GlobalSearch va BackToTop'ni React.lazy + requestIdleCallback bilan kechiktiring (Cmd+K bosilganda yuklang). Toaster'ni birinchi toast chaqirilganda import qiling."
+   },
+   {
+    "title": "Statik prerender/SSG yo'q: bo'sh <div id=root> + inline spinner",
+    "severity": "medium",
+    "where": "index.html:50-70; vercel.json (SPA rewrite)",
+    "detail": "Brauzer HTML'da faqat 'Yuklanmoqda...' spinneri ko'radi; barcha kontent JS (1.1MB+) + 4 API so'rovidan keyin paydo bo'ladi. LCP ≈ HTML -> JS -> API -> Unsplash rasm zanjiri (4 ta ketma-ket tarmoq bosqichi). Qidiruv botlari uchun SEO ham zaif (react-helmet client-side). Landing sahifa uchun eng katta tuzilmaviy yutuq.",
+    "fix": "Landing '/' ni build vaqtida prerender qiling (vite-plugin-ssg / react-snap / oddiy prerender skript) yoki hech bo'lmasa kritik Hero HTML + CSS ni index.html ichiga statik qo'ying (h1, tavsif, CTA, LCP rasmi), React hydrate o'rniga ustiga chiqsin. Kutilgan LCP: ~3-4s -> ~1.5s (4G)."
+   }
+  ]
+ },
+ {
+  "summary": "Read-only audit of the public landing UI (not run in a browser). The most serious problems: the language switcher does not update the page, there is no reduced-motion support, and the modals and mobile menu are not keyboard accessible. Gradient text and white-on-gradient buttons also fail contrast at the cyan end. The dark mode works through `html.dark .class !important` overrides plus `isDark` ternaries in components, so there are two sources of truth, and Tailwind `dark:` classes follow the OS setting rather than the toggle. The design-system inconsistencies for the redesign are in the last finding. Brand colors #0061ff, #60efff, #00b26b and black dark mode are kept in all fixes. Findings 3, 11, 17 and 24 are my own arithmetic or reasoning and need a browser check. Line numbers are per file.",
+  "findings": [
+   {
+    "title": "Language switcher does not update the rest of the page (no shared state)",
+    "severity": "critical",
+    "where": "i18n.ts:156-178 (useLanguage), components/layout/Navbar.tsx:17,206,290",
+    "detail": "`useLanguage` is a plain hook with its own `useState` per caller. There is no Context provider and no storage event; index.tsx only wraps the app in ThemeProvider. `setLang` in the Navbar re-renders only the Navbar, so Hero, FAQ, Testimonials and the other sections keep the old language until a reload. `document.documentElement.lang` is only set inside `setLang`, so a returning ru/en visitor still gets `<html lang=\"uz\">` (index.html:2). Most section copy is hard-coded Uzbek anyway: Courses.tsx:127-130,205,217, Gallery.tsx:31-34, Team.tsx:24-27, Hero.tsx:147-151,200,217,242, Contact.tsx:118-122,330-ish, EnrollModal.tsx whole file, Footer.tsx:70-192, GlobalSearch.tsx:18-24,144. The switcher gives the impression of working but translates a small part of the page.",
+    "fix": "Create a `LanguageProvider` (Context) in index.tsx that holds `lang` and updates `<html lang>` in an effect on mount and on change. Make `useLanguage()` read from the context. Move all hard-coded strings into `translations` or `tField({uz,ru,en})`. Mark the language buttons with `lang=\"ru\"` etc. and `aria-pressed`."
+   },
+   {
+    "title": "No reduced-motion support anywhere; many infinite animations",
+    "severity": "high",
+    "where": "index.css:199-227,361-442; Testimonials.tsx:59; Hero.tsx:116,142-143; BrandElements.tsx:132-134; Navbar.tsx:80-83",
+    "detail": "There is no `prefers-reduced-motion` handling in source (no `motion-reduce:`, `useReducedMotion` or `MotionConfig`). Infinite loops are star-float (many stars per section), `rotate-slow`, `pulse-glow`, `shimmer-text` on every h2, the Hero card bob `y:[0,-10,0]` repeat Infinity, and the 30s video marquee. The marquee also fails WCAG 2.2.2 (pause/stop/hide) because it pauses only on mouse hover. Each section also repeats the same fade-up whileInView.",
+    "fix": "Wrap the app in `<MotionConfig reducedMotion=\"user\">`. Add `@media (prefers-reduced-motion: reduce){ *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important} }`. Add a visible pause button for the marquee, or turn it into a horizontal scroll-snap carousel."
+   },
+   {
+    "title": "Gradient text and white-on-gradient buttons fail contrast at the cyan end",
+    "severity": "high",
+    "where": "Hero.tsx:87 and 216; Contact.tsx:118; FAQ.tsx:54; Gallery.tsx:31; Courses.tsx:127; Team.tsx:46,52; index.css:308-316 (.btn-glass-gradient); Navbar.tsx:221,303; Contact.tsx:447-448; About.tsx:94; Hero.tsx:223,241",
+    "detail": "`#0061ff -> #60efff` text on #f0f4ff/white is about 1.3:1 at the cyan end, so the end of the word is nearly invisible, and the shimmer animation worsens it. White text on `#60efff` is about 1.3:1. White on `#00b26b` is about 2.8:1 and on `#82f4b1` about 1.6:1. That is the Hero card 3 `<h3>`, which has only a `drop-shadow`. `.btn-glass-gradient` is 0.9 to 0.8 alpha blue to cyan, so the button label is unreadable on the right half. In dark mode the same gradient on black is fine, so this is a light-mode problem. Team role text (Team.tsx:46) is 14px with a cyan end.",
+    "fix": "Light mode: use a gradient that stays at or below L~0.25, e.g. #0061ff -> #0047c7 for text, and keep cyan only for decorative strokes or the dark theme. For CTAs use solid #0061ff (5:1 with white) with a cyan glow or border, or dark text (#04121f) on the cyan end. Card 3: use #04121f text, or darken the card to #007a4a. Add a `--grad-text-light` token and `--grad-text-dark` token."
+   },
+   {
+    "title": "EnrollModal is not an accessible dialog",
+    "severity": "high",
+    "where": "components/EnrollModal.tsx:122-132,155,170,24",
+    "detail": "No `role=\"dialog\"`, `aria-modal`, or `aria-labelledby`. No Escape handler, no focus on open, no focus trap or return, no body scroll lock. The close button (129) has no `aria-label`. The backdrop is a clickable div. Labels have no `htmlFor`/`id`, so inputs have no accessible name. The `animate-in fade-in zoom-in-95` classes (126) come from tailwindcss-animate, which is not installed (package.json and index.css have no match), so they do nothing. The auto-close `setTimeout` (107) is never cleared, so it calls setState and onClose after unmount. Because of `if(!isOpen) return null` (24), initialName/initialPhone only apply on first mount.",
+    "fix": "Use a shared `<Modal>` built on the native `<dialog>` element with `showModal()`, or a small focus-trap hook. Add `aria-labelledby`, Esc to close, `inert` on the background, and a body scroll lock. Add `htmlFor`/`id`, `autoComplete=\"name\"`, `autoComplete=\"tel-national\"`, `inputMode=\"numeric\"`, `aria-label=\"Yopish\"`. Reset state in an effect keyed on `isOpen`. Clear the timeout in cleanup. Replace animate-in with a framer-motion or CSS keyframe."
+   },
+   {
+    "title": "Contact form: labels not bound, validation only via toast, success state not announced",
+    "severity": "high",
+    "where": "components/home/Contact.tsx:200,212,229 (labels), 201-209,215-225 (inputs), 66-72, 186-198",
+    "detail": "The three `<label>`s have no `htmlFor` and the inputs have no `id`, so screen readers announce unnamed fields. Validation is JS-only with a `toast.error` and no inline messages or `aria-invalid`/`aria-describedby`. The phone field accepts any digits and only checks length. There is no `autoComplete` or `inputMode`. On success the form is replaced by a card, so focus is lost and there is no `role=\"status\"`. `slide-up` (189) is an undefined class. The decorative Mail icon in the button (249) is `absolute right-10` but the Button is not `relative`, so it positions against the card.",
+    "fix": "Add `id`/`htmlFor`, inline error text under each field with `aria-invalid` and `aria-describedby`, `autoComplete`/`inputMode=\"tel\"`, and a `role=\"status\" aria-live=\"polite\"` success region that receives focus. Add `relative` to the button or remove the icon. Delete or define `slide-up`. Extract one `<LeadForm>` shared by Contact, EnrollModal and ApplyForm, since the phone formatter and submit logic are copy-pasted."
+   },
+   {
+    "title": "Mobile menu and language dropdown are not keyboard or screen-reader operable",
+    "severity": "high",
+    "where": "components/layout/Navbar.tsx:163-175,229-250,178-218,256-310",
+    "detail": "The burger button (240) and the mobile theme button (230) have no `aria-label`, `aria-expanded` or `aria-controls`. The menu has no Escape handler, no focus management, and no click-outside close. The language dropdown (194-217) has no Escape or outside click, and `aria-haspopup=\"true\"` implies a menu role that is absent. The mobile language buttons (288-298) have no `aria-pressed` and do not close the menu. The menu stays open after route change only because of `setIsOpen(false)` in the link handler. Nav links get no keyboard focus style: the glass pill follows `hoveredLink` only (126), and `focus-visible` styling is absent project-wide. The nav also hides itself on scroll-down (45-47) even when focus is inside it.",
+    "fix": "Add `aria-label`/`aria-expanded`/`aria-controls` to the toggles, Esc and outside-click close hooks, and focus the first item on open. Set the pill target on `onFocus` as well as `onMouseEnter`. Don't hide the nav while `nav.contains(document.activeElement)`. Add a global `:focus-visible{outline:2px solid #60efff;outline-offset:3px}` and a skip-to-content link in PublicLayout."
+   },
+   {
+    "title": "Desktop nav likely overflows between 768px and ~1100px",
+    "severity": "high",
+    "where": "components/layout/Navbar.tsx:99-125,161-225",
+    "detail": "At `md` (768px) the 7 links each use `px-5` and `font-bold text-sm` (~110-130px each, about 800px), plus a 160px logo, theme and language buttons and the CTA (~250px). That exceeds the ~720px available inside `max-w-7xl w-[calc(100%-3rem)]`. There is no `flex-wrap` or `overflow` handling, so items collide or overflow on tablets and small laptops. This is my arithmetic from the class names, not a measured result.",
+    "fix": "Switch `hidden md:flex` to `hidden xl:flex` (burger below xl), or reduce to `px-3`, hide the CTA below `xl`, and merge Languages/Blog into a More menu. Verify at 768, 1024 and 1280."
+   },
+   {
+    "title": "Button nested inside Link (invalid HTML, double tab stop)",
+    "severity": "high",
+    "where": "Hero.tsx:101-112; Courses.tsx:215-219; About.tsx:93-98; CareerTestSection.tsx (Link>Button near :91); Team.tsx:50-55; Navbar.tsx:220-224,302-306",
+    "detail": "`<a><button>` is invalid interactive nesting. Keyboard users get two tab stops and screen readers announce a link with a button. Click targets are the button only in some browsers, middle-click and open-in-new-tab do not work on the button area, and the global Button component renders only `<button>` with no `as`/`asChild` option.",
+    "fix": "Add `LinkButton` (renders `<Link className={buttonClasses}>`) or `Button asChild`. Replace all 7 occurrences. Courses.tsx:201 uses a div in a Link, which is fine."
+   },
+   {
+    "title": "Dark mode is built on `html.dark .class !important` overrides plus per-component isDark ternaries",
+    "severity": "high",
+    "where": "index.css:22-171; ThemeContext.tsx:28-37; components throughout (every file uses isDark)",
+    "detail": "Two parallel systems: CSS remaps `.bg-white`, `.bg-slate-50/100`, `.text-slate-500..900`, borders, `.shadow-sm/xl`, and all inputs, while components also branch on `isDark`. Problems: (1) the override list is partial; `bg-slate-200/300`, `text-slate-300/400`, `bg-white/10`, `border-slate-300` and `bg-gray-*` are unmapped, so anything not on the list shows light styling on black. (2) `!important` makes it impossible to intentionally keep a white card in dark mode, since `.bg-white` is always remapped. (3) Some headings rely on the remap (Courses.tsx:126,129 use `text-slate-900/600` with no isDark branch) while siblings use ternaries (Gallery.tsx:30), so it is easy to drift. (4) `dark:` utilities (CareerTestSection.tsx:29,71-73; Hero.tsx:128; ErrorBoundary.tsx:31-40; App.tsx:133; pages/CourseDetail.tsx:29-30) are Tailwind 4 defaults tied to `prefers-color-scheme`, because no `@custom-variant dark` exists in index.css or src. They desync from the manual toggle. (5) The class is applied in a `useEffect` (ThemeContext:28) and index.html has no pre-paint script, so dark users get a light flash while `isDark` inline styles already say dark.",
+    "fix": "Define tokens as CSS variables on `:root` and `.dark` (`--bg`, `--surface`, `--text`, `--muted`, `--border`, `--brand`, `--accent`). Map them into `@theme` and use semantic classes (`bg-surface text-fg`). Add `@custom-variant dark (&:where(.dark, .dark *));`. Add an inline `<script>` in index.html head that sets `document.documentElement.classList.toggle('dark', ...)` before paint. Then delete the `!important` block and the isDark ternaries section by section."
+   },
+   {
+    "title": "Low-contrast muted text in dark mode and on dark footer; placeholders very low",
+    "severity": "medium",
+    "where": "index.css:58-60,122-125; Footer.tsx:43,69,88,177,186-189; Contact.tsx:345; GlobalSearch.tsx:195,210",
+    "detail": "`.text-slate-500` remaps to #64748b: about 4.2-4.4:1 on #000/#0a0a0a, below 4.5:1 for 12-14px text. The placeholder color #475569 on #0a0a0a is about 2.6:1. Footer `text-slate-500`, `text-xs`, and `placeholder:text-slate-600` (88) on #0f172a-ish are about 3.7:1 and 2.5:1. The Contact line 345 ternary uses `text-slate-500` in both branches. Sub-12px text (`text-[10px]` Hero.tsx:150,165, `text-[11px]` GlobalSearch.tsx:210) is also too small.",
+    "fix": "Set the dark muted text token to at least #94a3b8 (7:1) and placeholders to #8b9bb0 or lighter. Raise Footer muted text to slate-400/300. Set a 12px minimum for text."
+   },
+   {
+    "title": "Icon-only links and buttons have no accessible name; dead '#' links open new tabs",
+    "severity": "medium",
+    "where": "Footer.tsx:98-112 (social icons), 190-191; Contact.tsx:148-154 (copy button, title only), 164; GlobalSearch.tsx:150-155; BackToTop.tsx (has aria-label, ok)",
+    "detail": "Footer social `<a>` elements contain only an icon, so they announce as 'link'. Facebook/YouTube `href: '#'` with `target=\"_blank\"` (Footer 102-103, Contact 164) open a blank tab or jump to top. Privacy/Terms links are `href=\"#\"` as well (190-191). The copy button is 32px and has only `title`; `navigator.clipboard.writeText(...).then` (Contact 23) has no `.catch`, so it throws an unhandled rejection on http, permission denial or Safari.",
+    "fix": "Add `aria-label` ('Instagram' etc.), hide the icon with `aria-hidden`, remove links that have no URL or point them at the real pages, and create real /maxfiylik and /shartlar routes. Add `aria-label` and `.catch` to the copy button. Make hit areas at least 44x44 (use `min-w-11 min-h-11`)."
+   },
+   {
+    "title": "FAQ accordion: focus outline removed, no ARIA relationships, stagger tied to index",
+    "severity": "medium",
+    "where": "components/home/FAQ.tsx:105-110,112-125,98-103",
+    "detail": "The trigger has `focus:outline-none` (108) and no replacement `focus-visible` style, so keyboard focus is invisible. There is no `aria-controls`/`id` pair and the panel has no `role=\"region\" aria-labelledby`. The question `<span>` is not in a heading element. `useState(0)` opens the first item on load. The `/api/faqs` swap (fetch at 520 in the combined listing, ~line 54 per file) replaces the defaults after render, causing a visible flicker or CLS. Entry `delay: idx*0.1` grows with FAQ count.",
+    "fix": "Use `<h3><button id aria-expanded aria-controls>` and `<div id role=\"region\" aria-labelledby>`. Replace `focus:outline-none` with `focus-visible:ring-2 ring-[#60efff]`. Cap the stagger at 0.3s. Avoid the default-to-API swap by loading FAQ from the store or showing a skeleton."
+   },
+   {
+    "title": "Testimonial video marquee: unusable on touch, duplicates iframes, heavy",
+    "severity": "medium",
+    "where": "components/home/Testimonials.tsx:12,59-77",
+    "detail": "Each iframe has `pointer-events-none group-hover:pointer-events-auto` plus an overlay `group-hover:hidden`. On touch devices there is no hover, so the first tap is swallowed by the overlay and sticky hover is unreliable, which blocks play. The list is duplicated (12) for the seamless loop, so every video exists twice, announced twice to screen readers and fetched twice, and 6+ YouTube iframes load eagerly with no `loading=\"lazy\"`. The title attribute is the same for all. `hover:[animation-play-state:paused]` is mouse-only.",
+    "fix": "Use facade thumbnails (poster image plus a play button that swaps in the iframe on click), `aria-hidden` and `inert` on the duplicated half, distinct titles, `loading=\"lazy\"`, and a scroll-snap carousel on touch devices."
+   },
+   {
+    "title": "Hero LCP image is lazy-loaded; fake third-party assets and fabricated numbers",
+    "severity": "medium",
+    "where": "components/home/Hero.tsx:128-135,194,228,147-148,165,199,217,242",
+    "detail": "The main hero photo has `loading=\"lazy\"` (133) and no `fetchpriority`, `srcset` or dimensions, which delays LCP and can cause CLS. It is a hotlinked Unsplash photo. The avatars are `i.pravatar.cc` random faces labelled 'Student' (194) and the texture is hotlinked from transparenttextures.com (228), which are external requests that can fail or be blocked and are not the center's real students. Static stats such as '3 000 000 UZS', '75%', '98%' and '1500+' are hard-coded and the bar chart is dummyData; this is a credibility risk.",
+    "fix": "Host a real optimized hero image or video at /public with width/height, `fetchpriority=\"high\"`, `loading=\"eager\"`. Replace pravatar with real student photos or remove. Source stats from `siteContent` (admin-editable) or remove claims that cannot be verified. Self-host the texture or use the PatternBg SVG."
+   },
+   {
+    "title": "Fixed heights and fixed-pixel decor on mobile",
+    "severity": "medium",
+    "where": "Hero.tsx:128 (h-[450px] lg:h-[550px]), 61-63 (w-[500px]/[400px]/[600px] orbs), 141 (w-64 floating card); CareerTestSection.tsx:19 (w-[800px] blur-3xl); FAQ.tsx:73 (500px blur-[150px]); Testimonials.tsx:63 (w-[280px])",
+    "detail": "The hero image is a fixed 450px high on a 360-390px-wide phone, which pushes the stat cards a long way down, and the floating 256px card (`right-4`) covers about two thirds of the image width. 500-800px blurred orbs on mobile are expensive for the GPU (blur 100-150px plus `pulse-glow` animation on a layer) and the section uses `overflow-hidden` to hide them. Many layers (PatternBg, FloatingStars, orbs, stars) per section multiply compositing cost.",
+    "fix": "Use `aspect-[4/3] sm:aspect-[16/10] lg:h-[550px]`. Place the floating card statically under the image on `<sm`. Hide or scale decor with `hidden md:block`, cap blurs to <=60px, and drop animated blur layers on mobile."
+   },
+   {
+    "title": "Form control inconsistency: two different input systems and Button not on brand",
+    "severity": "medium",
+    "where": "EnrollModal.tsx:163,171-181 vs Contact.tsx:207-225; Button.tsx:5-12; Footer.tsx:88",
+    "detail": "EnrollModal inputs are `rounded-xl border py-3 focus:ring-2 ring-blue-100`; Contact inputs are `rounded-2xl border-2 py-4 focus:ring-4 ring-[#0061ff]/10`; Footer's are `rounded-xl bg-white/5`. Their focus rings are about 1.1:1 against the background (ring-blue-100 and 10% alpha), failing the 3:1 WCAG 1.4.11 requirement, and `outline-none` removes the browser default. The shared `Button` uses `bg-blue-600` (#2563eb) rather than brand #0061ff (and blue-700 hover); every caller overrides it with `!px`, `!rounded-full`, inline gradient and `className` hacks (Navbar.tsx:221 uses `!` overrides). `variant` is used by Team only.",
+    "fix": "Create one `<Input>`/`<Field>` and one `<Button>` with variants (primary/gradient, secondary/glass, ghost, outline) and sizes (md 44px, lg 56px). Use a `focus-visible:ring-2 ring-[#60efff] ring-offset-2` style. Remove `!` overrides."
+   },
+   {
+    "title": "Newsletter form in Footer fakes success and discards the email",
+    "severity": "medium",
+    "where": "components/layout/Footer.tsx:9-19,82-94",
+    "detail": "`handleSubscribe` only sets local state, shows 'Obuna bo'ldingiz! Rahmat!', and never sends the address anywhere (no API, no CRM). Users believe they subscribed. Input also has no label or `autoComplete=\"email\"`.",
+    "fix": "Post to an `/api/subscribe` endpoint (or the existing lead endpoint with sourceRef 'Newsletter') and show success only on 2xx; otherwise remove the form. Add a label (visually hidden) and `autoComplete`."
+   },
+   {
+    "title": "'Hozir ochiq' badge uses the visitor's local clock and ignores Sunday",
+    "severity": "medium",
+    "where": "components/home/Contact.tsx:30-33,126-131 vs Footer.tsx:179-180",
+    "detail": "`new Date().getHours()` runs in the visitor's timezone, not Asia/Tashkent, and does not exclude Sunday, which the Footer states is closed ('Yakshanba: Dam olish kuni'). It also evaluates once at render, so it can go stale on a long session. The badge can say 'Open' on Sunday or to a visitor abroad, which is misleading.",
+    "fix": "Compute with `Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Tashkent',hour:'numeric',weekday:'short',hour12:false})` and exclude Sun. Read the schedule from `siteContent.contactSchedule`, and refresh every minute."
+   },
+   {
+    "title": "Global `* { font-family }` and `!important` list override Tailwind font utilities",
+    "severity": "low",
+    "where": "index.css:3-16",
+    "detail": "The unlayered `* {font-family:'Poppins'...}` and the `!important` selector list beat Tailwind 4's layered utilities, so `font-mono`, `font-serif`, or code blocks can never work. The `--font-sans` token is already defined in @theme, so both are redundant. The `!important` list also does not include `svg text` or pseudo-elements. Poppins is loaded at 8 weights (index.html:~37) but the code uses mostly 400/500/700/900 (font-black x21, font-bold x48, font-medium x21, font-semibold x2), so 300/600/800 are wasted bytes. The font preload uses an `onload` swap so there is a FOUT on the hero heading.",
+    "fix": "Delete lines 8-16, keep `--font-sans` in @theme, and apply `font-sans` on html. Load Poppins 400;500;700;900 (or a variable font) and self-host with `font-display: swap` plus `size-adjust` fallback."
+   },
+   {
+    "title": "z-index and stacking ad hoc; nav `filter` creates a backdrop root",
+    "severity": "low",
+    "where": "Navbar.tsx:81-84,196; EnrollModal.tsx:123; BackToTop.tsx:31; ScrollProgress.tsx:25; GlobalSearch.tsx:119,128; Testimonials.tsx:55-75; Hero.tsx:100,141",
+    "detail": "z values in use: z-0/10/20 (local), z-50 (Navbar, lang menu, EnrollModal, BackToTop all equal), z-[100] (ScrollProgress), z-[200]/[201] (Search), react-hot-toast 9999. EnrollModal (50) vs Navbar (50) depends on DOM order. The nav animates to `filter: blur(0px)` (81-82); framer leaves that inline style, so the navbar remains a filter/backdrop root and the inner glass pill `backdrop-filter` (138) only blurs the nav's own contents rather than the page. A persistent `filter` also keeps the nav on its own compositing layer.",
+    "fix": "Define tokens (`--z-nav:40; --z-popover:50; --z-modal:60; --z-toast:70; --z-search:80`). Animate nav with opacity/transform only, no filter, or animate filter to `none`."
+   },
+   {
+    "title": "Scroll listeners set React state on every scroll event",
+    "severity": "low",
+    "where": "ScrollProgress.tsx:8-21; Navbar.tsx:41-54; BackToTop.tsx:43-49",
+    "detail": "ScrollProgress calls `setScrollProgress` per scroll event (only to decide `<0.01`), which re-renders on every tick, while a separate `useSpring` already exists. Navbar calls `setScrolled`/`setNavHidden` with the same values repeatedly (React bails out, but it still runs per event). There are three independent window scroll listeners. `scrollIntoView({behavior:'smooth'})` in Navbar.tsx:27,30 and the `setTimeout(...,300)` after navigate (26-28) is a race with lazy route loading, so the contact scroll can miss when Home is slow to mount.",
+    "fix": "Use framer-motion `useScroll` and `useTransform` for the progress bar (no state). Use one shared scroll hook or IntersectionObserver sentinels. For the contact link, use a hash/route effect (`useEffect` on `location.hash`) in Home that scrolls once the section exists."
+   },
+   {
+    "title": "Active-state logic in navigation is wrong for contact and nested routes",
+    "severity": "low",
+    "where": "Navbar.tsx:67-71,116-127",
+    "detail": "`isActive` is an exact path match, so '/#contact' is never active (the pathname is '/'), and on `/kurslar/:id` or `/blog/:slug` no link matches, so the fallback `activePath` highlights 'Home' (70). `Link to={'/'}` is used for both Home and Contact, so both have the same href and the same `key` basis (`link.path` is used as the key in the desktop list and `link.name` in the mobile list). Links also lack `aria-current=\"page\"`.",
+    "fix": "Use `useMatch`/`NavLink` with `end` for '/', prefix match for others, add `aria-current`. Make Contact a real hash link (`/#contact`) and handle scroll via effect; key by id."
+   },
+   {
+    "title": "Gallery and decorative image alt text; unnamed iframes; decor not hidden from AT",
+    "severity": "low",
+    "where": "Gallery.tsx:53; Hero.tsx:131,194; About.tsx:34; Testimonials.tsx:69; BrandElements.tsx (Star1/Star2/PatternBg/FloatingStars)",
+    "detail": "Gallery alt is 'Gallery image 1/2/...' in English on a Uzbek page, About alt 'About DATA', Hero 'Students learning IT' (English, and 4x 'Student'). Testimonial iframes all share the title 'O'quvchi fikri'. The decorative SVG stars/patterns appear in every section; they need `aria-hidden=\"true\"` or they add noise (not verified in BrandElements - check). `Logo` SVG has no `role=\"img\"`/`<title>`, and the Navbar `<Link to=\"/\">` has no accessible name. Hero h1 uses an uppercase CSS transform plus gradient span (fine) but the squiggle SVG (90) is not hidden.",
+    "fix": "Use localized, descriptive alt text from admin (`img.alt`) or `alt=\"\"` for decorative images. Add `aria-hidden` to decor components by default. Give the logo link `aria-label=\"DATA Ta'lim Stansiyasi — bosh sahifa\"`. Make each iframe title unique."
+   },
+   {
+    "title": "Touch targets and tiny controls",
+    "severity": "low",
+    "where": "Navbar.tsx:165,181 (w-10 h-10 = 40px), 231 (40px), Contact.tsx:148 (p-2 icon = ~32px), GlobalSearch.tsx:150-155 (ESC ~24px), EnrollModal.tsx:129 (40px), FAQ chevron 48px ok, Footer.tsx:98-111 (40px), Footer link rows (text-sm with space-y-3)",
+    "detail": "Several controls are under the 44x44 recommended size (WCAG 2.2 AA minimum 24px passes, but mobile usability suffers), especially the 32px copy button and 40px nav icon buttons. Footer link lists have about 20px line boxes.",
+    "fix": "Standardize on `min-h-11 min-w-11` for icon buttons and `py-2` on footer links."
+   },
+   {
+    "title": "Duplicated styles: section header, glass recipes, gradients, backgrounds",
+    "severity": "low",
+    "where": "Every home section header (Courses.tsx:126-131, Gallery.tsx:30-35, Team.tsx:24-27, FAQ.tsx:53-58, Testimonials.tsx:46-49, TourVideo.tsx:30-33, Contact.tsx:118-122); index.css:229-357 vs inline styles in Navbar.tsx:85-97,110-113,134-146",
+    "detail": "The section header block (badge + `text-4xl md:text-5xl font-black uppercase tracking-tight` + gradient span + `text-lg` description) is copied about 8 times with small differences (badge radius `rounded-full` vs `rounded-xl`, `mb-4` vs `mb-6`, gradient via inline `backgroundImage` vs `bg-gradient-to-r`, shimmer on some but not all). The gradient '#0061ff -> #60efff' appears inline over 100 times (138 `#0061ff` and 82 `#60efff` literals). The Navbar re-implements glass in inline styles instead of using `.glass`. Each section also repeats `PatternBg` + `FloatingStars` + a glow orb + `isDark ? '#000' : '#f8fafc'` backgrounds, while `PublicLayout` (App.tsx:78-85) and `body` (index.css:18-26) also set backgrounds.",
+    "fix": "Add `<Section id bg>` and `<SectionHeader eyebrow title accent description>` components, and `--grad-brand` / `.text-grad` utilities. Move backgrounds into one place (section variant tokens)."
+   },
+   {
+    "title": "Design-system inconsistencies to unify in the redesign (brand #0061ff / #60efff / #00b26b + black)",
+    "severity": "low",
+    "where": "Whole UI; counts from components/home, components/layout, components/*.tsx",
+    "detail": "RADII (6+ values): `rounded-[2rem]` x15 (cards, hero, nav pill container), `rounded-3xl` x5 (FAQ, modal, Contact info cards, search), `rounded-2xl` x27 (inputs, buttons, tiles, mobile links), `rounded-xl` x17 (inputs, badges), `rounded-[1.5rem]` x1 (Courses CTA), `rounded-lg` x4, `rounded-full` x53. Navbar is `rounded-[2rem]`. Pills: `rounded-full` (FAQ) vs `rounded-xl` (TourVideo, Hero badge). Buttons are mixed `rounded-full` (Hero, Navbar CTA) and `rounded-2xl` (About, Team, Contact, Career). COLORS: brand #0061ff and #60efff are used as 138 and 82 hex literals; #00b26b x14, #82f4b1 x10; Tailwind `blue-600/700` (Button.tsx) and `blue-50/100`, `emerald/green-500/600` (EnrollModal green-100/600 vs brand #00b26b in Contact), `purple` (Courses), amber #f59e0b and pink #ec4899 (Footer stats only), dark surfaces are four different values: #000, #0a0a0a, #090e17->#0a1426, #0f172a->#1e293b/slate-900 (Footer light mode uses #0f172a gradient with #0c1a3a; Hero card uses a third gradient; Contact uses slate-800 inputs on slate-900/80 while the remap makes inputs #0a0a0a); Course categories use off-brand gradients (media #f9ce34/#ee2a7b/#6228d7 and kids #d73ffb/#4f0ead). SHADOWS: shadow-sm x9, md x5, lg x8, xl x13, 2xl x7, plus 14 arbitrary `shadow-[...]` with different blur and colors (blue 0.4, green 0.3, black 0.04-0.1), and the dark remap only handles `.shadow-sm` and `.shadow-xl`. WEIGHTS: font-black x21 (all h2/h3/stats), font-bold x48 (including body-size nav links, buttons, labels and 18px FAQ questions), font-medium x21, font-semibold x2; nav links are `font-bold text-sm` (too heavy for 7 items). SPACING: sections `py-24` x10 but `py-16` once, Hero `pt-28 pb-12 lg:pt-32 lg:pb-16`; container paddings consistent (`px-4 sm:px-6 lg:px-8`) but max-width varies 3xl/4xl/5xl/7xl; card padding `p-6/p-8/p-10/p-5/p-1+p-6 sm:p-8`; gaps `gap-4/6/8/12/16`. BORDERS: `border` vs `border-2` vs `border-4` vs `border-[8px]` (TourVideo:42), `border-slate-100` vs `border-white/5` vs `border-white/10`. TYPE: h2 is `text-4xl md:text-5xl font-black uppercase` (9 of 11; the Career h2 goes to `lg:text-6xl`; Contact uses `mb-6`, Courses `mb-4`), the hero h1 `text-5xl..lg:text-7xl`; body copy `text-lg` for all descriptions; everything is uppercase + tracking-tight, which hurts Uzbek/Russian readability (apostrophes, long words).",
+    "fix": "Define tokens in `@theme`: radius `--radius-sm:0.75rem` (inputs/chips), `--radius-md:1.25rem` (cards/buttons), `--radius-lg:2rem` (hero/sections), plus full for pills; shadow scale `--shadow-1/2/3` plus one `--glow-brand`; dark surfaces `--bg:#000`, `--surface-1:#0a0a0a`, `--surface-2:#111418`; brand `--blue:#0061ff --cyan:#60efff --green:#00b26b`; text/font weights `700` headings (`900` for display only), `500` body-emphasis; section spacing `py-20 md:py-28`; one gradient token; and replace hex literals with `bg-brand`, `text-accent` etc. Drop uppercase on h2/h3 in ru and uz, or limit it to eyebrow labels."
+   }
+  ]
+ }
+]

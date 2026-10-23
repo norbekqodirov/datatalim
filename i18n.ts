@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
+import { create } from 'zustand';
 
 export type Language = 'uz' | 'ru' | 'en';
 
@@ -152,18 +153,43 @@ export const translations: Record<Language, Record<string, string>> = {
     },
 };
 
-// Custom hook for language management
-export const useLanguage = () => {
-    const [lang, setLangState] = useState<Language>(() => {
-        const saved = localStorage.getItem('data-talim-lang');
-        return (saved as Language) || 'uz';
-    });
+// --- Umumiy til holati (shared store) ---
+// Avval har bir komponent o'z useState'iga ega edi, shuning uchun til almashtirgich faqat Navbar'ni o'zgartirardi.
+const LANG_KEY = 'data-talim-lang';
+const isLanguage = (v: unknown): v is Language => v === 'uz' || v === 'ru' || v === 'en';
 
-    const setLang = useCallback((newLang: Language) => {
-        setLangState(newLang);
-        localStorage.setItem('data-talim-lang', newLang);
-        document.documentElement.lang = newLang;
-    }, []);
+const readSavedLang = (): Language => {
+    try {
+        const saved = localStorage.getItem(LANG_KEY);
+        if (isLanguage(saved)) return saved;
+    } catch { /* localStorage mavjud emas (private mode va h.k.) */ }
+    return 'uz';
+};
+
+interface LanguageState {
+    lang: Language;
+    setLang: (lang: Language) => void;
+}
+
+const useLanguageStore = create<LanguageState>((set) => ({
+    lang: readSavedLang(),
+    setLang: (newLang) => {
+        if (!isLanguage(newLang)) return;
+        try { localStorage.setItem(LANG_KEY, newLang); } catch { /* ignore */ }
+        if (typeof document !== 'undefined') document.documentElement.lang = newLang;
+        set({ lang: newLang });
+    },
+}));
+
+// <html lang> ni boshlang'ich yuklashda ham to'g'rilab qo'yamiz
+if (typeof document !== 'undefined') {
+    document.documentElement.lang = useLanguageStore.getState().lang;
+}
+
+// Custom hook for language management (API o'zgarmagan: {lang, setLang, t, tField})
+export const useLanguage = () => {
+    const lang = useLanguageStore((s) => s.lang);
+    const setLang = useLanguageStore((s) => s.setLang);
 
     const t = useCallback((key: string): string => {
         return translations[lang][key] || translations['uz'][key] || key;

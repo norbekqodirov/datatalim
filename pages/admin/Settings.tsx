@@ -20,7 +20,7 @@ const Settings: React.FC = () => {
   const changePassword = async () => {
     if (!currentPassword || !newPassword) { toast.error('Barcha maydonlarni to\'ldiring'); return; }
     if (newPassword !== confirmPassword) { toast.error('Parollar mos kelmaydi'); return; }
-    if (newPassword.length < 6) { toast.error('Parol kamida 6 belgidan iborat bo\'lsin'); return; }
+    if (newPassword.length < 10) { toast.error('Parol kamida 10 belgidan iborat bo\'lsin'); return; }
     try {
       const res = await fetch('/api/admin/change-password', {
         method: 'POST', headers: headers(),

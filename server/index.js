@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
@@ -30,7 +31,7 @@ async function sendTelegramMessage(text) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chat_id: TG_CHAT_ID, text, parse_mode: 'HTML' }),
-                signal: AbortSignal.timeout(6000),
+                signal: AbortSignal.timeout(4000),
             };
             if (route.dispatcher) fetchOpts.dispatcher = route.dispatcher;
 
@@ -56,11 +57,15 @@ dotenv.config({ path: path.join(__dirname, '../.env.local') });
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const JWT_SECRET = process.env.JWT_SECRET || 'data-talim-super-secret-key-2026';
+const IS_PROD = process.env.NODE_ENV === 'production';
 
-// Warn if using default JWT secret
-if (!process.env.JWT_SECRET) {
-    console.warn('⚠️  JWT_SECRET environment variable o\'rnatilmagan! Default qiymat ishlatilmoqda. Production uchun .env.local da JWT_SECRET ni o\'rnating.');
+// JWT: kuchli maxfiy kalit kerak. Yo'q yoki qisqa (<32 belgi) bo'lsa server YIQILMAYDI —
+// ishga tushganda tasodifiy kalit yaratiladi (restartda barcha admin tokenlari bekor bo'ladi).
+const JWT_ALGORITHM = 'HS256';
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    JWT_SECRET = crypto.randomBytes(64).toString('hex');
+    console.warn('⚠️  JWT_SECRET o\'rnatilmagan yoki 32 belgidan qisqa! Vaqtinchalik tasodifiy kalit yaratildi: server qayta ishga tushganda admin tokenlari bekor bo\'ladi (qayta kirish kerak). Doimiy ishlashi uchun .env.local da kamida 32 belgili JWT_SECRET o\'rnating.');
 }
 
 // Telegram config — faqat server tomonida
@@ -71,14 +76,73 @@ let lastAssignedManager = 'B'; // Round-robin: alternates between A and B
 // Basic input sanitization
 const sanitize = (str) => {
     if (typeof str !== 'string') return str;
-    return str.trim().replace(/<[^>]*>/g, '').substring(0, 500);
+    // eslint-disable-next-line no-control-regex
+    return str.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().replace(/<[^>]*>/g, '').substring(0, 500);
 };
+
+// sanitize() faqat satr uchun ishlaydi; satr bo'lmagan qiymat (obyekt, massiv) bo'sh satr bo'ladi
+const cleanText = (v) => (typeof v === 'string' ? sanitize(v) : '');
+
+// Ichki xatoni logga yozib, mijozga umumiy javob qaytaradi (err.message mijozga chiqmaydi)
+const serverError = (res, err, ctx = '') => {
+    console.error(`[API xato]${ctx ? ' ' + ctx + ':' : ''}`, err);
+    if (res.headersSent) return;
+    res.status(500).json({ error: 'Internal server error' });
+};
+
+// Telegram (parse_mode=HTML) uchun escape. Frontend xabarlarda faqat oddiy <b>...</b> ishlatadi,
+// shuning uchun avval hammasini escape qilamiz, so'ng FAQAT to'g'ri juftlangan <b></b> ni qaytaramiz
+// (juft bo'lmasa — to'liq escape qilingan matn yuboriladi, Telegram parse xatosi bermasligi uchun).
+const escapeHtml = (str) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const toTelegramHtml = (raw) => {
+    const escaped = escapeHtml(raw);
+    const withBold = escaped.replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>');
+    let depth = 0;
+    for (const m of withBold.matchAll(/<(\/?)b>/g)) {
+        depth += m[1] ? -1 : 1;
+        if (depth < 0 || depth > 1) return escaped;
+    }
+    return depth === 0 ? withBold : escaped;
+};
+
+// Telefonni tekshirish va "+998XXXXXXXXX" ko'rinishiga keltirish. Yaroqsiz bo'lsa null.
+const normalizePhone = (value) => {
+    if (typeof value !== 'string') return null;
+    let digits = value.replace(/\D/g, '');
+    if (digits.length === 10 && digits.startsWith('0')) digits = digits.slice(1); // 0901234567
+    if (digits.length === 9) digits = '998' + digits;
+    if (digits.length < 9 || digits.length > 13) return null;
+    // O'zbekiston raqami: 998 + 9 raqam, operator kodi 2-9 dan boshlanadi
+    if (digits.startsWith('998') && !/^998[2-9]\d{8}$/.test(digits)) return null;
+    return '+' + digits;
+};
+
+const REF_CODE_RE = /^[A-Za-z0-9]{6}$/; // /api/marketing-links yaratadigan ref kod formati (6 belgi)
+const SOURCE_REF_RE = /^[A-Za-z0-9_-]{1,40}$/; // ref kod yoki 'Karyera_Testi', 'Aloqa' kabi ichki manba nomlari
+const DEDUP_WINDOW_MS = 10 * 60 * 1000; // bir xil telefon + kurs uchun takroriy ariza oynasi
 
 // Rate limiters
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 daqiqa
     max: 5, // max 5 urinish
     message: { error: 'Juda ko\'p urinish. 15 daqiqadan so\'ng qayta urinib ko\'ring.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true, // faqat muvaffaqiyatsiz urinishlar sanaladi
+});
+
+const passwordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: 'Juda ko\'p urinish. Keyinroq qayta urinib ko\'ring.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const notifyLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10, // Telegram xabarlari uchun qattiqroq chegara
+    message: { error: 'Juda ko\'p so\'rov. Biroz kutib qayta urinib ko\'ring.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
@@ -100,9 +164,47 @@ const analyticsLimiter = rateLimit({
 });
 
 // Middleware
-app.use(cors());
+// nginx orqasida turamiz: haqiqiy mijoz IP'si X-Forwarded-For'dan olinadi (rate limit har IP uchun alohida)
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+// Oddiy xavfsizlik headerlari (helmet'siz). HSTS va keshni nginx beradi.
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+});
+
+// Ruxsat etilgan origin'lar: datatalim.uz / www.datatalim.uz, dev'da localhost / 127.0.0.1 (istalgan port),
+// same-origin va ixtiyoriy CORS_ORIGINS env (vergul bilan). Same-origin so'rovlar uchun CORS baribir kerak emas.
+const ALLOWED_HOSTS = new Set(['datatalim.uz', 'www.datatalim.uz']);
+const EXTRA_ORIGINS = (process.env.CORS_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+const isLocalHost = (hostname) => hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+const isAllowedOrigin = (origin, req) => {
+    if (EXTRA_ORIGINS.includes(origin)) return true;
+    let url;
+    try { url = new URL(origin); } catch { return false; }
+    if (ALLOWED_HOSTS.has(url.hostname)) return true;
+    if (!IS_PROD && isLocalHost(url.hostname)) return true;
+    return url.host === req.get('host'); // same-origin
+};
+app.use(cors((req, callback) => {
+    const origin = req.headers.origin;
+    callback(null, { origin: !origin || isAllowedOrigin(origin, req) });
+}));
 app.use(express.json({ limit: '5mb' }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use((req, res, next) => { if (req.body === undefined) req.body = {}; next(); }); // Express 5: body yo'q bo'lsa undefined
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    index: false,
+    setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cache-Control', 'public, max-age=2592000'); // 30 kun (fayl nomlari noyob)
+        // Eski/begona fayl (svg, html) to'g'ridan-to'g'ri ochilsa ham skript ishlamasin
+        res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox");
+    },
+}));
 
 // Ensure DB and Uploads directory exist
 initDB();
@@ -112,46 +214,71 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 // Set up Multer for image uploads
+const UPLOAD_MAX_BYTES = 8 * 1024 * 1024; // 8 MB
+const UPLOAD_TYPES = { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'], 'image/webp': ['.webp'], 'image/gif': ['.gif'] };
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, uploadDir)
     },
     filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-        cb(null, uniqueSuffix + path.extname(file.originalname))
+        // Nom va kengaytma serverda yaratiladi (mijoz bergan nomdan foydalanilmaydi)
+        const ext = UPLOAD_TYPES[file.mimetype][0];
+        cb(null, `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`);
     }
 });
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: UPLOAD_MAX_BYTES, files: 1 },
+    fileFilter: (req, file, cb) => {
+        // Faqat MIME ruxsat ro'yxati: kengaytmani qat'iy tekshirmaymiz (frontend base64'dan 'image.png' nomli File yasaydi,
+        // turi esa jpeg/webp bo'lishi mumkin). Fayl nomini server o'zi yaratadi, mazmunni esa sharp tekshiradi.
+        if (!UPLOAD_TYPES[file.mimetype]) {
+            return cb(Object.assign(new Error('Faqat JPG, PNG, WebP yoki GIF rasm yuklash mumkin'), { status: 415, expose: true }));
+        }
+        cb(null, true);
+    },
+});
 
 // Database helper
 const db = getDB();
 
+// --- HEALTH CHECK ---
+app.get('/api/health', (req, res) => {
+    try {
+        db.prepare('SELECT 1').get();
+        res.set('Cache-Control', 'no-store');
+        res.json({ ok: true, uptime: Math.round(process.uptime()) });
+    } catch (err) {
+        console.error('[health] DB xatosi:', err);
+        res.status(503).json({ ok: false });
+    }
+});
+
 // --- AUTHENTICATION API ---
-app.post('/api/admin/login', loginLimiter, (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
+// Noma'lum foydalanuvchi uchun ham bcrypt ishlasin (javob vaqti orqali username aniqlanmasligi uchun)
+const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(8).toString('hex'), 10);
+
+app.post('/api/admin/login', loginLimiter, async (req, res) => {
+    const { username, password } = req.body || {};
+    if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
         return res.status(400).json({ error: 'Username and password required' });
     }
 
     try {
         const user = db.prepare('SELECT * FROM admin_users WHERE username = ?').get(username);
 
-        if (!user) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
+        const passwordMatch = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
 
-        const passwordMatch = bcrypt.compareSync(password, user.password_hash);
-
-        if (!passwordMatch) {
+        if (!user || !passwordMatch) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         // Generate JWT token valid for 8 hours
-        const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '8h' });
+        const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: '8h' });
 
         res.json({ success: true, token });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'login');
     }
 });
 
@@ -164,7 +291,7 @@ const authenticateToken = (req, res, next) => {
         return res.status(401).json({ error: 'Access token required' });
     }
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
+    jwt.verify(token, JWT_SECRET, { algorithms: [JWT_ALGORITHM] }, (err, user) => {
         if (err) {
             return res.status(403).json({ error: 'Invalid or expired token' });
         }
@@ -173,13 +300,26 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+// Ochiq endpoint'lar uchun: yaroqli admin tokeni bormi (yo'q bo'lsa — oddiy tashrifchi, xato qaytarilmaydi)
+const isAdminRequest = (req) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return false;
+    try {
+        jwt.verify(token, JWT_SECRET, { algorithms: [JWT_ALGORITHM] });
+        return true;
+    } catch {
+        return false;
+    }
+};
+
 // --- MARKETING LINKS API ---
 app.get('/api/marketing-links', authenticateToken, (req, res) => {
     try {
         const rows = db.prepare('SELECT * FROM marketing_links ORDER BY created_at DESC').all();
         res.json(rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'marketing-links');
     }
 });
 
@@ -203,7 +343,7 @@ app.post('/api/marketing-links', authenticateToken, (req, res) => {
         const newLink = db.prepare('SELECT * FROM marketing_links WHERE id = ?').get(info.lastInsertRowid);
         res.json(newLink);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'marketing-links create');
     }
 });
 
@@ -212,13 +352,14 @@ app.delete('/api/marketing-links/:id', authenticateToken, (req, res) => {
         db.prepare('DELETE FROM marketing_links WHERE id = ?').run(req.params.id);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'marketing-links delete');
     }
 });
 
 // GET basic link info (public, used by forms)
 app.get('/api/marketing-links/info/:ref', (req, res) => {
     const { ref } = req.params;
+    if (!REF_CODE_RE.test(ref)) return res.status(404).json({ error: 'Link not found' });
     try {
         const link = db.prepare('SELECT name, category FROM marketing_links WHERE ref_code = ?').get(ref);
         if (link) {
@@ -227,14 +368,15 @@ app.get('/api/marketing-links/info/:ref', (req, res) => {
             res.status(404).json({ error: 'Link not found' });
         }
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'marketing-links info');
     }
 });
 
 // --- TRACKING API ---
-app.post('/api/track/click', (req, res) => {
+app.post('/api/track/click', analyticsLimiter, (req, res) => {
     const { ref } = req.body;
     if (!ref) return res.status(400).json({ error: 'Ref code required' });
+    if (typeof ref !== 'string' || !REF_CODE_RE.test(ref)) return res.status(400).json({ error: 'Invalid ref code' });
 
     try {
         db.prepare('UPDATE marketing_links SET clicks = clicks + 1 WHERE ref_code = ?').run(ref);
@@ -242,7 +384,7 @@ app.post('/api/track/click', (req, res) => {
 
         res.json({ success: true, target_url: link ? link.target_url : '/' });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'track click');
     }
 });
 
@@ -257,7 +399,7 @@ app.post('/api/analytics/track', analyticsLimiter, (req, res) => {
         db.prepare('INSERT INTO analytics_events (type) VALUES (?)').run(type);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'analytics track');
     }
 });
 
@@ -289,13 +431,29 @@ function scoreLead(lead) {
 
 // --- LEADS API ---
 app.post('/api/leads', leadsLimiter, (req, res) => {
-    const name = sanitize(req.body.name);
-    const phone = sanitize(req.body.phone);
-    const courseId = sanitize(req.body.courseId);
-    const sourceRef = sanitize(req.body.sourceRef);
-    if (!name || !phone) return res.status(400).json({ error: 'Name and phone are required' });
+    const name = cleanText(req.body.name);
+    const courseId = cleanText(req.body.courseId).slice(0, 300); // karyera testida 3 ta kurs nomi birga keladi
+    const rawSourceRef = cleanText(req.body.sourceRef);
+    const sourceRef = SOURCE_REF_RE.test(rawSourceRef) ? rawSourceRef : '';
+    if (!name || !req.body.phone) return res.status(400).json({ error: 'Name and phone are required' });
+    if (name.length > 80) return res.status(400).json({ error: 'Name is too long (max 80 characters)' });
+    const phone = normalizePhone(typeof req.body.phone === 'string' ? req.body.phone : '');
+    if (!phone) return res.status(400).json({ error: 'Invalid phone number' });
 
     const insertLead = db.transaction(() => {
+        // Takroriy ariza: bir xil telefon + kurs oxirgi 10 daqiqada kelgan bo'lsa — yangisini yaratmay, mavjudini qaytaramiz
+        const dup = db.prepare(
+            "SELECT * FROM leads WHERE phone = ? AND COALESCE(course_id, '') = ? AND created_at >= datetime('now', ?) ORDER BY id DESC LIMIT 1"
+        ).get(phone, courseId, `-${DEDUP_WINDOW_MS / 60000} minutes`);
+        if (dup) {
+            const sc = db.prepare('SELECT score, grade, factors FROM lead_scores WHERE lead_id = ?').get(dup.id);
+            return {
+                duplicate: true,
+                lead: { ...dup, score: sc?.score ?? 0, grade: sc?.grade ?? 'Unqualified', factors: sc?.factors ?? '[]' },
+                actualSourceRef: dup.source_ref,
+            };
+        }
+
         let actualSourceRef = sourceRef || null;
 
         if (sourceRef) {
@@ -326,10 +484,15 @@ app.post('/api/leads', leadsLimiter, (req, res) => {
     });
 
     try {
-        const { lead, actualSourceRef: resolvedRef } = insertLead();
+        const { lead, actualSourceRef: resolvedRef, duplicate } = insertLead();
 
         // Use resolvedRef for response instead of arbitrary `sourceRef`
         const finalResult = { ...lead, resolvedSourceRef: resolvedRef || sourceRef };
+
+        if (duplicate) {
+            // Takroriy ariza: Sheets'ga qayta yozilmaydi, mavjud lead bilan muvaffaqiyat javobi qaytadi
+            return res.json({ ...finalResult, duplicate: true });
+        }
 
         // Asynchronously save to Google Sheets
         appendLeadToSheet(finalResult).catch(err => {
@@ -338,7 +501,7 @@ app.post('/api/leads', leadsLimiter, (req, res) => {
 
         res.json(finalResult);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'leads');
     }
 });
 
@@ -346,22 +509,33 @@ app.post('/api/leads', leadsLimiter, (req, res) => {
 // Lead o'zi /api/leads orqali allaqachon CRM'ga va umumiy Sheetga tushadi;
 // bu endpoint faqat karyera testiga xos maydonlarni (jins, yosh, top-3 kurs)
 // "Karyera Testi" tabiga qo'shimcha yozish uchun ishlatiladi.
+const recentCareerTests = new Map(); // phone|hollandCode -> vaqt (takroriy yozuvni to'sish uchun)
 app.post('/api/career-test-result', leadsLimiter, async (req, res) => {
-    const name = sanitize(req.body.name);
-    const phone = sanitize(req.body.phone);
-    const gender = sanitize(req.body.gender);
-    const age = sanitize(String(req.body.age ?? ''));
-    const hollandCode = sanitize(req.body.hollandCode);
-    const courses = Array.isArray(req.body.courses) ? req.body.courses.slice(0, 3).map(sanitize) : [];
+    const name = cleanText(req.body.name);
+    const gender = ['male', 'female'].includes(req.body.gender) ? req.body.gender : '';
+    const age = /^\d{1,3}$/.test(String(req.body.age ?? '').trim()) ? String(req.body.age).trim() : '';
+    const hollandCode = /^[A-Za-z]{1,6}$/.test(String(req.body.hollandCode ?? '')) ? req.body.hollandCode : '';
+    const courses = Array.isArray(req.body.courses) ? req.body.courses.slice(0, 3).map(c => cleanText(c).slice(0, 120)) : [];
 
-    if (!name || !phone) return res.status(400).json({ error: 'Name and phone are required' });
+    if (!name || !req.body.phone) return res.status(400).json({ error: 'Name and phone are required' });
+    if (name.length > 80) return res.status(400).json({ error: 'Name is too long (max 80 characters)' });
+    const phone = normalizePhone(typeof req.body.phone === 'string' ? req.body.phone : '');
+    if (!phone) return res.status(400).json({ error: 'Invalid phone number' });
+
+    // Bir xil telefon + natija 10 daqiqa ichida takrorlansa Sheet'ga qayta yozmaymiz
+    const now = Date.now();
+    for (const [k, t] of recentCareerTests) if (now - t > DEDUP_WINDOW_MS) recentCareerTests.delete(k);
+    const dedupKey = `${phone}|${hollandCode}`;
+    if (recentCareerTests.has(dedupKey)) return res.json({ success: true, duplicate: true });
 
     try {
         const result = await appendCareerTestToSheet({ name, phone, gender, age, hollandCode, courses });
-        res.json(result);
+        if (result?.success) recentCareerTests.set(dedupKey, now);
+        else console.error('Career test sheet sync failed:', result?.error);
+        res.json(result?.success ? result : { success: false, error: 'Sheet sync failed' });
     } catch (err) {
         console.error('Career test sheet sync error:', err);
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });
 
@@ -457,7 +631,7 @@ app.get('/api/stats', authenticateToken, (req, res) => {
             siteVisitsPerDay,
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'stats');
     }
 });
 
@@ -467,86 +641,156 @@ app.get('/api/faqs', (req, res) => {
         const rows = db.prepare('SELECT * FROM faqs ORDER BY sort_order ASC, id ASC').all();
         res.json(rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'faqs');
     }
 });
 
 // --- BLOG API ---
+const POST_SLUG_RE = /^[a-z0-9-]{1,100}$/;
+const POST_FIELD_LIMITS = {
+    title_uz: 300, title_ru: 300, title_en: 300,
+    content_uz: 200000, content_ru: 200000, content_en: 200000,
+    excerpt_uz: 1000, excerpt_ru: 1000, excerpt_en: 1000,
+    cover_image: 1000, category: 100,
+};
+
+// Sarlavha/slug'dan xavfsiz slug yasaydi: faqat a-z, 0-9 va "-" (maks 100 belgi)
+const toSlug = (value) => String(value || '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100).replace(/-+$/g, '');
+
+const parsePostId = (value) => {
+    const id = Number(value);
+    return Number.isInteger(id) && id > 0 ? id : null;
+};
+
+// Post body'sini tekshiradi. Muvaffaqiyatda { data }, xatoda { error } qaytaradi.
+function parsePostBody(b) {
+    if (!b || typeof b !== 'object' || Array.isArray(b)) return { error: 'Invalid request body' };
+    const data = {};
+    for (const [field, max] of Object.entries(POST_FIELD_LIMITS)) {
+        const v = b[field] ?? '';
+        if (typeof v !== 'string') return { error: `${field} must be a string` };
+        if (v.length > max) return { error: `${field} is too long (max ${max})` };
+        data[field] = v;
+    }
+    if (!data.title_uz.trim()) return { error: 'title_uz is required' };
+    data.category = data.category || 'general';
+    data.is_published = b.is_published === true || b.is_published === 1 || b.is_published === '1' || b.is_published === 'true' ? 1 : 0;
+    data.slug = b.slug === undefined || b.slug === null ? '' : toSlug(b.slug);
+    if (typeof b.slug !== 'string' && b.slug !== undefined && b.slug !== null) return { error: 'slug must be a string' };
+    return { data };
+}
+
 app.get('/api/posts', (req, res) => {
     try {
-        const { published } = req.query;
-        let rows;
-        if (published === '1') {
-            rows = db.prepare('SELECT * FROM posts WHERE is_published = 1 ORDER BY published_at DESC').all();
-        } else {
-            rows = db.prepare('SELECT * FROM posts ORDER BY created_at DESC').all();
-        }
+        // Qoralamalar faqat yaroqli admin tokeni bilan ko'rinadi (admin panel shu endpointdan foydalanadi)
+        const includeDrafts = isAdminRequest(req) && req.query.published !== '1';
+        const rows = includeDrafts
+            ? db.prepare('SELECT * FROM posts ORDER BY created_at DESC').all()
+            : db.prepare('SELECT * FROM posts WHERE is_published = 1 ORDER BY published_at DESC').all();
         res.json(rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'posts list');
     }
 });
 
 app.get('/api/posts/:slug', (req, res) => {
+    const { slug } = req.params;
+    if (!POST_SLUG_RE.test(slug)) return res.status(400).json({ error: 'Invalid slug' });
     try {
-        const post = db.prepare('SELECT * FROM posts WHERE slug = ?').get(req.params.slug);
-        if (!post) return res.status(404).json({ error: 'Post not found' });
+        const post = db.prepare('SELECT * FROM posts WHERE slug = ?').get(slug);
+        // Nashr qilinmagan post oddiy tashrifchiga mavjud emas (404), admin ko'ra oladi
+        if (!post || (!post.is_published && !isAdminRequest(req))) return res.status(404).json({ error: 'Post not found' });
         res.json(post);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'posts get');
     }
 });
 
+const POST_COLUMNS = 'title_uz, title_ru, title_en, slug, content_uz, content_ru, content_en, excerpt_uz, excerpt_ru, excerpt_en, cover_image, category, is_published, published_at';
+const isUniqueViolation = (err) => err && typeof err.code === 'string' && err.code.startsWith('SQLITE_CONSTRAINT');
+
 app.post('/api/posts', authenticateToken, (req, res) => {
+    const { data, error } = parsePostBody(req.body);
+    if (error) return res.status(400).json({ error });
+    const slug = data.slug || toSlug(data.title_uz) || `post-${Date.now()}`;
     try {
-        const b = req.body;
-        const slug = b.slug || b.title_uz.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        const info = db.prepare('INSERT INTO posts (title_uz, title_ru, title_en, slug, content_uz, content_ru, content_en, excerpt_uz, excerpt_ru, excerpt_en, cover_image, category, is_published, published_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(b.title_uz||'', b.title_ru||'', b.title_en||'', slug, b.content_uz||'', b.content_ru||'', b.content_en||'', b.excerpt_uz||'', b.excerpt_ru||'', b.excerpt_en||'', b.cover_image||'', b.category||'general', b.is_published?1:0, b.is_published ? new Date().toISOString() : null);
+        if (db.prepare('SELECT 1 FROM posts WHERE slug = ?').get(slug)) {
+            return res.status(409).json({ error: 'Slug already exists' });
+        }
+        const info = db.prepare(`INSERT INTO posts (${POST_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+            data.title_uz, data.title_ru, data.title_en, slug,
+            data.content_uz, data.content_ru, data.content_en,
+            data.excerpt_uz, data.excerpt_ru, data.excerpt_en,
+            data.cover_image, data.category, data.is_published,
+            data.is_published ? new Date().toISOString() : null
+        );
         const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(info.lastInsertRowid);
         res.json(post);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        if (isUniqueViolation(err)) return res.status(409).json({ error: 'Slug already exists' });
+        serverError(res, err, 'posts create');
     }
 });
 
 app.put('/api/posts/:id', authenticateToken, (req, res) => {
+    const id = parsePostId(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid post id' });
+    const { data, error } = parsePostBody(req.body);
+    if (error) return res.status(400).json({ error });
     try {
-        const b = req.body;
-        const existing = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
-        const publishedAt = b.is_published && !existing.is_published ? new Date().toISOString() : existing.published_at;
-        db.prepare('UPDATE posts SET title_uz=?, title_ru=?, title_en=?, slug=?, content_uz=?, content_ru=?, content_en=?, excerpt_uz=?, excerpt_ru=?, excerpt_en=?, cover_image=?, category=?, is_published=?, published_at=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(b.title_uz||'', b.title_ru||'', b.title_en||'', b.slug||existing.slug, b.content_uz||'', b.content_ru||'', b.content_en||'', b.excerpt_uz||'', b.excerpt_ru||'', b.excerpt_en||'', b.cover_image||'', b.category||'general', b.is_published?1:0, publishedAt, req.params.id);
-        const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
+        const existing = db.prepare('SELECT * FROM posts WHERE id = ?').get(id);
+        if (!existing) return res.status(404).json({ error: 'Post not found' });
+        const slug = data.slug || existing.slug;
+        if (db.prepare('SELECT 1 FROM posts WHERE slug = ? AND id != ?').get(slug, id)) {
+            return res.status(409).json({ error: 'Slug already exists' });
+        }
+        const publishedAt = data.is_published && !existing.is_published ? new Date().toISOString() : existing.published_at;
+        db.prepare('UPDATE posts SET title_uz=?, title_ru=?, title_en=?, slug=?, content_uz=?, content_ru=?, content_en=?, excerpt_uz=?, excerpt_ru=?, excerpt_en=?, cover_image=?, category=?, is_published=?, published_at=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(
+            data.title_uz, data.title_ru, data.title_en, slug,
+            data.content_uz, data.content_ru, data.content_en,
+            data.excerpt_uz, data.excerpt_ru, data.excerpt_en,
+            data.cover_image, data.category, data.is_published, publishedAt, id
+        );
+        const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id);
         res.json(post);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        if (isUniqueViolation(err)) return res.status(409).json({ error: 'Slug already exists' });
+        serverError(res, err, 'posts update');
     }
 });
 
 app.delete('/api/posts/:id', authenticateToken, (req, res) => {
+    const id = parsePostId(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid post id' });
     try {
-        const result = db.prepare('DELETE FROM posts WHERE id = ?').run(req.params.id);
+        const result = db.prepare('DELETE FROM posts WHERE id = ?').run(id);
         if (result.changes === 0) return res.status(404).json({ error: 'Post not found' });
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'posts delete');
     }
 });
 
 // --- CHANGE PASSWORD ---
-app.post('/api/admin/change-password', authenticateToken, async (req, res) => {
+app.post('/api/admin/change-password', authenticateToken, passwordLimiter, async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
-        if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Both passwords required' });
-        if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-        const user = db.prepare('SELECT * FROM admin_users WHERE id = 1').get();
+        if (!currentPassword || !newPassword || typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+            return res.status(400).json({ error: 'Both passwords required' });
+        }
+        if (newPassword.length < 10) return res.status(400).json({ error: 'Password must be at least 10 characters' });
+        if (newPassword.length > 128) return res.status(400).json({ error: 'Password is too long (max 128 characters)' });
+        // Token egasining o'z yozuvi (avval doim id = 1 o'zgarardi)
+        const user = db.prepare('SELECT * FROM admin_users WHERE id = ?').get(req.user.id);
         if (!user) return res.status(404).json({ error: 'Admin user not found' });
         const valid = await bcrypt.compare(currentPassword, user.password_hash);
         if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
         const hash = await bcrypt.hash(newPassword, 10);
-        db.prepare('UPDATE admin_users SET password_hash = ? WHERE id = 1').run(hash);
+        db.prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?').run(hash, user.id);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'change-password');
     }
 });
 
@@ -558,14 +802,44 @@ app.get('/api/admin/backup', authenticateToken, (req, res) => {
         tables.forEach(t => {
             backup[t] = db.prepare(`SELECT * FROM ${t}`).all();
         });
+        res.set('Cache-Control', 'no-store'); // mijoz telefonlari bor — brauzer/proksi keshlamasin
         res.json(backup);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        serverError(res, err, 'backup');
     }
 });
 
 // API Endpoints for Data Ta'lim Store
 const KEYS = ['courses', 'team', 'site_content', 'visibility'];
+const ARRAY_KEYS = ['courses', 'team'];
+
+// Ochiq GET base64 (data:image) va picsum rasmlarini '' ga almashtirib beradi (tezlik uchun).
+// Admin shu javobni o'zgartirib qayta PUT qilganda bo'sh qiymat bazadagi asl rasmni o'chirib yubormasligi uchun,
+// PUT paytida shunday bo'sh qiymatlar bazadagi saqlangan qiymat bilan qayta to'ldiriladi.
+const isStrippable = (v) => typeof v === 'string' && (v.startsWith('data:image') || v.includes('picsum.photos'));
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+function restoreStripped(incoming, stored) {
+    if (Array.isArray(incoming) && Array.isArray(stored)) {
+        // id'si bor obyektlar id bo'yicha, qolganlari tartib raqami bo'yicha solishtiriladi
+        const byId = new Map();
+        for (const o of stored) if (isPlainObject(o) && o.id !== undefined) byId.set(o.id, o);
+        incoming.forEach((item, i) => {
+            if (typeof item === 'string') {
+                if (item === '' && isStrippable(stored[i])) incoming[i] = stored[i];
+            } else if (item && typeof item === 'object') {
+                const counterpart = isPlainObject(item) && item.id !== undefined ? byId.get(item.id) : stored[i];
+                if (counterpart && typeof counterpart === 'object') restoreStripped(item, counterpart);
+            }
+        });
+    } else if (isPlainObject(incoming) && isPlainObject(stored)) {
+        for (const k of Object.keys(incoming)) {
+            const v = incoming[k];
+            if (v === '' && isStrippable(stored[k])) incoming[k] = stored[k];
+            else if (v && typeof v === 'object' && stored[k] && typeof stored[k] === 'object') restoreStripped(v, stored[k]);
+        }
+    }
+}
 
 // GET data by key
 app.get('/api/:key', (req, res) => {
@@ -585,7 +859,7 @@ app.get('/api/:key', (req, res) => {
                     obj.forEach(cleanObj);
                 } else if (typeof obj === 'object' && obj !== null) {
                     for (const k in obj) {
-                        if (typeof obj[k] === 'string' && (obj[k].startsWith('data:image') || obj[k].includes('picsum.photos'))) {
+                        if (isStrippable(obj[k])) {
                             obj[k] = '';
                         } else if (typeof obj[k] === 'object' && obj[k] !== null) {
                             cleanObj(obj[k]);
@@ -600,6 +874,7 @@ app.get('/api/:key', (req, res) => {
             res.json(null);
         }
     } catch (err) {
+        console.error('[API xato] GET', key, err);
         res.status(500).json({ error: 'Database error' });
     }
 });
@@ -611,16 +886,30 @@ app.put('/api/:key', authenticateToken, (req, res) => {
         return res.status(400).json({ error: 'Invalid key' });
     }
 
+    const body = req.body;
+    if (ARRAY_KEYS.includes(key) ? !Array.isArray(body) : !isPlainObject(body)) {
+        return res.status(400).json({ error: ARRAY_KEYS.includes(key) ? 'Expected a JSON array' : 'Expected a JSON object' });
+    }
+
     try {
-        const value = JSON.stringify(req.body);
+        const row = db.prepare('SELECT value FROM app_data WHERE key = ?').get(key);
+        if (row && row.value) {
+            try {
+                restoreStripped(body, JSON.parse(row.value));
+            } catch (e) {
+                console.error('[API] saqlangan qiymatni tiklashda xato (', key, '):', e.message);
+            }
+        }
+        const value = JSON.stringify(body);
         const stmt = db.prepare(`
-      INSERT INTO app_data (key, value, updated_at) 
+      INSERT INTO app_data (key, value, updated_at)
       VALUES (?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
     `);
         stmt.run(key, value);
         res.json({ success: true, message: `${key} updated successfully` });
     } catch (err) {
+        console.error('[API xato] PUT', key, err);
         res.status(500).json({ error: 'Database error' });
     }
 });
@@ -634,40 +923,77 @@ app.post('/api/upload', authenticateToken, upload.single('image'), async (req, r
     const originalPath = req.file.path;
     const originalSize = req.file.size;
     const baseName = req.file.filename.replace(/\.[^.]+$/, '');
-    const webpName = baseName + '.webp';
+    // Asl fayl ham .webp bo'lsa, sharp o'sha faylning o'ziga yozolmaydi — boshqa nom beramiz
+    const webpName = req.file.filename.endsWith('.webp') ? baseName + '-c.webp' : baseName + '.webp';
     const webpPath = path.join(uploadDir, webpName);
+    const removeQuietly = (p) => fs.promises.unlink(p).catch(() => { });
 
     try {
         // Dynamically import sharp (ESM compatible)
         const { default: sharp } = await import('sharp');
 
-        await sharp(originalPath)
+        // Faylni buferga o'qib beramiz (<= 8 MB): Windows'da libvips faylni band qilib qo'yib, o'chirishga xalaqit bermasligi uchun
+        await sharp(await fs.promises.readFile(originalPath))
             .resize({ width: 1920, withoutEnlargement: true })
             .webp({ quality: 85 })
             .toFile(webpPath);
 
         // Remove original file
-        fs.unlinkSync(originalPath);
+        await removeQuietly(originalPath);
 
-        const webpSize = fs.statSync(webpPath).size;
+        const webpSize = (await fs.promises.stat(webpPath)).size;
         const imageUrl = `/uploads/${webpName}`;
         res.json({ url: imageUrl, originalSize, webpSize });
     } catch (err) {
-        // Fallback: keep original if sharp fails
-        console.error('WebP konvertatsiya xatosi (fallback):', err);
-        const imageUrl = `/uploads/${req.file.filename}`;
-        res.json({ url: imageUrl, originalSize, webpSize: originalSize });
+        // Rasm sifatida o'qilmadi: xom faylni (va yarim yozilgan webp'ni) saqlamaymiz
+        console.error('Rasm qayta ishlash (sharp) xatosi:', err.message);
+        await removeQuietly(originalPath);
+        await removeQuietly(webpPath);
+        res.status(400).json({ error: 'Invalid or unsupported image file' });
     }
 });
 
 // --- TELEGRAM NOTIFICATION API (server-side only, token not exposed to frontend) ---
-app.post('/api/notify-telegram', leadsLimiter, async (req, res) => {
-    const message = sanitize(req.body.message);
-    if (!message) return res.status(400).json({ error: 'Message is required' });
+const TELEGRAM_MAX_RAW = 2500;
+const TELEGRAM_HOURLY_CAP = 300; // butun sayt bo'yicha soatiga (spam bo'lsa ham chat to'lib ketmasin)
+const TELEGRAM_RESPONSE_DEADLINE_MS = 7000;
+let telegramWindowStart = Date.now();
+let telegramWindowCount = 0;
+
+// So'rov saytning o'z sahifasidan (yoki dev'da localhost'dan) kelganini Origin/Referer bo'yicha tekshiradi.
+// Brauzerdagi begona saytlardan foydalanishni to'sadi; curl kabi vositalar bu headerni soxtalashtirishi mumkin,
+// shuning uchun haqiqiy himoya — notifyLimiter va soatlik umumiy chegara.
+const isSameSiteRequest = (req) => {
+    const source = req.headers.origin || req.headers.referer;
+    if (!source) return false;
+    try {
+        return isAllowedOrigin(new URL(source).origin, req);
+    } catch {
+        return false;
+    }
+};
+
+app.post('/api/notify-telegram', leadsLimiter, notifyLimiter, async (req, res) => {
+    if (!isSameSiteRequest(req)) return res.status(403).json({ error: 'Forbidden' });
+
+    if (typeof req.body.message !== 'string') return res.status(400).json({ error: 'Message is required' });
+    // eslint-disable-next-line no-control-regex
+    const raw = req.body.message.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, TELEGRAM_MAX_RAW);
+    if (!raw) return res.status(400).json({ error: 'Message is required' });
 
     if (!TG_BOT_TOKEN || !TG_CHAT_ID) {
         console.warn('Telegram sozlanmagan. Xabar yuborilmadi.');
         return res.json({ success: true, skipped: true });
+    }
+
+    const now = Date.now();
+    if (now - telegramWindowStart > 60 * 60 * 1000) {
+        telegramWindowStart = now;
+        telegramWindowCount = 0;
+    }
+    if (++telegramWindowCount > TELEGRAM_HOURLY_CAP) {
+        console.warn('Telegram soatlik chegarasi oshdi — xabar yuborilmadi.');
+        return res.status(429).json({ success: false, error: 'Too many requests' });
     }
 
     // Round-robin manager assignment
@@ -679,12 +1005,61 @@ app.post('/api/notify-telegram', leadsLimiter, async (req, res) => {
         console.error('Manager assignment error:', e);
     }
 
-    const finalMessage = `${message}\n\n👥 <b>Biriktirildi:</b> ${assignedManager}`;
-    const result = await sendTelegramMessage(finalMessage);
-    res.json(result);
+    const finalMessage = `${toTelegramHtml(raw)}\n\n👥 <b>Biriktirildi:</b> ${assignedManager}`;
+    if (finalMessage.length > 4096) return res.status(400).json({ error: 'Message is too long' });
+
+    // Telegram sekin/ishlamasa ham HTTP javobni TELEGRAM_RESPONSE_DEADLINE_MS dan ortiq kutdirmaymiz
+    // (yuborish fonda davom etadi; frontend uchun Telegram faqat qo'shimcha bildirishnoma kanali).
+    const sendPromise = sendTelegramMessage(finalMessage)
+        .then((r) => {
+            if (!r.success) console.error('Telegram xabari yuborilmadi:', r.error);
+            return r;
+        })
+        .catch((err) => {
+            console.error('Telegram yuborish xatosi:', err);
+            return { success: false, error: 'Telegram xatosi' };
+        });
+    let deadline;
+    const timeout = new Promise((resolve) => {
+        deadline = setTimeout(() => resolve({ success: false, error: 'Telegram javobi kechikdi' }), TELEGRAM_RESPONSE_DEADLINE_MS);
+    });
+    const result = await Promise.race([sendPromise, timeout]);
+    clearTimeout(deadline);
+    res.json(result.success ? { success: true } : { success: false, error: 'Telegram xabari yuborilmadi' });
+});
+
+// Noma'lum /api yo'llari uchun JSON 404
+app.use('/api', (req, res) => {
+    res.status(404).json({ error: 'Not found' });
+});
+
+// Yagona xato handler: ichki tafsilotlar mijozga chiqmaydi, serverda loglanadi
+app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    if (err instanceof multer.MulterError) {
+        const tooBig = err.code === 'LIMIT_FILE_SIZE';
+        return res.status(tooBig ? 413 : 400).json({ error: tooBig ? `Fayl hajmi ${UPLOAD_MAX_BYTES / 1024 / 1024} MB dan oshmasin` : 'Invalid upload' });
+    }
+    if (err.status === 415 && err.expose) return res.status(415).json({ error: err.message });
+    if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Request body too large' });
+    if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON body' });
+    console.error('[API xato]', req.method, req.originalUrl, err);
+    res.status(500).json({ error: 'Internal server error' });
 });
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`✅ Backend server running at http://localhost:${PORT}`);
 });
+
+// Graceful shutdown (pm2 restart / SIGTERM): yangi so'rovlarni to'xtatib, bazani yopamiz
+const shutdown = (signal) => {
+    console.log(`${signal} qabul qilindi, server to'xtatilmoqda...`);
+    server.close(() => {
+        try { db.close(); } catch { /* ignore */ }
+        process.exit(0);
+    });
+    setTimeout(() => process.exit(0), 5000).unref();
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
