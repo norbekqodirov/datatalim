@@ -1,38 +1,40 @@
 import React from 'react';
 import { useStore } from '../store/useStore';
-import { Hero } from '../components/home/Hero';
-import { About } from '../components/home/About';
-import { TourVideo } from '../components/home/TourVideo';
-import { Courses } from '../components/home/Courses';
-import { Testimonials } from '../components/home/Testimonials';
-import { Facilities } from '../components/home/Facilities';
-import { CareerTestSection } from '../components/home/CareerTestSection';
-import { Team } from '../components/home/Team';
-import { FAQ } from '../components/home/FAQ';
-import { Gallery } from '../components/home/Gallery';
-import { Contact } from '../components/home/Contact';
 import { SEO } from '../components/SEO';
+import { HeroSignal } from '../components/v2/HeroSignal';
+import { Manifesto, Numbers } from '../components/v2/Manifesto';
+import { Directions } from '../components/v2/Directions';
+import { CareerLab } from '../components/v2/CareerLab';
+import { Campus } from '../components/v2/Campus';
+import { Voices, TeamStrip } from '../components/v2/People';
+import { FaqV2, ContactV2 } from '../components/v2/Closing';
+import '../components/v2/v2.css';
 
+// v2 landing ("DATA · Signal"). The previous homepage lives on in pages/HomeClassic.tsx
+// (route /eski-dizayn) so both can be compared. Admin visibility toggles still apply.
 export default function Home() {
-  const { visibility } = useStore();
+  const { visibility: v } = useStore();
 
   return (
-    <>
+    <div className="v2">
       <SEO
-        title="Bosh Sahifa"
-        description="DATA Ta'lim Stansiyasi - zamonaviy kasblarni biz bilan o'rganing. Dasturlash, dizayn, va moliya bepul ta'lim grantlari mavjud."
+        title="Bosh sahifa"
+        description="DATA Taʼlim Stansiyasi — Urganchdagi dasturlash, sunʼiy intellekt, media, dizayn va moliya boʻyicha zamonaviy oʻquv markazi. Bepul karyera testi va konsultatsiya."
       />
-      {visibility.hero && <Hero />}
-      {visibility.about && <About />}
-      {visibility.tourVideo && <TourVideo />}
-      {visibility.courses && <Courses />}
-      {visibility.testimonials && <Testimonials />}
-      {visibility.careerTest && <CareerTestSection />}
-      {visibility.facilities && <Facilities />}
-      {visibility.team && <Team />}
-      {visibility.faq && <FAQ />}
-      {visibility.gallery && <Gallery />}
-      {visibility.contact && <Contact />}
-    </>
+      {v.hero && <HeroSignal />}
+      {v.about && (
+        <>
+          <Manifesto />
+          <Numbers />
+        </>
+      )}
+      {v.courses && <Directions />}
+      {v.careerTest && <CareerLab />}
+      {(v.facilities || v.tourVideo) && <Campus />}
+      {v.testimonials && <Voices />}
+      {v.team && <TeamStrip />}
+      {v.faq && <FaqV2 />}
+      {v.contact && <ContactV2 />}
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { initPixel, trackEvent } from './utils/pixel';
 import { trackSiteEventOncePerSession } from './utils/analytics';
 const Home = lazy(() => import('./pages/Home'));
+const HomeClassic = lazy(() => import('./pages/HomeClassic'));
 const CareerTest = lazy(() => import('./pages/CareerTest'));
 const Courses = lazy(() => import('./pages/Courses'));
 const CourseDetail = lazy(() => import('./pages/CourseDetail'));
@@ -16,8 +17,9 @@ const Blog = lazy(() => import('./pages/Blog'));
 const BlogPost = lazy(() => import('./pages/BlogPost'));
 
 // Layout
-import { Navbar } from './components/layout/Navbar';
-import { Footer } from './components/layout/Footer';
+// v2 chrome (previous versions remain in components/layout/ for rollback)
+import { NavbarV2 as Navbar } from './components/v2/NavbarV2';
+import { FooterV2 as Footer } from './components/v2/FooterV2';
 import { useTheme } from './store/ThemeContext';
 import { useStore } from './store/useStore';
 import { useTracking } from './hooks/useTracking';
@@ -84,7 +86,7 @@ const PublicLayout = () => {
       }}
     >
       <Navbar />
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <ErrorBoundary>
           <Outlet />
         </ErrorBoundary>
@@ -135,6 +137,8 @@ function App() {
             {/* Public Routes — Navbar/Footer persist */}
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Home />} />
+              {/* Previous homepage, kept for side-by-side comparison with the v2 redesign */}
+              <Route path="/eski-dizayn" element={<HomeClassic />} />
               <Route path="/biz-haqimizda" element={<About />} />
               <Route path="/jamoa" element={<Team />} />
               <Route path="/kurslar" element={<Courses />} />
