@@ -1,10 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
-import type { ComponentType, CSSProperties, ChangeEvent } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
+import type { ComponentType, CSSProperties, ChangeEvent, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer,
-} from 'recharts';
+import toast from 'react-hot-toast';
 import {
   ArrowLeft, ChevronRight, RotateCcw, BookOpen, Award, Target, TrendingUp,
   CheckCircle, Star, Download, Loader2, Wrench, FlaskConical, Palette, Heart,
@@ -13,14 +11,15 @@ import {
   Hammer, Lightbulb, Brush, Megaphone, Calculator, Trees, Music, Microscope,
   Handshake, FileText, Cog, Telescope, Building2, PenTool, Database, Atom,
   Receipt, HandHeart, Library, Camera, LineChart, ClipboardCheck, User, Gauge,
-  Scale, Ruler, Layers, Phone,
+  Scale, Ruler, Layers, Phone, ArrowRight, Share2,
 } from 'lucide-react';
-import { useTheme } from '../store/ThemeContext';
-import { PatternBg, FloatingStars } from '../components/BrandElements';
 import { SEO } from '../components/SEO';
 import { EnrollModal } from '../components/EnrollModal';
 import { trackSiteEvent } from '../utils/analytics';
 import { submitLeadToAPI, submitCareerTestResult } from '../utils/api';
+import { uz, useMotionReduced } from '../components/v2/utils';
+import { useStore } from '../store/useStore';
+import '../components/v2/v2.css';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type RiasecType = 'R' | 'I' | 'A' | 'S' | 'E' | 'C';
@@ -433,58 +432,247 @@ function topStrengthsOf(s2Answers: Record<number, number>) {
 const diffLabel = (d: number) => d >= 25 ? 'Yuqori' : d >= 15 ? "O'rtacha" : 'Past';
 const consLabel = (d: number) => d === 1 ? 'Yuqori' : d === 2 ? "O'rtacha" : 'Past';
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function StageProgress({ stage, current, total, isDark }: { stage: Stage; current: number; total: number; isDark: boolean }) {
-  const pct = Math.round((current / total) * 100);
-  const stageLabels = ['Majburiy Tanlov', 'Baholash', 'Vaziyatli Qaror'];
-  return (
-    <div className="mb-8">
-      <div className="flex items-center gap-2 mb-3">
-        {[1, 2, 3].map(s => (
-          <div key={s} className="flex-1 flex items-center gap-2">
-            <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0' }}>
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: '#0061ff' }}
-                initial={{ width: 0 }}
-                animate={{ width: s < stage ? '100%' : s === stage ? `${pct}%` : '0%' }}
-                transition={{ duration: 0.4, ease: 'easeOut' }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="flex items-center justify-between">
-        <span className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-          Bosqich {stage} / 3 · {stageLabels[stage - 1]}
-        </span>
-        <span className="text-xs font-black" style={{ color: '#0061ff' }}>Savol {current} / {total}</span>
-      </div>
-    </div>
-  );
+// ─── UI (v2 dizayn tizimi) ───────────────────────────────────────────────────
+type S1Answers = Record<number, 'a' | 'b'>;
+type S3Answers = Record<number, 'A' | 'B' | 'C' | 'D'>;
+
+interface Outcome {
+  pcts: Record<RiasecType, number>;
+  results: CourseResult[];
+  quality: QualityMetrics;
 }
 
-function CircularProgress({ pct, color, size = 72 }: { pct: number; color: string; size?: number }) {
-  const r = (size - 10) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (pct / 100) * circ;
+const STAGE_LABELS = ['Majburiy tanlov', 'Oʻzini baholash', 'Vaziyatli qaror'];
+const LIKERT_HINTS = ['Umuman yoʻq', 'Koʻproq yoʻq', 'Betaraf', 'Koʻproq ha', 'Toʻliq qoʻshilaman'];
+const CALC_STEPS = [
+  'Javoblar normallashtirilmoqda',
+  '15 ta tip juftligi taqqoslanmoqda',
+  'Holland kodi aniqlanmoqda',
+  'Kurslar bilan solishtirilmoqda',
+];
+const CALC_MS = 2600;
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+
+function parseAge(age: string): number | null {
+  const n = parseInt(age, 10);
+  return age.trim() !== '' && Number.isFinite(n) && n >= 10 && n <= 90 ? n : null;
+}
+
+function buildOutcome(s1: S1Answers, s2: Record<number, number>, s3: S3Answers, age: string): Outcome {
+  const pcts = computePercentages(s1, s2, s3);
+  return { pcts, results: matchCourses(pcts, parseAge(age)), quality: computeQuality(pcts, s2) };
+}
+
+// ─── Jarayonni saqlash: sahifa yangilansa ham javoblar yo'qolmaydi ───────────
+// sessionStorage — faqat shu brauzer oynasida, oyna yopilganda o'chadi.
+const STORE_KEY = 'data-career-test-v2';
+
+interface SavedProgress {
+  v: 1;
+  view: View;
+  stage: Stage;
+  currentQ: number;
+  s2Page: number;
+  s1: S1Answers;
+  s2: Record<number, number>;
+  s3: S3Answers;
+  fcSwap: boolean[];
+  mcOrder: number[][];
+  name: string;
+  phone: string;
+  age: string;
+  gender: Gender;
+  submitted: boolean;
+}
+
+const isPerm4 = (a: unknown) => Array.isArray(a) && a.length === 4 && [0, 1, 2, 3].every(i => a.includes(i));
+
+function loadProgress(): SavedProgress | null {
+  try {
+    const raw = sessionStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as SavedProgress;
+    const valid = d && d.v === 1
+      && ['test', 'calculating', 'result'].includes(d.view)
+      && [1, 2, 3].includes(d.stage)
+      && Array.isArray(d.fcSwap) && d.fcSwap.length === FORCED_CHOICE.length
+      && Array.isArray(d.mcOrder) && d.mcOrder.length === MULTI_CHOICE.length && d.mcOrder.every(isPerm4)
+      && typeof d.name === 'string' && typeof d.phone === 'string' && typeof d.age === 'string';
+    if (!valid) return null;
+    d.s1 = d.s1 || {}; d.s2 = d.s2 || {}; d.s3 = d.s3 || {};
+    const stageLen = d.stage === 1 ? FORCED_CHOICE.length : MULTI_CHOICE.length;
+    d.currentQ = Math.max(0, Math.min(Number(d.currentQ) || 0, stageLen - 1));
+    d.s2Page = Math.max(0, Math.min(Number(d.s2Page) || 0, S2_PAGES - 1));
+    if (d.view !== 'test') {
+      // natija faqat barcha savollarga javob bo'lsa tiklanadi
+      const complete = FORCED_CHOICE.every(q => d.s1[q.id])
+        && LIKERT.every(q => d.s2[q.id])
+        && MULTI_CHOICE.every(q => d.s3[q.id]);
+      if (!complete) return null;
+      d.view = 'result';
+    }
+    return d;
+  } catch {
+    return null;
+  }
+}
+
+function saveProgress(d: SavedProgress | null) {
+  try {
+    if (d) sessionStorage.setItem(STORE_KEY, JSON.stringify(d));
+    else sessionStorage.removeItem(STORE_KEY);
+  } catch {
+    /* private rejim yoki to'lgan xotira — test baribir ishlayveradi */
+  }
+}
+
+// ─── Holland olti burchagi (SVG, kutubxonasiz) ───────────────────────────────
+function HexChart({ pcts, reduced, size = 460 }: { pcts: Record<RiasecType, number>; reduced: boolean; size?: number }) {
+  const gid = useId().replace(/:/g, '');
+  const C = size / 2;
+  const R = size * 0.3;
+  const top = Math.max(...HEX_ORDER.map(t => pcts[t]));
+  const domain = Math.max(30, Math.ceil(top / 10) * 10);
+  const pt = (i: number, r: number) => {
+    const a = -Math.PI / 2 + (i * Math.PI) / 3;
+    return [C + Math.cos(a) * r, C + Math.sin(a) * r] as const;
+  };
+  const poly = (radius: (i: number) => number) =>
+    HEX_ORDER.map((_, i) => pt(i, radius(i)).map(n => n.toFixed(1)).join(',')).join(' ');
+  const rOf = (t: RiasecType) => R * Math.min(1, pcts[t] / domain);
+  const shape = poly(i => rOf(HEX_ORDER[i]));
+  const code = getHollandCode(pcts);
+  const transition = { duration: reduced ? 0 : 1.2, ease: EASE_OUT, delay: reduced ? 0 : 0.15 };
+
   return (
-    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={8} />
-      <motion.circle
-        cx={size/2} cy={size/2} r={r} fill="none"
-        stroke={color} strokeWidth={8}
-        strokeDasharray={circ}
-        initial={{ strokeDashoffset: circ }}
-        animate={{ strokeDashoffset: offset }}
-        transition={{ duration: 1.2, ease: 'easeOut' }}
-        strokeLinecap="round"
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      className="w-full h-auto overflow-visible"
+      role="img"
+      aria-label={`RIASEC profili: ${HEX_ORDER.map(t => `${RIASEC_INFO[t].short} ${pcts[t]}%`).join(', ')}`}
+    >
+      <defs>
+        <linearGradient id={`${gid}-fill`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#0061ff" stopOpacity="0.6" />
+          <stop offset="100%" stopColor="#60efff" stopOpacity="0.22" />
+        </linearGradient>
+      </defs>
+      {[0.25, 0.5, 0.75, 1].map(f => (
+        <polygon key={f} points={poly(() => R * f)} fill="none" stroke="var(--line-2)" strokeWidth={1} />
+      ))}
+      {HEX_ORDER.map((t, i) => {
+        const [x, y] = pt(i, R);
+        return <line key={t} x1={C} y1={C} x2={x} y2={y} stroke="var(--line)" />;
+      })}
+      <motion.polygon
+        initial={reduced ? false : { points: poly(() => 0.5), opacity: 0 }}
+        animate={{ points: shape, opacity: 1 }}
+        transition={transition}
+        fill={`url(#${gid}-fill)`}
+        stroke="#60efff"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
       />
+      {HEX_ORDER.map((t, i) => {
+        const [x, y] = pt(i, rOf(t));
+        const lead = code.includes(t);
+        return (
+          <motion.circle
+            key={t}
+            initial={reduced ? false : { cx: C, cy: C }}
+            animate={{ cx: x, cy: y }}
+            transition={transition}
+            r={lead ? 5.5 : 3.5}
+            fill={lead ? RIASEC_INFO[t].color : 'var(--bg)'}
+            stroke={lead ? 'var(--bg)' : '#60efff'}
+            strokeWidth={1.5}
+          />
+        );
+      })}
+      {HEX_ORDER.map((t, i) => {
+        const [lx, ly] = pt(i, R + 44);
+        const lead = code.includes(t);
+        return (
+          <g key={t}>
+            <text x={lx} y={ly - 7} textAnchor="middle" fontSize="19" className="mono" fill={lead ? 'var(--fg)' : 'var(--fg-3)'} style={{ fontWeight: 500 }}>
+              {t}
+            </text>
+            <text x={lx} y={ly + 14} textAnchor="middle" fontSize="14.5" fill={lead ? 'var(--fg-2)' : 'var(--fg-3)'}>
+              {RIASEC_INFO[t].short} · {pcts[t]}%
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }
 
-// ─── PDF: jsPDF bilan vektor chizma (sahifa skrinshoti emas) ────────────────
+/** Kirish sahifasi orqasidagi sekin aylanuvchi olti burchak to'ri */
+function HexBackdrop({ reduced }: { reduced: boolean }) {
+  const S = 600, C = S / 2;
+  const ring = (r: number) =>
+    Array.from({ length: 6 }, (_, i) => {
+      const a = -Math.PI / 2 + (i * Math.PI) / 3;
+      return `${(C + Math.cos(a) * r).toFixed(1)},${(C + Math.sin(a) * r).toFixed(1)}`;
+    }).join(' ');
+  return (
+    <motion.svg
+      viewBox={`0 0 ${S} ${S}`}
+      aria-hidden="true"
+      className="pointer-events-none absolute -right-[22vw] top-[6vh] w-[min(130vw,980px)] h-auto opacity-60 lg:right-[-8vw] lg:top-[8vh] lg:w-[min(64vw,980px)]"
+      animate={reduced ? undefined : { rotate: 360 }}
+      transition={reduced ? undefined : { duration: 160, repeat: Infinity, ease: 'linear' }}
+    >
+      {[60, 120, 180, 240, 290].map((r, i) => (
+        <polygon key={r} points={ring(r)} fill="none" stroke={i === 4 ? 'rgba(0,97,255,.45)' : 'var(--line-2)'} strokeWidth={1} />
+      ))}
+      {Array.from({ length: 6 }, (_, i) => {
+        const a = -Math.PI / 2 + (i * Math.PI) / 3;
+        return <line key={i} x1={C} y1={C} x2={C + Math.cos(a) * 290} y2={C + Math.sin(a) * 290} stroke="var(--line)" />;
+      })}
+      <polygon points={ring(150)} fill="rgba(0,97,255,.10)" stroke="#60efff" strokeOpacity={0.35} />
+    </motion.svg>
+  );
+}
+
+
+// ─── PDF hisobot: jsPDF bilan vektor chizma (brend shrifti Poppins, 3 sahifa) ──
+type RGB = [number, number, number];
+const PDF_C = {
+  ink: [5, 7, 13] as RGB,
+  ink2: [74, 82, 97] as RGB,
+  ink3: [125, 134, 148] as RGB,
+  line: [228, 232, 239] as RGB,
+  soft: [243, 246, 251] as RGB,
+  blue: [0, 97, 255] as RGB,
+  cyan: [96, 239, 255] as RGB,
+  night: [5, 7, 13] as RGB,
+  nightLine: [38, 44, 58] as RGB,
+  white: [255, 255, 255] as RGB,
+};
+const PDF_FONTS = [
+  ['Poppins-Regular.ttf', 'normal'],
+  ['Poppins-Medium.ttf', 'medium'],
+  ['Poppins-SemiBold.ttf', 'semibold'],
+  ['Poppins-Bold.ttf', 'bold'],
+] as const;
+type PdfWeight = typeof PDF_FONTS[number][1];
+
+const UZ_MONTHS = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+
+function bufToBase64(buf: ArrayBuffer) {
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+const hexRgb = (hex: string): RGB => {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+};
+const mix = (a: RGB, b: RGB, t: number): RGB => [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * t)) as RGB;
+
 async function generateCareerTestPdf(params: {
   name: string;
   age: string;
@@ -494,256 +682,423 @@ async function generateCareerTestPdf(params: {
   results: CourseResult[];
   strengths: { name: string; desc: string }[];
   quality: QualityMetrics;
+  contact?: { phone?: string; address?: string };
 }) {
   const { jsPDF } = await import('jspdf');
-  const { name, age, gender, percentages, hollandCode, results, strengths, quality } = params;
+  const { name, age, gender, percentages, hollandCode, results, strengths, quality, contact } = params;
 
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const marginX = 18;
-  const contentW = pageW - marginX * 2;
-  const brand = { r: 0, g: 97, b: 255 };
-  let y = 0;
-  let pageNum = 1;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const M = 16;
+  const CW = W - M * 2;
 
-  const hexToRgb = (hex: string) => {
-    const h = hex.replace('#', '');
-    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)] as [number, number, number];
-  };
-
-  const drawFooter = () => {
-    doc.setFontSize(8.5);
-    doc.setTextColor(150, 150, 150);
-    doc.setFont('helvetica', 'normal');
-    doc.text("DATA Ta'lim Stansiyasi · Holland RIASEC Karyera Testi Hisoboti", marginX, pageH - 10);
-    doc.text(`${pageNum}-bet`, pageW - marginX, pageH - 10, { align: 'right' });
-  };
-
-  const ensureSpace = (needed: number) => {
-    if (y + needed > pageH - 18) { drawFooter(); doc.addPage(); pageNum += 1; y = 18; }
-  };
-
-  const heading = (t: string, size = 13) => {
-    ensureSpace(14);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(size); doc.setTextColor(15, 23, 42);
-    doc.text(t, marginX, y);
-    y += 2;
-    doc.setDrawColor(brand.r, brand.g, brand.b); doc.setLineWidth(0.6);
-    doc.line(marginX, y, marginX + 14, y);
-    y += 7;
-  };
-
-  const paragraph = (t: string, size = 10, color: [number, number, number] = [71, 85, 105]) => {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(size); doc.setTextColor(...color);
-    (doc.splitTextToSize(t, contentW) as string[]).forEach(line => {
-      ensureSpace(6); doc.text(line, marginX, y); y += 5.2;
+  // Brend shrifti yuklanadi; tarmoq xatosida Helvetica bilan davom etadi
+  let brandFont = true;
+  try {
+    const files = await Promise.all(PDF_FONTS.map(async ([file]) => {
+      const res = await fetch(`/fonts/pdf/${file}`);
+      if (!res.ok) throw new Error(`font ${file}: ${res.status}`);
+      return bufToBase64(await res.arrayBuffer());
+    }));
+    PDF_FONTS.forEach(([file, weight], i) => {
+      doc.addFileToVFS(file, files[i]);
+      doc.addFont(file, `Poppins-${weight}`, 'normal');
     });
+  } catch (e) {
+    console.warn('PDF: brend shrifti yuklanmadi, Helvetica ishlatiladi', e);
+    brandFont = false;
+  }
+
+  /** O'zbek apostroflari: Poppins'da ʻ yo'q, shuning uchun ‘ (U+2018) va ’ (U+2019) */
+  const tx = (s: string) => {
+    const t = s.replace(/([oOgG])['‘ʻ`]/g, '$1‘').replace(/['ʼ`]/g, '’');
+    return brandFont ? t : t.replace(/[‘’]/g, "'").replace(/[—–]/g, '-').replace(/[·•]/g, '-').replace(/…/g, '...');
   };
-
-  // ── Sarlavha ──
-  doc.setFillColor(brand.r, brand.g, brand.b);
-  doc.rect(0, 0, pageW, 28, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
-  doc.text('DATA', marginX, 13);
-  doc.setFontSize(8.5); doc.setFont('helvetica', 'normal');
-  doc.text("TA'LIM STANSIYASI", marginX, 19);
-  doc.setFontSize(9); doc.setFont('helvetica', 'bold');
-  doc.text('KARYERA TESTI HISOBOTI', pageW - marginX, 12, { align: 'right' });
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-  doc.text(new Date().toLocaleDateString('uz-UZ', { year: 'numeric', month: 'long', day: 'numeric' }), pageW - marginX, 18, { align: 'right' });
-  y = 38;
-
-  // ── Ishtirokchi ──
-  heading("Ishtirokchi Ma'lumotlari", 12);
-  const genderLabel = gender === 'male' ? 'Erkak' : gender === 'female' ? 'Ayol' : "Ko'rsatilmagan";
-  doc.setFontSize(10); doc.setTextColor(51, 65, 85); doc.setFont('helvetica', 'normal');
-  doc.text(`Ism: ${name || "Ko'rsatilmagan"}     Yosh: ${age || "Ko'rsatilmagan"}     Jins: ${genderLabel}`, marginX, y);
-  y += 10;
-
-  // ── Metodologiya ──
-  heading('Metodologiya');
-  paragraph(
-    "Hisobot Jon Holland (John L. Holland, 1997) RIASEC kasbiy qiziqishlar nazariyasiga asoslanadi. " +
-    `Test ${TOTAL_Q} ta savoldan iborat: ${FORCED_CHOICE.length} ta majburiy tanlov (barcha 15 ta tip juftligi aynan bir martadan taqqoslanadi), ` +
-    `${LIKERT.length} ta o'z-o'zini baholash (har bir tip uchun 4 tadan mustaqil savol) va ${MULTI_CHOICE.length} ta vaziyatli qaror. ` +
-    "Har uchala bosqich normallashtirilib, yakuniy ballga teng hissa qo'shadi. Variantlar tasodifiy tartibda ko'rsatiladi — " +
-    "bu javob berishdagi pozitsion moyillikning oldini oladi."
-  );
-  y += 3;
-
-  // ── Holland kodi ──
-  ensureSpace(24);
-  doc.setFillColor(240, 246, 255);
-  doc.roundedRect(marginX, y, contentW, 20, 3, 3, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(brand.r, brand.g, brand.b);
-  doc.text('SIZNING HOLLAND KODINGIZ', marginX + 6, y + 8);
-  doc.setFontSize(16);
-  doc.text(hollandCode.join(''), marginX + 6, y + 16);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(71, 85, 105);
-  doc.text(hollandCode.map(t => RIASEC_INFO[t].short).join('  >  '), marginX + 45, y + 13);
-  y += 28;
-
-  // ── Olti burchakli profil grafigi ──
-  heading('RIASEC Profil Grafigi');
-  ensureSpace(90);
-  const cx = pageW / 2, cy = y + 40, R = 32;
-  const pt = (r: number, i: number) => {
-    const ang = (-90 + i * 60) * Math.PI / 180;
-    return [cx + r * Math.cos(ang), cy + r * Math.sin(ang)] as [number, number];
+  const font = (weight: PdfWeight, size: number, color: RGB) => {
+    if (brandFont) doc.setFont(`Poppins-${weight}`, 'normal');
+    else doc.setFont('helvetica', weight === 'normal' ? 'normal' : 'bold');
+    doc.setFontSize(size);
+    doc.setTextColor(...color);
   };
-  // to'r
-  doc.setDrawColor(214, 222, 233); doc.setLineWidth(0.2);
-  [0.25, 0.5, 0.75, 1].forEach(f => {
-    for (let i = 0; i < 6; i++) {
-      const p1 = pt(R * f, i), p2 = pt(R * f, (i + 1) % 6);
-      doc.line(p1[0], p1[1], p2[0], p2[1]);
+  const text = (s: string, x: number, y: number, opts?: { align?: 'left' | 'right' | 'center'; charSpace?: number }) => {
+    doc.text(tx(s), x, y, { align: opts?.align, charSpace: opts?.charSpace });
+  };
+  const wrap = (s: string, width: number) => doc.splitTextToSize(tx(s), width) as string[];
+  const kicker = (s: string, x: number, y: number, color: RGB = PDF_C.ink3) => {
+    font('medium', 7, color);
+    text(s.toUpperCase(), x, y, { charSpace: 0.6 });
+  };
+  const opacity = (o: number) => {
+    const G = (doc as unknown as { GState: new (o: { opacity: number }) => unknown }).GState;
+    (doc as unknown as { setGState: (g: unknown) => void }).setGState(new G({ opacity: o }));
+  };
+  /** Gorizontal brend gradienti (ko'k → moviy) ingichka vektor bo'laklar bilan */
+  const gradBar = (x: number, y: number, w: number, h: number) => {
+    const n = 48;
+    for (let i = 0; i < n; i++) {
+      doc.setFillColor(...mix(PDF_C.blue, PDF_C.cyan, i / (n - 1)));
+      doc.rect(x + (w * i) / n, y, w / n + 0.35, h, 'F');
     }
-  });
-  for (let i = 0; i < 6; i++) { const p = pt(R, i); doc.line(cx, cy, p[0], p[1]); }
-  // ma'lumot ko'pburchagi (50% = to'liq radius)
-  const dataPts = HEX_ORDER.map((t, i) => pt(R * Math.min(1, percentages[t] / 50), i));
-  doc.setDrawColor(brand.r, brand.g, brand.b); doc.setLineWidth(0.9);
-  doc.setFillColor(0, 97, 255);
-  for (let i = 0; i < 6; i++) {
-    const p1 = dataPts[i], p2 = dataPts[(i + 1) % 6];
-    doc.line(p1[0], p1[1], p2[0], p2[1]);
-  }
-  dataPts.forEach(p => doc.circle(p[0], p[1], 1.1, 'F'));
-  // yorliqlar
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-  HEX_ORDER.forEach((t, i) => {
-    const p = pt(R + 8, i);
-    const [rr, gg, bb] = hexToRgb(RIASEC_INFO[t].color);
-    doc.setTextColor(rr, gg, bb);
-    doc.text(`${RIASEC_INFO[t].short} ${percentages[t]}%`, p[0], p[1], { align: 'center' });
-  });
-  y = cy + R + 18;
-
-  // ── Sifat ko'rsatkichlari ──
-  heading('Natijaning Ishonchlilik Ko\'rsatkichlari');
-  ensureSpace(30);
-  const boxW = (contentW - 8) / 3;
-  const boxes = [
-    ['Ishonchlilik', `${quality.confidence}%`],
-    ['Differensiatsiya', `${diffLabel(quality.differentiation)} (${quality.differentiation}%)`],
-    ['Izchillik', consLabel(quality.consistencyDistance)],
-  ];
-  boxes.forEach(([label, val], i) => {
-    const bx = marginX + i * (boxW + 4);
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(bx, y, boxW, 18, 2.5, 2.5, 'F');
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 116, 139);
-    doc.text(label.toUpperCase(), bx + 4, y + 6.5);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(brand.r, brand.g, brand.b);
-    doc.text(String(val), bx + 4, y + 14);
-  });
-  y += 24;
-  paragraph(
-    "Differensiatsiya — profilingizdagi eng yuqori va eng past tip orasidagi farq: yuqori bo'lsa qiziqishlaringiz aniq ajralgan. " +
-    "Izchillik — Holland olti burchagida ustuvor ikki tipingiz qanchalik yaqin joylashgani: yuqori bo'lsa ular bir-birini tabiiy to'ldiradi.",
-    8.7, [100, 116, 139]
-  );
-  y += 3;
-
-  // ── To'liq RIASEC tavsifi ──
-  heading('RIASEC Profili — Barcha Tiplar');
-  sortedTypes(percentages).forEach(t => {
-    ensureSpace(26);
-    const info = RIASEC_INFO[t];
-    const [rr, gg, bb] = hexToRgb(info.color);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(15, 23, 42);
-    doc.text(info.name, marginX, y);
-    doc.setTextColor(rr, gg, bb);
-    doc.text(`${percentages[t]}%`, marginX + contentW, y, { align: 'right' });
-    y += 3;
-    doc.setFillColor(238, 242, 247);
-    doc.roundedRect(marginX, y, contentW, 3, 1.5, 1.5, 'F');
-    doc.setFillColor(rr, gg, bb);
-    doc.roundedRect(marginX, y, Math.max(contentW * (percentages[t] / 100), 3), 3, 1.5, 1.5, 'F');
-    y += 6;
-    paragraph(info.desc, 8.7, [100, 116, 139]);
-    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(120, 130, 145);
-    ensureSpace(6);
-    doc.text(`Tipik kasblar: ${info.careers}`, marginX, y);
-    doc.setFont('helvetica', 'normal');
-    y += 8;
-  });
-
-  // ── Kuchli tomonlar ──
-  if (strengths.length > 0) {
-    heading('Kuchli Tomonlar');
-    strengths.forEach(s => {
-      ensureSpace(7);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(15, 23, 42);
-      doc.text(`•  ${s.name}`, marginX, y);
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139); doc.setFontSize(8.7);
-      doc.text(s.desc, marginX + 48, y);
-      y += 6.2;
+  };
+  /** Brend yulduzi: |x|^k + |y|^k = 1 (k<1) — saytdagi 4 qirrali yulduz */
+  const star = (cx: number, cy: number, r: number, color: RGB) => {
+    const pts: [number, number][] = [];
+    for (let i = 0; i <= 96; i++) {
+      const a = (i / 96) * Math.PI * 2;
+      const c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a));
+      const rr = r / Math.pow(Math.pow(c, 0.62) + Math.pow(s, 0.62), 1 / 0.62);
+      pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]);
+    }
+    polygon(pts, 'F', color);
+  };
+  const polygon = (pts: [number, number][], style: 'F' | 'S' | 'FD', fill?: RGB, stroke?: RGB) => {
+    if (fill) doc.setFillColor(...fill);
+    if (stroke) doc.setDrawColor(...stroke);
+    const segs = pts.slice(1).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]);
+    doc.lines(segs, pts[0][0], pts[0][1], [1, 1], style, true);
+  };
+  const hexPts = (cx: number, cy: number, radius: (i: number) => number): [number, number][] =>
+    HEX_ORDER.map((_, i) => {
+      const a = -Math.PI / 2 + (i * Math.PI) / 3;
+      const r = radius(i);
+      return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
     });
-    y += 3;
-  }
+  const domain = Math.max(30, Math.ceil(Math.max(...HEX_ORDER.map(t => percentages[t])) / 10) * 10);
+  const profileR = (R: number) => (i: number) => R * Math.min(1, percentages[HEX_ORDER[i]] / domain);
+  const pageHeader = (title: string) => {
+    star(M + 2.2, 15.2, 2.6, PDF_C.blue);
+    font('bold', 9.5, PDF_C.ink);
+    text('DATA', M + 6.5, 16.6);
+    font('normal', 7.5, PDF_C.ink3);
+    text(title, W - M, 16.6, { align: 'right' });
+    doc.setDrawColor(...PDF_C.line); doc.setLineWidth(0.25);
+    doc.line(M, 21, W - M, 21);
+  };
+  const sectionTitle = (num: string, title: string, y: number) => {
+    font('medium', 8, PDF_C.blue);
+    text(num, M, y);
+    font('semibold', 17, PDF_C.ink);
+    text(title, M + 10, y + 0.4);
+    return y + 9;
+  };
 
-  // ── Kurslar ──
-  heading('Tavsiya Etilgan Kurslar');
-  paragraph(
-    "Moslik foizi ikki ko'rsatkich asosida hisoblanadi: profil shakli o'xshashligi (kosinus) va Holland kodlari mosligi (Iachan indeksi, 1984). " +
-    "Kurslar yosh chegarasi bo'yicha ham filtrlanadi.",
-    8.7, [100, 116, 139]
-  );
-  y += 2;
-  results.forEach(r => {
-    ensureSpace(26);
-    const isTop = r.rank === 1;
-    doc.setFillColor(isTop ? 240 : 248, isTop ? 246 : 250, isTop ? 255 : 252);
-    doc.roundedRect(marginX, y, contentW, 22, 3, 3, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(brand.r, brand.g, brand.b);
-    doc.text(`#${r.rank}`, marginX + 5, y + 9);
-    doc.setTextColor(15, 23, 42);
-    doc.text(r.course.name, marginX + 16, y + 9);
-    doc.setFontSize(13); doc.setTextColor(brand.r, brand.g, brand.b);
-    doc.text(`${r.matchScore}%`, marginX + contentW - 5, y + 9, { align: 'right' });
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100, 116, 139);
-    doc.text((doc.splitTextToSize(r.course.desc, contentW - 22) as string[]).slice(0, 2), marginX + 16, y + 15);
-    y += 26;
+  const now = new Date();
+  const dateStr = `${now.getDate()}-${UZ_MONTHS[now.getMonth()]}, ${now.getFullYear()}`;
+  const genderLabel = gender === 'male' ? 'Erkak' : gender === 'female' ? 'Ayol' : '';
+  const ordered = sortedTypes(percentages);
+  const reportTitle = `Karyera testi hisoboti${name ? ` — ${name}` : ''}`;
+
+  // ═══ 1-SAHIFA: muqova + asosiy xulosa ═══
+  const bandH = 104;
+  doc.setFillColor(...PDF_C.night);
+  doc.rect(0, 0, W, bandH, 'F');
+
+  // muqovadagi san'at: foydalanuvchining haqiqiy RIASEC olti burchagi
+  const hx = 156, hy = 54, hR = 36;
+  doc.setLineWidth(0.2);
+  [0.25, 0.5, 0.75, 1].forEach(f => polygon(hexPts(hx, hy, () => hR * f), 'S', undefined, PDF_C.nightLine));
+  hexPts(hx, hy, () => hR).forEach(([x, y]) => { doc.setDrawColor(...PDF_C.nightLine); doc.line(hx, hy, x, y); });
+  opacity(0.5);
+  polygon(hexPts(hx, hy, profileR(hR)), 'F', PDF_C.blue);
+  opacity(1);
+  doc.setLineWidth(0.45);
+  polygon(hexPts(hx, hy, profileR(hR)), 'S', undefined, PDF_C.cyan);
+  hexPts(hx, hy, profileR(hR)).forEach(([x, y], i) => {
+    const lead = hollandCode.includes(HEX_ORDER[i]);
+    doc.setFillColor(...(lead ? hexRgb(RIASEC_INFO[HEX_ORDER[i]].color) : PDF_C.cyan));
+    doc.circle(x, y, lead ? 1.1 : 0.6, 'F');
+  });
+  hexPts(hx, hy, () => hR + 7).forEach(([x, y], i) => {
+    const t = HEX_ORDER[i];
+    font('semibold', 8, hollandCode.includes(t) ? PDF_C.white : [110, 118, 134]);
+    text(t, x, y - 0.6, { align: 'center' });
+    font('normal', 6, [110, 118, 134]);
+    text(`${percentages[t]}%`, x, y + 2.6, { align: 'center' });
   });
 
-  drawFooter();
+  // logotip
+  star(M + 3, 17, 3.4, PDF_C.white);
+  font('bold', 13, PDF_C.white);
+  text('DATA', M + 8.6, 19.3);
+  font('medium', 5.6, [150, 158, 172]);
+  text('TA’LIM STANSIYASI', M + 8.8, 22.6, { charSpace: 0.5 });
+
+  kicker('Karyera testi hisoboti · Holland RIASEC', M, 40, PDF_C.cyan);
+  font('semibold', 22, PDF_C.white);
+  const nameLines = wrap(name || 'Sizning natijangiz', 108).slice(0, 2);
+  nameLines.forEach((l, i) => doc.text(l, M, 51 + i * 9));
+  const afterName = 51 + (nameLines.length - 1) * 9;
+
+  kicker('Holland kodingiz', M, afterName + 13, [150, 158, 172]);
+  font('bold', 42, PDF_C.cyan);
+  text(hollandCode.join(''), M - 0.6, afterName + 30, { charSpace: 2.2 });
+  font('normal', 9, [200, 206, 216]);
+  text(hollandCode.map(t => RIASEC_INFO[t].short).join('  ·  '), M, afterName + 38);
+
+  font('normal', 7.2, [125, 134, 148]);
+  text([dateStr, age ? `${age} yosh` : '', genderLabel].filter(Boolean).join('   ·   '), M, bandH - 7);
+  gradBar(0, bandH, W, 1.6);
+
+  // ishonchlilik ko'rsatkichlari
+  let y = bandH + 13;
+  const tiles = [
+    ['Ishonchlilik', `${quality.confidence}%`, 'Javoblar izchilligi'],
+    ['Farqlanish', diffLabel(quality.differentiation), `${quality.differentiation}% farq`],
+    ['Izchillik', consLabel(quality.consistencyDistance), 'Ustuvor 2 tip yaqinligi'],
+  ];
+  const tw = (CW - 8) / 3;
+  tiles.forEach(([k, v, h], i) => {
+    const x = M + i * (tw + 4);
+    doc.setFillColor(...PDF_C.soft);
+    doc.roundedRect(x, y, tw, 22, 2.5, 2.5, 'F');
+    kicker(k, x + 5, y + 6.5);
+    font('semibold', 14, PDF_C.ink);
+    text(v, x + 5, y + 14.5);
+    font('normal', 6.8, PDF_C.ink3);
+    text(h, x + 5, y + 19);
+  });
+  y += 29;
+  font('normal', 8.4, PDF_C.ink2);
+  const verdict = quality.confidence >= 75
+    ? "Javoblaringiz izchil va profilingiz aniq ajralgan — natija yuqori ishonchli."
+    : quality.confidence >= 55
+      ? "Natija ishonchli, ammo ba'zi tiplar bir-biriga yaqin — kurs tanlashda ikkinchi variantni ham ko'rib chiqing."
+      : "Profilingiz nisbatan tekis chiqdi. Aniqroq natija uchun testni shoshilmasdan qayta topshirishni tavsiya qilamiz.";
+  wrap(verdict, CW).forEach(l => { doc.text(l, M, y); y += 4.3; });
+
+  // ustuvor 3 tip
+  y += 6;
+  y = sectionTitle('01', 'Sizning kodingiz nimani anglatadi', y);
+  const colW = (CW - 12) / 3;
+  let maxBottom = y;
+  hollandCode.forEach((t, i) => {
+    const info = RIASEC_INFO[t];
+    const x = M + i * (colW + 6);
+    let cy = y + 2;
+    doc.setFillColor(...hexRgb(info.color));
+    doc.roundedRect(x, cy, 9, 9, 2, 2, 'F');
+    font('bold', 10, PDF_C.white);
+    text(t, x + 4.5, cy + 6.3, { align: 'center' });
+    font('semibold', 18, PDF_C.ink);
+    text(`${percentages[t]}%`, x + colW, cy + 7, { align: 'right' });
+    cy += 15;
+    font('semibold', 10.5, PDF_C.ink);
+    text(info.short, x, cy);
+    cy += 5.2;
+    font('normal', 7.8, PDF_C.ink2);
+    wrap(info.desc, colW).forEach(l => { doc.text(l, x, cy); cy += 3.9; });
+    maxBottom = Math.max(maxBottom, cy);
+  });
+  y = maxBottom + 6;
+
+  // eng mos kurs
+  if (results[0]) {
+    const r = results[0];
+    const boxH = 40;
+    const by = Math.max(y, H - 24 - boxH);
+    doc.setDrawColor(...PDF_C.blue); doc.setLineWidth(0.5);
+    doc.roundedRect(M, by, CW, boxH, 3, 3, 'S');
+    kicker('Eng mos yo‘nalish', M + 7, by + 9, PDF_C.blue);
+    font('semibold', 16, PDF_C.ink);
+    text(r.course.name, M + 7, by + 18);
+    font('normal', 8.2, PDF_C.ink2);
+    wrap(r.course.desc, CW - 60).slice(0, 2).forEach((l, i) => doc.text(l, M + 7, by + 25 + i * 4.2));
+    font('normal', 7.2, PDF_C.ink3);
+    text(`datatalim.uz${r.course.url}`, M + 7, by + boxH - 5);
+    font('bold', 30, PDF_C.blue);
+    text(`${r.matchScore}%`, W - M - 7, by + 22, { align: 'right' });
+    font('normal', 7.5, PDF_C.ink3);
+    text('moslik', W - M - 7, by + 28, { align: 'right' });
+  }
+
+  // ═══ 2-SAHIFA: olti o'lchov + kuchli tomonlar ═══
+  doc.addPage();
+  pageHeader(reportTitle);
+  y = 36;
+  y = sectionTitle('02', 'Olti o‘lchov', y);
+  font('normal', 8.2, PDF_C.ink3);
+  text('Har bir tip qiziqishlaringizning qancha qismini tashkil etishi (jami 100%).', M, y);
+  y += 8;
+  ordered.forEach((t, idx) => {
+    const info = RIASEC_INFO[t];
+    const col = hexRgb(info.color);
+    font('normal', 7.8, PDF_C.ink2);
+    const descLines = wrap(info.desc, CW - 11);
+    const blockH = 12 + descLines.length * 3.9 + 5;
+    if (y + blockH > H - 22) { doc.addPage(); pageHeader(reportTitle); y = 32; }
+    doc.setFillColor(...col);
+    doc.roundedRect(M, y - 4.6, 7, 7, 1.6, 1.6, 'F');
+    font('bold', 8.5, PDF_C.white);
+    text(t, M + 3.5, y + 0.4, { align: 'center' });
+    font('semibold', 10.5, idx < 3 ? PDF_C.ink : PDF_C.ink2);
+    text(info.name, M + 11, y);
+    font('semibold', 10.5, PDF_C.ink);
+    text(`${percentages[t]}%`, W - M, y, { align: 'right' });
+    y += 4;
+    doc.setFillColor(...PDF_C.line);
+    doc.roundedRect(M + 11, y, CW - 11, 1.6, 0.8, 0.8, 'F');
+    doc.setFillColor(...col);
+    doc.roundedRect(M + 11, y, Math.max(1.6, (CW - 11) * (percentages[t] / 100)), 1.6, 0.8, 0.8, 'F');
+    y += 6.2;
+    font('normal', 7.8, PDF_C.ink2);
+    descLines.forEach(l => { doc.text(l, M + 11, y); y += 3.9; });
+    font('normal', 7.2, PDF_C.ink3);
+    text(`Tipik kasblar: ${info.careers}`, M + 11, y + 0.4);
+    y += 8.5;
+  });
+
+  if (strengths.length > 0) {
+    y += 2;
+    if (y + 40 > H - 22) { doc.addPage(); pageHeader(reportTitle); y = 36; }
+    y = sectionTitle('03', 'Kuchli tomonlaringiz', y);
+    y += 1;
+    const sw = (CW - 8) / 2;
+    strengths.forEach((s, i) => {
+      const col = i % 2;
+      const x = M + col * (sw + 8);
+      if (col === 0 && y + 14 > H - 22) { doc.addPage(); pageHeader(reportTitle); y = 32; }
+      doc.setFillColor(...PDF_C.blue);
+      doc.circle(x + 1.2, y - 1.2, 0.9, 'F');
+      font('semibold', 9, PDF_C.ink);
+      text(s.name, x + 4.5, y);
+      font('normal', 7.6, PDF_C.ink2);
+      wrap(s.desc, sw - 5).slice(0, 2).forEach((l, j) => doc.text(l, x + 4.5, y + 4.4 + j * 3.7));
+      if (col === 1 || i === strengths.length - 1) y += 14;
+    });
+  }
+
+  // ═══ 3-SAHIFA: kurslar, metodologiya, keyingi qadam ═══
+  doc.addPage();
+  pageHeader(reportTitle);
+  y = 36;
+  y = sectionTitle('04', 'Tavsiya etilgan kurslar', y);
+  font('normal', 8, PDF_C.ink3);
+  wrap("Moslik profil shakli o'xshashligi (kosinus) va Holland kodlari mosligi (Iachan indeksi, 1984) asosida hisoblangan, yoshingiz bo'yicha saralangan.", CW)
+    .forEach(l => { doc.text(l, M, y); y += 3.9; });
+  y += 5;
+  results.forEach(r => {
+    const top = r.rank === 1;
+    font('normal', 7.8, PDF_C.ink2);
+    const descLines = wrap(r.course.desc, CW - 60).slice(0, 2);
+    const rowH = 22 + (descLines.length - 1) * 3.9;
+    doc.setFillColor(...(top ? [236, 243, 255] as RGB : PDF_C.soft));
+    doc.roundedRect(M, y, CW, rowH, 3, 3, 'F');
+    font('medium', 9, top ? PDF_C.blue : PDF_C.ink3);
+    text(String(r.rank).padStart(2, '0'), M + 6, y + 9);
+    font('semibold', 11.5, PDF_C.ink);
+    text(r.course.name, M + 17, y + 9);
+    font('normal', 7.8, PDF_C.ink2);
+    descLines.forEach((l, i) => doc.text(l, M + 17, y + 14 + i * 3.9));
+    font('bold', 17, top ? PDF_C.blue : PDF_C.ink);
+    text(`${r.matchScore}%`, W - M - 6, y + 10, { align: 'right' });
+    doc.setFillColor(...PDF_C.line);
+    doc.roundedRect(W - M - 32, y + 13.5, 26, 1.4, 0.7, 0.7, 'F');
+    doc.setFillColor(...(top ? PDF_C.blue : PDF_C.ink3));
+    doc.roundedRect(W - M - 32, y + 13.5, Math.max(1.4, 26 * r.matchScore / 100), 1.4, 0.7, 0.7, 'F');
+    y += rowH + 4;
+  });
+
+  y += 6;
+  y = sectionTitle('05', 'Metodologiya', y);
+  font('normal', 8, PDF_C.ink2);
+  [
+    "Hisobot Jon Holland (1997) RIASEC kasbiy qiziqishlar nazariyasiga asoslanadi. " +
+    `Test ${TOTAL_Q} ta savoldan iborat: ${FORCED_CHOICE.length} ta majburiy tanlov (barcha 15 ta tip juftligi bir martadan taqqoslanadi), ` +
+    `${LIKERT.length} ta o'z-o'zini baholash (har bir tip uchun 4 tadan) va ${MULTI_CHOICE.length} ta vaziyatli qaror. ` +
+    "Uchala bosqich normallashtirilib, yakuniy ballga teng hissa qo'shadi; variantlar tasodifiy tartibda ko'rsatiladi.",
+    "Farqlanish — eng yuqori va eng past tip orasidagi farq: yuqori bo'lsa qiziqishlaringiz aniq ajralgan. " +
+    "Izchillik — Holland olti burchagida ustuvor ikki tipingiz qanchalik yaqin joylashgani.",
+  ].forEach(p => {
+    wrap(p, CW).forEach(l => { doc.text(l, M, y); y += 3.9; });
+    y += 2.5;
+  });
+
+  // keyingi qadam
+  y += 4;
+  const ctaH = 40;
+  // sahifa oxiriga bog'langan yakuniy blok (oraliq bo'sh qolsa ham imzo pastda turadi)
+  if (y + ctaH > H - 22) { doc.addPage(); pageHeader(reportTitle); y = 36; }
+  const cy0 = Math.max(y, H - 22 - ctaH);
+  doc.setFillColor(...PDF_C.night);
+  doc.roundedRect(M, cy0, CW, ctaH, 3, 3, 'F');
+  gradBar(M + 7, cy0 + 7, 14, 1);
+  font('semibold', 14, PDF_C.white);
+  text('Keyingi qadam: bepul maslahat', M + 7, cy0 + 16);
+  font('normal', 8, [190, 197, 208]);
+  wrap('Mutaxassisimiz natijangizni siz bilan birga koʻrib chiqadi va mos kursni tanlashda yordam beradi.', CW - 80)
+    .forEach((l, i) => doc.text(l, M + 7, cy0 + 22 + i * 4));
+  font('semibold', 9.5, PDF_C.white);
+  const rx = W - M - 7;
+  if (contact?.phone) text(contact.phone, rx, cy0 + 16, { align: 'right' });
+  font('normal', 7.8, [190, 197, 208]);
+  text('datatalim.uz', rx, cy0 + 22, { align: 'right' });
+  text('t.me/data_talim_stansiyasi', rx, cy0 + 26.5, { align: 'right' });
+  if (contact?.address) {
+    wrap(contact.address, 70).slice(0, 2).forEach((l, i) => doc.text(l, rx, cy0 + 31 + i * 3.8, { align: 'right' }));
+  }
+
+  // sahifa raqamlari va pastki qism
+  const pages = doc.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p);
+    doc.setDrawColor(...PDF_C.line); doc.setLineWidth(0.25);
+    doc.line(M, H - 14, W - M, H - 14);
+    font('normal', 6.8, PDF_C.ink3);
+    text('DATA Ta’lim Stansiyasi · Holland RIASEC karyera testi', M, H - 9.5);
+    text(`${p} / ${pages}`, W - M, H - 9.5, { align: 'right' });
+  }
+  doc.setPage(1);
+  doc.setProperties({ title: reportTitle, author: 'DATA Ta’lim Stansiyasi', subject: 'Holland RIASEC karyera testi hisoboti' });
   return doc;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function CareerTest() {
-  const { isDark } = useTheme();
-  const [view, setView] = useState<View>('intro');
-  const [userName, setUserName] = useState('');
-  const [userPhone, setUserPhone] = useState('');
-  const [userAge, setUserAge] = useState('');
-  const [userGender, setUserGender] = useState<Gender>('');
-  const [stage, setStage] = useState<Stage>(1);
-  const [currentQ, setCurrentQ] = useState(0);
-  const [s1Answers, setS1Answers] = useState<Record<number, 'a' | 'b'>>({});
-  const [s2Answers, setS2Answers] = useState<Record<number, number>>({});
-  const [s3Answers, setS3Answers] = useState<Record<number, 'A' | 'B' | 'C' | 'D'>>({});
-  const [s2Page, setS2Page] = useState(0);
-  const [results, setResults] = useState<CourseResult[]>([]);
-  const [percentages, setPercentages] = useState<Record<RiasecType, number>>({ R:0,I:0,A:0,S:0,E:0,C:0 });
-  const [quality, setQuality] = useState<QualityMetrics>({ differentiation:0, consistencyDistance:1, distinctRatings:0, confidence:0 });
-  const [enrollCourse, setEnrollCourse] = useState<{ name: string; id: string } | null>(null);
-  const [calcDots, setCalcDots] = useState(0);
-  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const reduced = useMotionReduced();
+  const siteContent = useStore(s => s.siteContent);
+  const [saved] = useState(loadProgress);
+  const [view, setView] = useState<View>(saved?.view ?? 'intro');
+  const [userName, setUserName] = useState(saved?.name ?? '');
+  const [userPhone, setUserPhone] = useState(saved?.phone ?? '');
+  const [userAge, setUserAge] = useState(saved?.age ?? '');
+  const [userGender, setUserGender] = useState<Gender>(saved?.gender ?? '');
+  const [stage, setStage] = useState<Stage>(saved?.stage ?? 1);
+  const [currentQ, setCurrentQ] = useState(saved?.currentQ ?? 0);
+  const [s1Answers, setS1Answers] = useState<S1Answers>(saved?.s1 ?? {});
+  const [s2Answers, setS2Answers] = useState<Record<number, number>>(saved?.s2 ?? {});
+  const [s3Answers, setS3Answers] = useState<S3Answers>(saved?.s3 ?? {});
+  const [s2Page, setS2Page] = useState(saved?.s2Page ?? 0);
   // Variantlar tasodifiy tartibda — pozitsion moyillikning oldini oladi
-  const [fcSwap, setFcSwap] = useState<boolean[]>(() => FORCED_CHOICE.map(() => Math.random() < 0.5));
-  const [mcOrder, setMcOrder] = useState<number[][]>(() => MULTI_CHOICE.map(() => shuffledIndices(4)));
+  const [fcSwap, setFcSwap] = useState<boolean[]>(() => saved?.fcSwap ?? FORCED_CHOICE.map(() => Math.random() < 0.5));
+  const [mcOrder, setMcOrder] = useState<number[][]>(() => saved?.mcOrder ?? MULTI_CHOICE.map(() => shuffledIndices(4)));
+  // Tiklangan natija javoblardan qayta hisoblanadi (hisob deterministik)
+  const [outcome, setOutcome] = useState<Outcome | null>(() =>
+    saved?.view === 'result' ? buildOutcome(saved.s1, saved.s2, saved.s3, saved.age) : null,
+  );
+  const [enrollCourse, setEnrollCourse] = useState<{ name: string; id: string } | null>(null);
+  const [calcStep, setCalcStep] = useState(0);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [tried, setTried] = useState(false);
+  const [dir, setDir] = useState(1);
+  const [confirmRestart, setConfirmRestart] = useState(false);
+
   const calcTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const transitionLockRef = useRef(false);
   // Har bir test topshirilishida faqat bir marta avtomatik yuborilishi uchun
-  const autoSubmittedRef = useRef(false);
+  const autoSubmittedRef = useRef(saved?.submitted ?? false);
   // Kutilayotgan animatsiya taymerlari. Ular bekor qilinmasa, "Qayta"/"Orqaga"
   // bosilganda eski taymer allaqachon almashgan ekranning holatini o'zgartirib
   // yuboradi va AnimatePresence chiqish animatsiyasida qotib qoladi.
   const pendingTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const rowRefs = useRef<(HTMLLIElement | null)[]>([]);
+  const nextBtnRef = useRef<HTMLButtonElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const ageRef = useRef<HTMLInputElement>(null);
+  const genderRef = useRef<HTMLButtonElement>(null);
 
   /** setTimeout — bekor qilinishi mumkin bo'lgan ro'yxatga yozib boradi */
   function schedule(fn: () => void, ms: number) {
@@ -761,27 +1116,48 @@ export default function CareerTest() {
   }
 
   // Komponent yopilganda ham taymerlar qolib ketmasligi kerak
-  useEffect(() => clearPending, []);
+  useEffect(() => () => {
+    clearPending();
+    if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+  }, []);
 
-  const overallQ = stage === 1 ? currentQ + 1
-    : stage === 2 ? FORCED_CHOICE.length + s2Page * S2_PER_PAGE + 1
-    : FORCED_CHOICE.length + LIKERT.length + currentQ + 1;
-
-  const bg = isDark ? 'transparent' : 'linear-gradient(180deg, #f0f4ff 0%, #f8fafc 30%, #ffffff 100%)';
-  const card = isDark ? 'bg-slate-800/60 border-white/10' : 'bg-white border-slate-200';
-  const text = isDark ? 'text-white' : 'text-slate-900';
-  const sub = isDark ? 'text-slate-400' : 'text-slate-500';
-
-  const ageNum = parseInt(userAge, 10);
-  const ageValid = userAge.trim() !== '' && Number.isFinite(ageNum) && ageNum >= 10 && ageNum <= 90;
+  // ── Validatsiya ──
+  const ageNum = parseAge(userAge);
+  const ageValid = ageNum !== null;
   const genderValid = userGender !== '';
   const nameValid = userName.trim().length >= 2;
   const rawPhone = userPhone.replace(/\D/g, '');
   const phoneValid = rawPhone.length === 9;
   const canStart = ageValid && genderValid && nameValid && phoneValid;
+  const errors = {
+    name: tried && !nameValid ? 'Ismingizni kiriting (kamida 2 harf).' : '',
+    phone: tried && !phoneValid ? 'Telefon raqamini toʻliq kiriting: 9 ta raqam.' : '',
+    age: tried && !ageValid ? 'Yoshingizni kiriting (10–90).' : '',
+    gender: tried && !genderValid ? 'Jinsingizni tanlang.' : '',
+  };
+
+  // ── Jarayonni saqlash ──
+  useEffect(() => {
+    if (view === 'intro') { saveProgress(null); return; }
+    saveProgress({
+      v: 1, view, stage, currentQ, s2Page,
+      s1: s1Answers, s2: s2Answers, s3: s3Answers, fcSwap, mcOrder,
+      name: userName, phone: userPhone, age: userAge, gender: userGender,
+      submitted: autoSubmittedRef.current,
+    });
+  }, [view, stage, currentQ, s2Page, s1Answers, s2Answers, s3Answers, fcSwap, mcOrder, userName, userPhone, userAge, userGender]);
+
+  // Tiklanganda: foydalanuvchiga xabar va (agar yetib bormagan bo'lsa) natijani yuborish
+  useEffect(() => {
+    if (!saved) return;
+    if (saved.view === 'test') toast('Oldingi javoblaringiz tiklandi — davom eting.', { id: 'ct-restored' });
+    if (saved.view === 'result' && outcome && !autoSubmittedRef.current) submitCareerTestAuto(outcome.pcts, outcome.results);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handlePhoneChange(e: ChangeEvent<HTMLInputElement>) {
     let val = e.target.value.replace(/\D/g, '');
+    if (val.startsWith('998') && val.length > 9) val = val.slice(3);
     if (val.length > 9) val = val.slice(0, 9);
     let formatted = '';
     if (val.length > 0) formatted += val.substring(0, 2);
@@ -791,10 +1167,21 @@ export default function CareerTest() {
     setUserPhone(formatted);
   }
 
-  function startTest() {
-    if (!canStart) return;
+  function startTest(e?: FormEvent) {
+    e?.preventDefault();
+    if (!canStart) {
+      setTried(true);
+      if (!nameValid) nameRef.current?.focus();
+      else if (!phoneValid) phoneRef.current?.focus();
+      else if (!ageValid) ageRef.current?.focus();
+      else genderRef.current?.focus();
+      return;
+    }
     clearPending();
     autoSubmittedRef.current = false;
+    setTried(false);
+    setDir(1);
+    setOutcome(null);
     setView('test'); setStage(1); setCurrentQ(0);
     setS1Answers({}); setS2Answers({}); setS3Answers({}); setS2Page(0);
     setFcSwap(FORCED_CHOICE.map(() => Math.random() < 0.5));
@@ -805,12 +1192,27 @@ export default function CareerTest() {
   function restartTest() {
     clearPending();
     autoSubmittedRef.current = false;
-    setView('intro'); setResults([]); setPercentages({ R:0,I:0,A:0,S:0,E:0,C:0 });
+    setConfirmRestart(false);
+    setOutcome(null);
+    setView('intro'); setStage(1); setCurrentQ(0); setS2Page(0);
+    setS1Answers({}); setS2Answers({}); setS3Answers({});
     window.scrollTo(0, 0);
   }
 
+  /** Test o'rtasida — tasodifan bosilmasligi uchun ikki bosqichli tasdiq */
+  function onRestartClick() {
+    if (confirmRestart) { restartTest(); return; }
+    setConfirmRestart(true);
+    if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+    confirmTimerRef.current = setTimeout(() => setConfirmRestart(false), 3500);
+  }
+
+  const atStart = stage === 1 && currentQ === 0;
+
   function goBack() {
+    if (atStart) return;
     clearPending();
+    setDir(-1);
     if (stage === 1) { if (currentQ > 0) setCurrentQ(q => q - 1); }
     else if (stage === 2) {
       if (s2Page > 0) setS2Page(p => p - 1);
@@ -829,15 +1231,37 @@ export default function CareerTest() {
     const q = FORCED_CHOICE[idx];
     if (!q) return;
     transitionLockRef.current = true;
+    setDir(1);
     setS1Answers(prev => ({ ...prev, [q.id]: answer }));
     schedule(() => {
       if (idx < FORCED_CHOICE.length - 1) setCurrentQ(idx + 1);
       else { setStage(2); setS2Page(0); setCurrentQ(0); }
-    }, 350);
-    schedule(() => { transitionLockRef.current = false; }, 700);
+    }, 320);
+    schedule(() => { transitionLockRef.current = false; }, 620);
+  }
+
+  const likertPageQs = LIKERT.slice(s2Page * S2_PER_PAGE, s2Page * S2_PER_PAGE + S2_PER_PAGE);
+  const s2PageComplete = likertPageQs.every(q => s2Answers[q.id] !== undefined);
+  const s2AnsweredOnPage = likertPageQs.filter(q => s2Answers[q.id] !== undefined).length;
+
+  function handleS2Answer(qid: number, val: number) {
+    const next = { ...s2Answers, [qid]: val };
+    setS2Answers(next);
+    // keyingi javobsiz fikrni (yoki "Keyingisi" tugmasini) ko'rinadigan joyga olib keladi
+    const i = likertPageQs.findIndex(q => q.id === qid);
+    const nextIdx = likertPageQs.findIndex((q, j) => j > i && next[q.id] === undefined);
+    const target = nextIdx >= 0 ? rowRefs.current[nextIdx] : likertPageQs.every(q => next[q.id] !== undefined) ? nextBtnRef.current : null;
+    if (target) {
+      const rect = target.getBoundingClientRect();
+      if (rect.bottom > window.innerHeight - 24 || rect.top < 72) {
+        target.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+      }
+    }
   }
 
   function handleS2Next() {
+    if (!s2PageComplete) return;
+    setDir(1);
     if (s2Page < S2_PAGES - 1) setS2Page(p => p + 1);
     else { setStage(3); setCurrentQ(0); }
   }
@@ -848,31 +1272,35 @@ export default function CareerTest() {
     const q = MULTI_CHOICE[idx];
     if (!q) return;
     transitionLockRef.current = true;
+    setDir(1);
     const newS3 = { ...s3Answers, [q.id]: answer };
     setS3Answers(newS3);
-    const isLast = idx >= MULTI_CHOICE.length - 1;
+    if (idx < MULTI_CHOICE.length - 1) {
+      schedule(() => setCurrentQ(idx + 1), 320);
+      schedule(() => { transitionLockRef.current = false; }, 620);
+      return;
+    }
+    // Oxirgi savol: natija darhol hisoblanadi va yuboriladi (sahifa yangilansa ham yo'qolmaydi),
+    // "hisoblanmoqda" ekrani esa faqat tahlil bosqichlarini ko'rsatadi.
+    const o = buildOutcome(s1Answers, s2Answers, newS3, userAge);
+    setOutcome(o);
+    trackSiteEvent('career_test_complete');
+    submitCareerTestAuto(o.pcts, o.results);
     schedule(() => {
-      if (!isLast) {
-        setCurrentQ(idx + 1);
-      } else {
-        setView('calculating');
-        window.scrollTo(0, 0);
-        calcTimerRef.current = setInterval(() => setCalcDots(d => (d + 1) % 4), 500);
-        schedule(() => {
-          if (calcTimerRef.current) { clearInterval(calcTimerRef.current); calcTimerRef.current = null; }
-          const pcts = computePercentages(s1Answers, s2Answers, newS3);
-          const finalResults = matchCourses(pcts, ageValid ? ageNum : null);
-          setPercentages(pcts);
-          setQuality(computeQuality(pcts, s2Answers));
-          setResults(finalResults);
-          setView('result');
-          window.scrollTo(0, 0);
-          trackSiteEvent('career_test_complete');
-          submitCareerTestAuto(pcts, finalResults);
-        }, 2500);
-      }
-    }, 350);
-    schedule(() => { transitionLockRef.current = false; }, isLast ? 350 : 700);
+      setView('calculating');
+      setCalcStep(0);
+      window.scrollTo(0, 0);
+      calcTimerRef.current = setInterval(
+        () => setCalcStep(s => Math.min(s + 1, CALC_STEPS.length - 1)),
+        CALC_MS / CALC_STEPS.length,
+      );
+    }, 320);
+    schedule(() => {
+      if (calcTimerRef.current) { clearInterval(calcTimerRef.current); calcTimerRef.current = null; }
+      transitionLockRef.current = false;
+      setView('result');
+      window.scrollTo(0, 0);
+    }, 320 + CALC_MS);
   }
 
   /**
@@ -891,14 +1319,14 @@ export default function CareerTest() {
     const code = getHollandCode(pcts).join('');
 
     submitLeadToAPI({
-      name: userName,
+      name: userName.trim(),
       phone: fullPhone,
       courseId: topCourseNames.join(', ') || 'Karyera testi',
       sourceRef: 'Karyera_Testi',
     }).catch(err => console.error('Karyera testi CRM lead xatosi:', err));
 
     submitCareerTestResult({
-      name: userName,
+      name: userName.trim(),
       phone: fullPhone,
       gender: userGender,
       age: userAge,
@@ -907,586 +1335,682 @@ export default function CareerTest() {
     }).catch(err => console.error('Karyera testi Sheets xatosi:', err));
   }
 
+  const displayStrengths = topStrengthsOf(s2Answers);
+  const pcts = outcome?.pcts ?? { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
+  const results = outcome?.results ?? [];
+  const quality = outcome?.quality ?? { differentiation: 0, consistencyDistance: 1, distinctRatings: 0, confidence: 0 };
+  const hollandCode = getHollandCode(pcts);
+  const ordered = sortedTypes(pcts);
+
   async function handleDownloadPdf() {
-    if (generatingPdf) return;
+    if (generatingPdf || !outcome) return;
     setGeneratingPdf(true);
     try {
       const doc = await generateCareerTestPdf({
-        name: userName, age: userAge, gender: userGender,
-        percentages, hollandCode, results, strengths: displayStrengths, quality,
+        name: userName.trim(), age: userAge, gender: userGender,
+        percentages: pcts, hollandCode, results, strengths: displayStrengths, quality,
+        contact: { phone: siteContent?.contactPhone, address: siteContent?.contactAddress?.uz },
       });
-      doc.save(`Karyera-Testi-Natijasi${userName ? '-' + userName.replace(/\s+/g, '_') : ''}.pdf`);
+      doc.save(`Karyera-Testi-Natijasi${userName.trim() ? '-' + userName.trim().replace(/\s+/g, '_') : ''}.pdf`);
     } catch (e) {
       console.error('PDF generation error:', e);
+      toast.error('PDF tayyorlab boʻlmadi. Internetni tekshirib, qayta urinib koʻring.');
     } finally {
       setGeneratingPdf(false);
     }
   }
 
-  const likertPageQs = LIKERT.slice(s2Page * S2_PER_PAGE, s2Page * S2_PER_PAGE + S2_PER_PAGE);
-  const s2PageComplete = likertPageQs.every(q => s2Answers[q.id] !== undefined);
-  const likertScale = [1, 2, 3, 4, 5];
+  async function handleShare() {
+    const url = `${window.location.origin}/karyera-testi`;
+    const text = `Mening Holland kodim — ${hollandCode.join('')} (${hollandCode.map(t => RIASEC_INFO[t].short).join(', ')}). Siz ham oʻzingizga mos kasbni aniqlang:`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Karyera testi — DATA Taʼlim', text, url });
+        return;
+      }
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      toast.success('Matn va havola nusxalandi');
+    } catch (e) {
+      if ((e as Error)?.name !== 'AbortError') toast.error('Ulashib boʻlmadi');
+    }
+  }
 
-  const displayStrengths = topStrengthsOf(s2Answers);
-  const hollandCode = getHollandCode(percentages);
-  const ordered = sortedTypes(percentages);
-  const radarData = HEX_ORDER.map(t => ({ type: RIASEC_INFO[t].short, value: percentages[t] }));
+  // ── Klaviatura: 1/2 (A/B), 1–5, 1–4 (A–D) ──
+  const stage1Q = FORCED_CHOICE[Math.min(currentQ, FORCED_CHOICE.length - 1)];
+  const stage1Slots: ('a' | 'b')[] = fcSwap[Math.min(currentQ, FORCED_CHOICE.length - 1)] ? ['b', 'a'] : ['a', 'b'];
+  const mcIdx = Math.min(currentQ, MULTI_CHOICE.length - 1);
+  const mcQ = MULTI_CHOICE[mcIdx];
+  const mcOptions = (mcOrder[mcIdx] || [0, 1, 2, 3]).map(i => mcQ.options[i]);
+
+  const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  keyHandlerRef.current = (e: KeyboardEvent) => {
+    if (view !== 'test' || enrollCourse || e.metaKey || e.ctrlKey || e.altKey) return;
+    const el = e.target as HTMLElement | null;
+    const tag = el?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+    const k = e.key.toLowerCase();
+    if (stage === 1) {
+      const i = k === '1' || k === 'a' ? 0 : k === '2' || k === 'b' ? 1 : -1;
+      if (i >= 0) { e.preventDefault(); handleS1(stage1Slots[i]); }
+    } else if (stage === 2) {
+      if (/^[1-5]$/.test(k)) {
+        const q = likertPageQs.find(x => s2Answers[x.id] === undefined);
+        if (q) { e.preventDefault(); handleS2Answer(q.id, Number(k)); }
+      } else if (k === 'enter' && tag !== 'BUTTON' && tag !== 'A' && s2PageComplete) {
+        e.preventDefault(); handleS2Next();
+      }
+    } else {
+      const i = '1234'.indexOf(k) >= 0 ? '1234'.indexOf(k) : 'abcd'.indexOf(k);
+      if (k.length === 1 && i >= 0 && mcOptions[i]) { e.preventDefault(); handleS3(mcOptions[i].label); }
+    }
+  };
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => keyHandlerRef.current(e);
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+
+  // Savol almashganda: sahifa tepaga, fokus savol sarlavhasiga (ekran o'quvchilar uchun)
+  const qKey = stage === 2 ? `s2-${s2Page}` : `s${stage}-${currentQ}`;
+  useEffect(() => {
+    if (view !== 'test') return;
+    if (window.scrollY > 80) window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qKey, view]);
+
+  const slide = {
+    enter: (d: number) => ({ opacity: 0, x: reduced ? 0 : 56 * d }),
+    center: { opacity: 1, x: 0, transition: { duration: reduced ? 0.15 : 0.45, ease: EASE_OUT } },
+    exit: (d: number) => ({ opacity: 0, x: reduced ? 0 : -36 * d, transition: { duration: reduced ? 0.1 : 0.2, ease: 'easeIn' as const } }),
+  };
+  const fade = {
+    initial: { opacity: 0, y: reduced ? 0 : 16 },
+    animate: { opacity: 1, y: 0, transition: { duration: reduced ? 0.15 : 0.6, ease: EASE_OUT } },
+    exit: { opacity: 0, transition: { duration: 0.2 } },
+  };
+
+  const stageFrac = stage === 1 ? currentQ / FORCED_CHOICE.length : stage === 2 ? s2Page / S2_PAGES : currentQ / MULTI_CHOICE.length;
+  const counter = stage === 1
+    ? String(currentQ + 1).padStart(2, '0')
+    : stage === 2
+      ? `${FORCED_CHOICE.length + s2Page * S2_PER_PAGE + 1}–${FORCED_CHOICE.length + s2Page * S2_PER_PAGE + likertPageQs.length}`
+      : String(FORCED_CHOICE.length + LIKERT.length + currentQ + 1);
+  const answeredTotal = Object.keys(s1Answers).length + Object.keys(s2Answers).length + Object.keys(s3Answers).length;
+
+  const fieldCls = 'field';
+  const firstName = uz(userName.trim().split(/\s+/)[0] || '');
 
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{ background: bg }}>
+    <div className="v2 relative min-h-[100svh] overflow-hidden">
       <SEO
-        title="Karyera Testi | Data Talim"
-        description="Holland RIASEC ilmiy modeliga asoslangan karyera testi. O'zingizga mos IT kursini toping."
+        title="Karyera testi — Holland RIASEC | DATA Taʼlim"
+        description="Holland RIASEC ilmiy modeliga asoslangan bepul karyera testi: 45 ta savol, 3 bosqich, PDF hisobot va sizga mos IT, media, dizayn yoki moliya kursi."
       />
-      <PatternBg color={isDark ? '#ffffff' : '#0061ff'} opacity={isDark ? 0.02 : 0.025} />
-      <FloatingStars />
+      {/* yumshoq brend nuri */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[70vh]"
+        style={{ background: 'radial-gradient(60% 55% at 70% 0%, rgba(0,97,255,.18), transparent 70%)' }}
+      />
 
       <AnimatePresence mode="wait">
 
-        {/* INTRO */}
+        {/* ═══ INTRO ═══ */}
         {view === 'intro' && (
-          <motion.div
-            key="intro"
-            initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-30 }}
-            transition={{ duration:0.5 }}
-            className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 pt-20 pb-6"
-          >
-            <motion.h1 initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.15 }} className={`text-2xl sm:text-3xl md:text-4xl font-black text-center mb-2 tracking-tight uppercase ${text}`}>
-              Kelajak kasbingizni <span className="text-[#0061ff]">aniqlang</span>
-            </motion.h1>
-            <motion.p initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.22 }} className={`text-sm sm:text-base text-center max-w-xl mb-1 leading-snug ${sub}`}>
-              Holland RIASEC ilmiy modeliga asoslangan {TOTAL_Q} ta savol — sizga eng mos IT yo'nalishini aniqlaymiz.
-            </motion.p>
-            <motion.p initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.26 }} className={`text-[11px] text-center max-w-2xl mb-3 leading-snug ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              J. Holland (1997) nazariyasi · barcha 15 ta tip juftligi taqqoslanadi · har bosqich teng vaznda · variantlar tasodifiy tartibda
-            </motion.p>
-            <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.3 }} className="flex flex-wrap gap-2 justify-center mb-4">
-              {[
-                { icon: ClipboardCheck, label: '~12 daqiqa' },
-                { icon: Target, label: `${TOTAL_Q} savol` },
-                { icon: Trophy, label: '3 bosqich' },
-                { icon: FileText, label: 'PDF hisobot' },
-              ].map(item => (
-                <div key={item.label} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold ${isDark ? 'bg-slate-800/60 border-white/10 text-slate-300 backdrop-blur-xl' : 'bg-white border-slate-200 text-slate-600 shadow-sm'}`}>
-                  <item.icon size={12} style={{ color: '#0061ff' }} /><span>{item.label}</span>
-                </div>
-              ))}
-            </motion.div>
-
-            {/* Demographics */}
-            <motion.div initial={{ opacity:0, y:15 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.36 }} className={`w-full max-w-2xl mb-4 rounded-2xl border p-4 backdrop-blur-xl ${isDark ? 'bg-slate-800/50 border-white/10' : 'bg-white/90 border-slate-200 shadow-sm'}`}>
-              <p className={`text-[11px] font-bold uppercase tracking-wider mb-3 text-center ${sub}`}>Hisobotni shaxsiylashtirish va natijangizni yuborish uchun</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Ismingiz *</label>
-                  <div className="relative">
-                    <User size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-                    <input
-                      type="text" value={userName} onChange={e => setUserName(e.target.value)}
-                      placeholder="Ismingiz" maxLength={60}
-                      className={`w-full pl-9 pr-3 py-2 rounded-xl border font-medium outline-none transition-all focus:ring-2 focus:ring-blue-400/40 text-sm ${
-                        isDark ? 'bg-slate-900/60 border-white/10 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
-                      }`}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Telefon raqamingiz *</label>
-                  <div className="relative">
-                    <Phone size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-                    <span className={`absolute left-9 top-1/2 -translate-y-1/2 text-sm font-medium pointer-events-none ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>+998</span>
-                    <input
-                      type="tel" inputMode="numeric" value={userPhone} onChange={handlePhoneChange}
-                      placeholder="90 123 45 67" maxLength={12}
-                      className={`w-full pl-[4.7rem] pr-3 py-2 rounded-xl border font-medium outline-none transition-all focus:ring-2 focus:ring-blue-400/40 text-sm ${
-                        isDark ? 'bg-slate-900/60 border-white/10 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
-                      }`}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Yoshingiz *</label>
-                  <input
-                    type="number" value={userAge} onChange={e => setUserAge(e.target.value)}
-                    placeholder="17" min={10} max={90}
-                    className={`w-full px-3 py-2 rounded-xl border font-medium outline-none transition-all focus:ring-2 focus:ring-blue-400/40 text-sm ${
-                      isDark ? 'bg-slate-900/60 border-white/10 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Jinsingiz *</label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {([['male', 'Erkak'], ['female', 'Ayol']] as [Gender, string][]).map(([val, label]) => (
-                      <button
-                        key={val} type="button" onClick={() => setUserGender(val)}
-                        className={`py-2 rounded-xl border text-xs font-bold transition-all ${
-                          userGender === val
-                            ? 'border-[#0061ff] bg-[#0061ff] text-white'
-                            : isDark ? 'border-white/10 bg-slate-900/60 text-slate-400 hover:border-white/20' : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <p className={`text-[10px] mt-3 text-center leading-snug ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                Ma'lumotlaringiz faqat test natijasi va tavsiya etilgan kurslar bo'yicha siz bilan bog'lanish uchun ishlatiladi.
-              </p>
-            </motion.div>
-
-            <motion.div initial={{ opacity:0, scale:0.9 }} animate={{ opacity:1, scale:1 }} transition={{ delay:0.42 }}>
-              <button
-                onClick={startTest} disabled={!canStart}
-                className={`px-8 py-3 rounded-2xl text-white font-bold text-base shadow-lg transition-all duration-300 ${canStart ? 'hover:shadow-xl hover:scale-105' : 'opacity-40 cursor-not-allowed'}`}
-                style={{ background: '#0061ff', boxShadow: canStart ? '0 10px 40px rgba(0,97,255,0.35)' : undefined }}
-              >
-                Testni Boshlash →
-              </button>
-              {!canStart && (
-                <p className={`text-xs text-center mt-2 ${sub}`}>Ism, telefon, yosh va jinsni to'ldiring (* majburiy)</p>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-
-        {/* TEST */}
-        {view === 'test' && (
-          <motion.div key="test" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} className="relative z-10 min-h-screen px-4 pt-36 pb-8">
-            <div className="max-w-3xl mx-auto">
-              <div className="flex items-center justify-between mb-6">
-                <button onClick={goBack} className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
-                  <ArrowLeft size={16} /><span className="text-sm">Orqaga</span>
-                </button>
-                <button onClick={restartTest} className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${isDark ? 'border-slate-700 text-slate-400 hover:bg-slate-800' : 'border-slate-200 text-slate-500 hover:bg-slate-100'}`}>
-                  <RotateCcw size={14} /><span className="text-sm">Qayta</span>
-                </button>
-              </div>
-
-              <StageProgress stage={stage} current={overallQ} total={TOTAL_Q} isDark={isDark} />
-
-              {/* Stage 1 */}
-              {stage === 1 && (() => {
-                const fcIdx = Math.min(currentQ, FORCED_CHOICE.length - 1);
-                const fcQ = FORCED_CHOICE[fcIdx];
-                const slots: ('a' | 'b')[] = fcSwap[fcIdx] ? ['b', 'a'] : ['a', 'b'];
-                return (
-                <AnimatePresence mode="wait">
-                  <motion.div key={fcQ.id} initial={{ opacity:0, x:60 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-60 }} transition={{ duration:0.35, ease:'easeInOut' }}>
-                    <h2 className={`text-xl md:text-2xl font-bold text-center mb-8 ${text}`}>{fcQ.text}</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      {slots.map(key => {
-                        const opt = key === 'a' ? fcQ.optionA : fcQ.optionB;
-                        const isSelected = s1Answers[fcQ.id] === key;
-                        const Icon = opt.icon;
-                        return (
-                          <motion.button
-                            key={key}
-                            onClick={() => handleS1(key)}
-                            whileHover={{ scale:1.02, y:-3 }} whileTap={{ scale:0.98 }}
-                            className={`relative flex flex-col items-center gap-4 p-8 rounded-3xl border-2 transition-all duration-300 cursor-pointer text-center backdrop-blur-xl ${
-                              isSelected ? 'border-[#0061ff] shadow-lg' : isDark ? 'border-white/10 bg-slate-800/60 hover:border-white/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-lg'
-                            }`}
-                            style={isSelected ? { background: isDark ? 'rgba(0,97,255,0.12)' : 'rgba(0,97,255,0.05)' } : {}}
-                          >
-                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${isSelected ? '' : isDark ? 'bg-slate-700/60' : 'bg-slate-100'}`} style={isSelected ? { background: '#0061ff' } : {}}>
-                              <Icon size={26} className={isSelected ? 'text-white' : isDark ? 'text-slate-300' : 'text-slate-500'} />
-                            </div>
-                            <p className={`text-base font-medium leading-snug ${text}`}>{opt.text}</p>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
-                );
-              })()}
-
-              {/* Stage 2 */}
-              {stage === 2 && (
-                <AnimatePresence mode="wait">
-                  <motion.div key={s2Page} initial={{ opacity:0, x:60 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-60 }} transition={{ duration:0.35, ease:'easeInOut' }}>
-                    <h2 className={`text-lg font-bold text-center mb-2 ${text}`}>Quyidagi iboralarga qanchalik qo'shilasiz?</h2>
-                    <p className={`text-sm text-center mb-6 ${sub}`}>1 = Umuman yo'q · 5 = To'liq qo'shilaman</p>
-                    <div className="space-y-5">
-                      {likertPageQs.map((q, qi) => (
-                        <div key={q.id} className={`rounded-2xl border p-5 backdrop-blur-xl ${isDark ? 'bg-slate-800/60 border-white/10' : 'bg-white border-slate-200'}`}>
-                          <p className={`font-normal mb-4 ${text}`}>
-                            <span style={{ color: '#0061ff' }} className="font-bold mr-2">{qi + 1}.</span>{q.text}
-                          </p>
-                          <div className="flex gap-2 justify-center flex-wrap">
-                            {likertScale.map(val => {
-                              const selected = s2Answers[q.id] === val;
-                              const intensity = 0.15 + (val - 1) * 0.2125;
-                              return (
-                                <motion.button
-                                  key={val}
-                                  whileHover={{ scale:1.1 }} whileTap={{ scale:0.95 }}
-                                  onClick={() => setS2Answers(prev => ({ ...prev, [q.id]: val }))}
-                                  className="w-12 h-12 rounded-xl font-bold text-base flex items-center justify-center transition-all duration-200"
-                                  style={{
-                                    background: selected ? '#0061ff' : isDark ? `rgba(0,97,255,${intensity * 0.6})` : `rgba(0,97,255,${intensity * 0.35})`,
-                                    color: selected ? '#fff' : isDark ? '#cbd5e1' : '#334155',
-                                    boxShadow: selected ? '0 4px 16px rgba(0,97,255,0.4)' : undefined,
-                                    transform: selected ? 'scale(1.08)' : undefined,
-                                  }}
-                                >
-                                  {val}
-                                </motion.button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-8 flex justify-center">
-                      <motion.button
-                        whileHover={{ scale: s2PageComplete ? 1.04 : 1 }} whileTap={{ scale: s2PageComplete ? 0.97 : 1 }}
-                        onClick={handleS2Next} disabled={!s2PageComplete}
-                        className={`px-8 py-3.5 rounded-xl font-bold text-white flex items-center gap-2 transition-all duration-300 ${s2PageComplete ? 'shadow-lg' : 'opacity-40 cursor-not-allowed'}`}
-                        style={{ background: s2PageComplete ? '#0061ff' : '#6b7280' }}
-                      >
-                        {s2Page < S2_PAGES - 1 ? 'Keyingisi' : 'Yakunlash'}
-                        <ChevronRight size={18} />
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
-              )}
-
-              {/* Stage 3 */}
-              {stage === 3 && (() => {
-                const mcIdx = Math.min(currentQ, MULTI_CHOICE.length - 1);
-                const mcQ = MULTI_CHOICE[mcIdx];
-                const order = mcOrder[mcIdx] || [0, 1, 2, 3];
-                const orderedOptions = order.map(i => mcQ.options[i]);
-                return (
-                <AnimatePresence mode="wait">
-                  <motion.div key={mcQ.id} initial={{ opacity:0, x:60 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-60 }} transition={{ duration:0.35, ease:'easeInOut' }}>
-                    <div className="text-xs font-bold uppercase tracking-wider text-center mb-3" style={{ color: '#0061ff' }}>
-                      Vaziyat {mcIdx + 1} / {MULTI_CHOICE.length}
-                    </div>
-                    <h2 className={`text-lg md:text-xl font-bold text-center mb-8 ${text}`}>{mcQ.text}</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {orderedOptions.map(opt => {
-                        const isSelected = s3Answers[mcQ.id] === opt.label;
-                        const Icon = opt.icon;
-                        return (
-                          <motion.button
-                            key={opt.label}
-                            onClick={() => handleS3(opt.label)}
-                            whileHover={{ scale:1.02, y:-2 }} whileTap={{ scale:0.98 }}
-                            className={`relative flex items-start gap-4 p-5 rounded-2xl border-2 text-left transition-all duration-300 ${
-                              isSelected ? 'border-[#0061ff] shadow-lg' : isDark ? 'border-white/10 bg-slate-800/60 hover:border-white/20' : 'border-slate-200 bg-white hover:border-slate-400 hover:shadow-md'
-                            }`}
-                            style={isSelected ? { background: isDark ? 'rgba(0,97,255,0.1)' : 'rgba(0,97,255,0.05)' } : {}}
-                          >
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: isSelected ? '#0061ff' : isDark ? '#334155' : '#f1f5f9' }}>
-                              <Icon size={17} className={isSelected ? 'text-white' : isDark ? 'text-slate-300' : 'text-slate-500'} />
-                            </div>
-                            <p className={`text-sm font-normal leading-relaxed pt-1.5 ${text}`}>{opt.text}</p>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
-                );
-              })()}
-            </div>
-          </motion.div>
-        )}
-
-        {/* CALCULATING */}
-        {view === 'calculating' && (
-          <motion.div key="calculating" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
-            <motion.div
-              animate={{ rotate:360 }} transition={{ duration:2, repeat:Infinity, ease:'linear' }}
-              className="w-20 h-20 rounded-full mb-8"
-              style={{ border:'4px solid #0061ff', borderTopColor:'transparent' }}
-            />
-            <h2 className={`text-2xl font-bold mb-3 ${text}`}>Natijalar hisoblanmoqda{'.'.repeat(calcDots)}</h2>
-            <p className={`text-center ${sub}`}>Javoblaringiz RIASEC modeli asosida tahlil qilinmoqda</p>
-            <div className="flex gap-2 mt-8">
-              {TYPES.map((t, i) => (
-                <motion.div
-                  key={t} className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: RIASEC_INFO[t].color }}
-                  animate={{ scale:[1,1.5,1], opacity:[0.5,1,0.5] }}
-                  transition={{ duration:1, repeat:Infinity, delay:i*0.15 }}
-                />
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* RESULT */}
-        {view === 'result' && (
-          <motion.div key="result" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} className="relative z-10 min-h-screen px-4 pt-36 pb-12">
-            <div className="max-w-4xl mx-auto">
-
-              <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} className="text-center mb-8">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(0,97,255,0.1)' }}>
-                  <Trophy size={30} style={{ color: '#0061ff' }} />
-                </div>
-                <h1 className={`text-3xl md:text-4xl font-black mb-3 ${text}`}>
-                  {userName ? `Ajoyib, ${userName}!` : 'Sizning Natijangiz'}
+          <motion.section key="intro" {...fade} className="relative pt-28 pb-20 lg:pt-36 lg:pb-28" aria-labelledby="ct-title">
+            <HexBackdrop reduced={reduced} />
+            <div className="wrap relative grid gap-12 lg:grid-cols-12 lg:gap-8 items-start">
+              <div className="lg:col-span-6">
+                <p className="t-kicker">Karyera laboratoriyasi · Holland RIASEC</p>
+                <h1 id="ct-title" className="t-display mt-6 max-w-[13ch]">
+                  Kasbingizni <span className="ink-grad">maʼlumot</span> bilan aniqlang.
                 </h1>
-                <p className={`text-lg ${sub}`}>Holland RIASEC modeli asosida siz uchun mos kurslar aniqlandi</p>
-              </motion.div>
-
-              {/* Holland Code */}
-              <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.08 }} className={`rounded-3xl border p-6 mb-6 flex items-center gap-5 ${isDark ? 'bg-[#0061ff]/10 border-[#0061ff]/25' : 'bg-blue-50 border-blue-100'}`}>
-                <div className="text-center shrink-0">
-                  <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isDark ? 'text-blue-300' : 'text-blue-500'}`}>Holland Kodi</p>
-                  <p className="text-3xl font-black tracking-wider" style={{ color: '#0061ff' }}>{hollandCode.join('')}</p>
-                </div>
-                <div className={`h-12 w-px ${isDark ? 'bg-white/10' : 'bg-blue-200'}`} />
-                <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                  {hollandCode.map(t => RIASEC_INFO[t].short).join(' → ')} — bu uch tip sizning kasbiy qiziqishlaringizning ustuvor kombinatsiyasini ilmiy tarzda ifodalaydi.
+                <p className="t-lead mt-6 max-w-[34rem]">
+                  {TOTAL_Q} ta savol qiziqishlaringizni olti oʻlchovda baholaydi va sizga eng mos yoʻnalishni — dasturlash, media, dizayn yoki moliyani — koʻrsatadi.
                 </p>
-              </motion.div>
 
-              {/* Radar + Quality */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.12 }} className={`rounded-3xl border p-6 backdrop-blur-xl ${isDark ? 'bg-slate-800/60 border-white/10' : 'bg-white border-slate-200 shadow-lg'}`}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <Layers size={20} style={{ color: '#0061ff' }} />
-                    <h2 className={`text-lg font-bold ${text}`}>Profil Grafigi</h2>
-                  </div>
-                  <p className={`text-xs mb-2 ${sub}`}>Holland olti burchagi bo'yicha qiziqishlar taqsimoti</p>
-                  <ResponsiveContainer width="100%" height={240}>
-                    <RadarChart data={radarData} outerRadius="72%">
-                      <PolarGrid stroke={isDark ? 'rgba(255,255,255,0.12)' : '#e2e8f0'} />
-                      <PolarAngleAxis dataKey="type" tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 11, fontWeight: 600 }} />
-                      <PolarRadiusAxis domain={[0, 50]} tick={false} axisLine={false} />
-                      <Radar dataKey="value" stroke="#0061ff" fill="#0061ff" fillOpacity={0.35} strokeWidth={2} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </motion.div>
+                <ul className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-px rounded-2xl overflow-hidden max-w-[36rem]" style={{ background: 'var(--line)' }}>
+                  {[
+                    ['≈12', 'daqiqa'],
+                    [String(TOTAL_Q), 'savol'],
+                    ['3', 'bosqich'],
+                    ['PDF', 'hisobot'],
+                  ].map(([n, l]) => (
+                    <li key={l} className="p-4" style={{ background: 'var(--bg)' }}>
+                      <span className="block mono text-2xl" style={{ fontWeight: 500 }}>{n}</span>
+                      <span className="block text-sm ink-3 mt-1">{l}</span>
+                    </li>
+                  ))}
+                </ul>
 
-                <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.16 }} className={`rounded-3xl border p-6 backdrop-blur-xl ${isDark ? 'bg-slate-800/60 border-white/10' : 'bg-white border-slate-200 shadow-lg'}`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <ShieldCheck size={20} style={{ color: '#0061ff' }} />
-                    <h2 className={`text-lg font-bold ${text}`}>Natija Ishonchliligi</h2>
-                  </div>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="relative shrink-0">
-                      <CircularProgress pct={quality.confidence} color="#0061ff" size={84} />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-lg font-black" style={{ color: '#0061ff' }}>{quality.confidence}%</span>
-                      </div>
-                    </div>
-                    <p className={`text-xs leading-relaxed ${sub}`}>
-                      {quality.confidence >= 75
-                        ? "Javoblaringiz izchil va profilingiz aniq ajralgan — natija yuqori ishonchli."
-                        : quality.confidence >= 55
-                        ? "Natija ishonchli, ammo ba'zi tiplar bir-biriga yaqin — kurs tanlashda ikkinchi variantni ham ko'rib chiqing."
-                        : "Profilingiz nisbatan tekis chiqdi. Aniqroq natija uchun testni shoshilmasdan qayta topshirishni tavsiya qilamiz."}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    {[
-                      { icon: Scale, label: 'Differensiatsiya', val: `${diffLabel(quality.differentiation)} · ${quality.differentiation}%`, hint: 'Tiplar orasidagi farq aniqligi' },
-                      { icon: Gauge, label: 'Izchillik', val: consLabel(quality.consistencyDistance), hint: 'Ustuvor 2 tipning o\'zaro yaqinligi' },
-                    ].map(m => (
-                      <div key={m.label} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${isDark ? 'bg-slate-700/40' : 'bg-slate-50'}`}>
-                        <m.icon size={15} style={{ color: '#0061ff' }} className="shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`text-xs font-bold ${text}`}>{m.label}</span>
-                            <span className="text-xs font-black" style={{ color: '#0061ff' }}>{m.val}</span>
-                          </div>
-                          <p className={`text-[10px] ${sub}`}>{m.hint}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
+                <ol className="mt-12 grid gap-0 max-w-[36rem]">
+                  {[
+                    ['01', STAGE_LABELS[0], `${FORCED_CHOICE.length} juftlik — ikkitadan sizga yaqinini tanlaysiz.`],
+                    ['02', STAGE_LABELS[1], `${LIKERT.length} ta fikrga 1 dan 5 gacha baho berasiz.`],
+                    ['03', STAGE_LABELS[2], `${MULTI_CHOICE.length} ta real vaziyatda qanday yoʻl tutishingizni tanlaysiz.`],
+                  ].map(([n, t, d]) => (
+                    <li key={n} className="hairline py-4 grid grid-cols-[3rem_1fr] gap-2">
+                      <span className="mono ink-blue text-sm pt-0.5">{n}</span>
+                      <span>
+                        <span className="block font-semibold">{t}</span>
+                        <span className="block text-[0.95rem] ink-2 mt-0.5">{d}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-6 text-sm ink-3 max-w-[36rem]">
+                  J. Holland (1997) nazariyasi asosida: barcha 15 ta tip juftligi taqqoslanadi, har bosqich teng vaznda, variantlar tasodifiy tartibda.
+                </p>
               </div>
 
-              {/* Full profile */}
-              <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2 }} className={`rounded-3xl border p-6 mb-6 backdrop-blur-xl ${isDark ? 'bg-slate-800/60 border-white/10' : 'bg-white border-slate-200 shadow-lg'}`}>
-                <div className="flex items-center gap-3 mb-5">
-                  <Award size={20} style={{ color: '#0061ff' }} />
-                  <h2 className={`text-lg font-bold ${text}`}>Sizning Holland Profilingiz</h2>
-                </div>
-                <div className="space-y-4">
-                  {ordered.map(t => {
-                    const Icon = RIASEC_INFO[t].icon;
-                    return (
-                      <div key={t} className="flex items-start gap-3">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ background: `${RIASEC_INFO[t].color}1f` }}>
-                          <Icon size={16} style={{ color: RIASEC_INFO[t].color }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={`text-sm font-bold truncate ${text}`}>{RIASEC_INFO[t].name}</span>
-                            <span className="text-sm font-black shrink-0 ml-2" style={{ color:RIASEC_INFO[t].color }}>{percentages[t]}%</span>
-                          </div>
-                          <div className={`h-2 rounded-full overflow-hidden mb-1.5 ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                            <motion.div
-                              className="h-full rounded-full"
-                              style={{ backgroundColor:RIASEC_INFO[t].color }}
-                              initial={{ width:0 }} animate={{ width:`${percentages[t]}%` }}
-                              transition={{ duration:1, delay:0.3 }}
-                            />
-                          </div>
-                          <p className={`text-xs leading-relaxed mb-1 ${sub}`}>{RIASEC_INFO[t].desc}</p>
-                          <p className={`text-[11px] italic ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Tipik kasblar: {RIASEC_INFO[t].careers}</p>
+              <div className="lg:col-span-5 lg:col-start-8 lg:sticky lg:top-28">
+                <form onSubmit={startTest} noValidate className="panel p-6 sm:p-9 backdrop-blur-xl" style={{ background: 'color-mix(in srgb, var(--bg-2) 88%, transparent)' }} aria-labelledby="ct-form-title">
+                  <p id="ct-form-title" className="t-h3">Natijani kimga tayyorlaymiz?</p>
+                  <p className="t-body mt-2 !text-[0.95rem]">Hisobot shaxsiy boʻladi, mos kurslar yoshingizga qarab saralanadi.</p>
+
+                  <div className="mt-7 grid gap-5">
+                    <div>
+                      <label htmlFor="ct-name" className="block text-sm font-medium mb-2">Ismingiz</label>
+                      <input
+                        ref={nameRef} id="ct-name" name="name" autoComplete="given-name" maxLength={60}
+                        value={userName} onChange={e => setUserName(e.target.value)}
+                        aria-invalid={!!errors.name} aria-describedby={errors.name ? 'ct-name-err' : undefined}
+                        className={fieldCls} placeholder="Masalan, Dilnoza"
+                      />
+                      {errors.name && <p id="ct-name-err" className="field-err">{errors.name}</p>}
+                    </div>
+                    <div>
+                      <label htmlFor="ct-phone" className="block text-sm font-medium mb-2">Telefon raqamingiz</label>
+                      <div className="field-group" data-invalid={!!errors.phone || undefined}>
+                        <span className="flex items-center pl-5 pr-2 mono ink-3 select-none" aria-hidden="true">+998</span>
+                        <input
+                          ref={phoneRef} id="ct-phone" name="phone" type="tel" inputMode="numeric" autoComplete="tel-national"
+                          value={userPhone} onChange={handlePhoneChange} maxLength={14}
+                          aria-invalid={!!errors.phone} aria-describedby={errors.phone ? 'ct-phone-err' : 'ct-phone-hint'}
+                          className="bare-input flex-1 min-w-0 h-14 pr-5 outline-none text-[1.0625rem]"
+                          style={{ background: 'transparent', border: 0, color: 'var(--fg)' }}
+                          placeholder="90 123 45 67"
+                        />
+                      </div>
+                      {errors.phone
+                        ? <p id="ct-phone-err" className="field-err">{errors.phone}</p>
+                        : <p id="ct-phone-hint" className="text-xs ink-3 mt-2">Natija va mos kurslar boʻyicha maslahat uchun.</p>}
+                    </div>
+                    <div className="grid grid-cols-[minmax(0,7rem)_1fr] gap-4">
+                      <div>
+                        <label htmlFor="ct-age" className="block text-sm font-medium mb-2">Yoshingiz</label>
+                        <input
+                          ref={ageRef} id="ct-age" name="age" inputMode="numeric" maxLength={2}
+                          value={userAge} onChange={e => setUserAge(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                          aria-invalid={!!errors.age} aria-describedby={errors.age ? 'ct-age-err' : undefined}
+                          className={`${fieldCls} mono`} placeholder="17"
+                        />
+                      </div>
+                      <div>
+                        <span id="ct-gender-label" className="block text-sm font-medium mb-2">Jinsingiz</span>
+                        <div role="radiogroup" aria-labelledby="ct-gender-label" aria-describedby={errors.gender ? 'ct-gender-err' : undefined} className="grid grid-cols-2 gap-2">
+                          {([['male', 'Erkak'], ['female', 'Ayol']] as [Gender, string][]).map(([val, label], i) => (
+                            <button
+                              key={val} ref={i === 0 ? genderRef : undefined} type="button" role="radio"
+                              aria-checked={userGender === val}
+                              onClick={() => setUserGender(val)}
+                              className="seg"
+                              data-invalid={!!errors.gender || undefined}
+                            >
+                              {label}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
+                    </div>
+                    {(errors.age || errors.gender) && (
+                      <div className="-mt-2">
+                        {errors.age && <p id="ct-age-err" className="field-err">{errors.age}</p>}
+                        {errors.gender && <p id="ct-gender-err" className="field-err">{errors.gender}</p>}
+                      </div>
+                    )}
+                  </div>
 
-              {/* PDF */}
-              <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.24 }} className="mb-8">
-                <button
-                  onClick={handleDownloadPdf} disabled={generatingPdf}
-                  className={`w-full flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl font-bold text-sm border-2 transition-all ${
-                    generatingPdf ? 'opacity-60 cursor-wait' : 'hover:-translate-y-0.5'
-                  } ${isDark ? 'border-[#0061ff]/40 bg-[#0061ff]/10 text-[#60efff] hover:bg-[#0061ff]/15' : 'border-[#0061ff]/30 bg-blue-50 text-[#0061ff] hover:bg-blue-100'}`}
-                >
-                  {generatingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                  {generatingPdf ? 'PDF tayyorlanmoqda...' : "To'liq ilmiy hisobotni PDF sifatida yuklab olish"}
+                  <button type="submit" className="btn btn-primary w-full mt-8">
+                    Testni boshlash <ArrowRight size={18} aria-hidden="true" />
+                  </button>
+                  <p className="text-xs ink-3 mt-4 leading-relaxed">
+                    Maʼlumotlaringiz faqat test natijasi va tavsiya etilgan kurslar boʻyicha siz bilan bogʻlanish uchun ishlatiladi.
+                  </p>
+                </form>
+              </div>
+            </div>
+          </motion.section>
+        )}
+
+        {/* ═══ TEST ═══ */}
+        {view === 'test' && (
+          <motion.section key="test" {...fade} className="relative pt-24 pb-20 sm:pt-28" aria-label="Karyera testi savollari">
+            <div className="wrap" style={{ maxWidth: '64rem' }}>
+              {/* boshqaruv paneli */}
+              <div className="flex items-center justify-between gap-3">
+                <button type="button" onClick={goBack} disabled={atStart} className="btn btn-ghost !min-h-[44px] !px-4 !text-[0.9rem]">
+                  <ArrowLeft size={16} aria-hidden="true" /> Orqaga
                 </button>
-              </motion.div>
+                <span className="mono text-sm ink-2" aria-live="polite">
+                  <span className="sr-only">Savol </span>{counter} <span className="ink-3">/ {TOTAL_Q}</span>
+                </span>
+                <button
+                  type="button" onClick={onRestartClick}
+                  className={`btn !min-h-[44px] !px-4 !text-[0.9rem] ${confirmRestart ? 'btn-primary' : 'btn-ghost'}`}
+                  aria-label={confirmRestart ? 'Tasdiqlang: testni qaytadan boshlash' : 'Testni qaytadan boshlash'}
+                >
+                  <RotateCcw size={16} aria-hidden="true" />
+                  <span className={confirmRestart ? '' : 'hidden sm:inline'}>{confirmRestart ? 'Tasdiqlash' : 'Qaytadan'}</span>
+                </button>
+              </div>
 
-              {/* Strengths */}
-              {displayStrengths.length > 0 && (
-                <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.28 }} className={`rounded-3xl border p-6 mb-8 backdrop-blur-xl ${isDark ? 'bg-slate-800/60 border-white/10' : 'bg-white border-slate-200 shadow-lg'}`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <Sparkles size={20} style={{ color: '#0061ff' }} />
-                    <h2 className={`text-lg font-bold ${text}`}>Sizning Kuchli Tomonlaringiz</h2>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {displayStrengths.map(s => (
-                      <div key={s.name} className={`flex items-start gap-3 px-4 py-3 rounded-xl border ${isDark ? 'bg-slate-700/40 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(0,97,255,0.1)' }}>
-                          <s.icon size={15} style={{ color: '#0061ff' }} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className={`text-sm font-semibold ${text}`}>{s.name}</p>
-                          <p className={`text-[11px] leading-snug ${sub}`}>{s.desc}</p>
-                        </div>
+              {/* bosqichlar */}
+              <div
+                className="mt-6 grid grid-cols-3 gap-2"
+                role="progressbar" aria-label="Test jarayoni"
+                aria-valuemin={0} aria-valuemax={TOTAL_Q} aria-valuenow={answeredTotal}
+                aria-valuetext={`${STAGE_LABELS[stage - 1]}, ${answeredTotal} ta javob`}
+              >
+                {[1, 2, 3].map(s => {
+                  const fill = s < stage ? 1 : s === stage ? Math.max(0.04, stageFrac) : 0;
+                  return (
+                    <div key={s}>
+                      <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--line-2)' }}>
+                        <motion.div
+                          className="h-full w-full rounded-full"
+                          style={{ background: 'var(--grad)', originX: 0 }}
+                          initial={false}
+                          animate={{ scaleX: fill }}
+                          transition={{ duration: reduced ? 0 : 0.5, ease: EASE_OUT }}
+                        />
                       </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
+                      <span className={`mt-2 block text-xs ${s === stage ? '' : 'ink-3'}`}>
+                        <span className="mono mr-1.5">0{s}</span>
+                        <span className={s === stage ? '' : 'hidden sm:inline'}>{STAGE_LABELS[s - 1]}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
 
-              {/* Courses */}
-              <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.32 }} className="mb-8">
-                <div className="flex items-center gap-3 mb-2">
-                  <Target size={20} style={{ color:'#0061ff' }} />
-                  <h2 className={`text-xl font-bold ${text}`}>Mos Kurslar</h2>
-                </div>
-                <p className={`text-xs mb-5 ${sub}`}>
-                  Moslik profil shakli (kosinus) va Holland kodlari mosligi (Iachan indeksi) asosida hisoblangan · yosh bo'yicha filtrlangan
-                </p>
-                {results.length < 3 && ageValid && (
-                  <div className={`text-xs mb-5 px-4 py-3 rounded-xl border ${isDark ? 'bg-slate-800/60 border-white/10 text-slate-300' : 'bg-blue-50/60 border-blue-100 text-slate-600'}`}>
-                    {ageNum} yosh uchun ayni paytda {results.length} ta kurs mavjud — qolgan yo'nalishlarimiz 15 yoshdan boshlanadi.
-                  </div>
-                )}
-                <div className="space-y-5">
-                  {results.map((r, idx) => {
-                    const topTypes = [...TYPES].sort((a,b) => r.course.riasec[b]-r.course.riasec[a]).slice(0,3);
-                    return (
-                      <motion.div
-                        key={r.course.id}
-                        initial={{ opacity:0, x:30 }} animate={{ opacity:1, x:0 }}
-                        transition={{ delay:0.36+idx*0.1 }}
-                        className={`rounded-2xl overflow-hidden border ${idx === 0 ? 'border-[#0061ff]' : card}`}
-                      >
-                        <div className={`p-6 ${idx === 0 ? (isDark ? 'bg-[#0061ff]/10' : 'bg-blue-50/50') : ''}`}>
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <span
-                                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black"
-                                  style={{ background: idx === 0 ? '#0061ff' : isDark ? '#334155' : '#e2e8f0', color: idx === 0 ? '#fff' : isDark ? '#cbd5e1' : '#475569' }}
-                                >
-                                  {r.rank}
-                                </span>
-                                <span className="text-sm font-bold" style={{ color: idx === 0 ? '#0061ff' : isDark ? '#94a3b8' : '#64748b' }}>
-                                  #{r.rank} O'rin
-                                </span>
-                              </div>
-                              <h3 className={`text-xl font-black mb-1 ${text}`}>{r.course.name}</h3>
-                              <p className={`text-sm mb-3 ${sub}`}>{r.course.desc}</p>
-                              <div className="flex flex-wrap gap-2 mb-4">
-                                {topTypes.map(t => (
-                                  <span key={t} className="text-xs px-2 py-1 rounded-full font-medium text-white" style={{ backgroundColor:RIASEC_INFO[t].color }}>
-                                    {RIASEC_INFO[t].short}
-                                  </span>
+              <AnimatePresence mode="wait" custom={dir} initial={false}>
+                <motion.div
+                  key={qKey}
+                  custom={dir}
+                  variants={slide}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  className="mt-12 sm:mt-16"
+                  onAnimationComplete={def => { if (def === 'center') headingRef.current?.focus({ preventScroll: true }); }}
+                >
+                  {/* Bosqich 1 — majburiy tanlov */}
+                  {stage === 1 && (
+                    <>
+                      <p className="t-kicker">Savol {String(currentQ + 1).padStart(2, '0')} · Qaysi biri sizga yaqinroq?</p>
+                      <h2 ref={headingRef} tabIndex={-1} className="t-q mt-4 outline-none">{uz(stage1Q.text)}</h2>
+                      <div className="mt-10 grid gap-3 sm:gap-4 md:grid-cols-2" role="group" aria-label="Variantlar">
+                        {stage1Slots.map((key, i) => {
+                          const opt = key === 'a' ? stage1Q.optionA : stage1Q.optionB;
+                          const Icon = opt.icon;
+                          return (
+                            <button
+                              key={key} type="button" className="choice md:min-h-[15rem]"
+                              aria-pressed={s1Answers[stage1Q.id] === key}
+                              onClick={() => handleS1(key)}
+                            >
+                              <span className="flex items-center justify-between w-full">
+                                <span className="ico"><Icon size={24} aria-hidden="true" /></span>
+                                <span className="key" aria-hidden="true">{i + 1}</span>
+                              </span>
+                              <span className="text-[1.15rem] md:text-[1.3rem] leading-snug font-medium tracking-[-0.015em]">{uz(opt.text)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Bosqich 2 — Likert */}
+                  {stage === 2 && (
+                    <>
+                      <p className="t-kicker">Oʻzini baholash · {s2Page + 1}/{S2_PAGES}</p>
+                      <h2 ref={headingRef} tabIndex={-1} className="t-q mt-4 outline-none">Bu fikrlar sizga qanchalik mos?</h2>
+                      <ol className="mt-10 grid gap-3">
+                        {likertPageQs.map((q, qi) => {
+                          const val = s2Answers[q.id];
+                          return (
+                            <li key={q.id} ref={el => { rowRefs.current[qi] = el; }} className="panel !rounded-[22px] p-5 sm:p-6">
+                              <p id={`lk-${q.id}`} className="text-[1.05rem] sm:text-[1.15rem] leading-snug">
+                                <span className="mono ink-3 mr-3 text-sm">{FORCED_CHOICE.length + s2Page * S2_PER_PAGE + qi + 1}</span>
+                                {uz(q.text)}
+                              </p>
+                              <div className="mt-5 grid grid-cols-5 gap-2" role="group" aria-labelledby={`lk-${q.id}`}>
+                                {[1, 2, 3, 4, 5].map(v => (
+                                  <button
+                                    key={v} type="button" className="scale-btn"
+                                    aria-pressed={val === v}
+                                    data-fill={val !== undefined && v < val ? 'on' : undefined}
+                                    aria-label={`${v} — ${LIKERT_HINTS[v - 1]}`}
+                                    title={LIKERT_HINTS[v - 1]}
+                                    onClick={() => handleS2Answer(q.id, v)}
+                                  >
+                                    {v}
+                                  </button>
                                 ))}
                               </div>
-                              <p className={`text-xs flex items-start gap-1.5 ${sub}`}>
-                                <Star size={12} className="mt-0.5 shrink-0" style={{ color:'#0061ff' }} />
-                                Nima uchun mos: sizning {topTypes.slice(0,2).map(t => RIASEC_INFO[t].short).join(' va ')} qobiliyatlaringiz bu kurs talablariga yaqin
-                              </p>
-                            </div>
-                            <div className="flex flex-col items-center flex-shrink-0">
-                              <div className="relative">
-                                <CircularProgress pct={r.matchScore} color="#0061ff" size={72} />
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <span className="text-base font-black" style={{ color: '#0061ff' }}>{r.matchScore}%</span>
-                                </div>
+                              <div className="mt-2 flex justify-between text-xs ink-3" aria-hidden="true">
+                                <span>{LIKERT_HINTS[0]}</span>
+                                <span>{LIKERT_HINTS[4]}</span>
                               </div>
-                              <span className={`text-xs mt-1 ${sub}`}>Moslik</span>
-                            </div>
-                          </div>
-                          <div className="flex gap-3 mt-4 flex-wrap">
-                            <Link to={r.course.url}>
-                              <motion.button
-                                whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }}
-                                className="px-5 py-2.5 rounded-xl text-white font-semibold text-sm flex items-center gap-2 transition-all"
-                                style={{ background: '#0061ff' }}
-                              >
-                                <BookOpen size={15} />Kursga o'tish
-                              </motion.button>
-                            </Link>
-                            <motion.button
-                              whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }}
-                              onClick={() => setEnrollCourse({ name:r.course.name, id:r.course.id })}
-                              className={`px-5 py-2.5 rounded-xl font-semibold text-sm border-2 flex items-center gap-2 transition-all ${isDark ? 'border-blue-500 text-blue-400 hover:bg-blue-500/10' : 'border-blue-500 text-blue-600 hover:bg-blue-50'}`}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                      <div className="mt-8 flex items-center justify-between gap-4">
+                        <span className="text-sm ink-3" aria-live="polite">{s2AnsweredOnPage}/{likertPageQs.length} javob</span>
+                        <button ref={nextBtnRef} type="button" onClick={handleS2Next} disabled={!s2PageComplete} className="btn btn-primary">
+                          {s2Page < S2_PAGES - 1 ? 'Keyingisi' : '3-bosqichga oʻtish'} <ArrowRight size={18} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Bosqich 3 — vaziyatli qaror */}
+                  {stage === 3 && (
+                    <>
+                      <p className="t-kicker">Vaziyat {mcIdx + 1} / {MULTI_CHOICE.length} · Siz nima qilasiz?</p>
+                      <h2 ref={headingRef} tabIndex={-1} className="t-q mt-4 outline-none">{uz(mcQ.text)}</h2>
+                      <div className="mt-10 grid gap-3 md:grid-cols-2" role="group" aria-label="Variantlar">
+                        {mcOptions.map((opt, i) => {
+                          const Icon = opt.icon;
+                          return (
+                            <button
+                              key={opt.label} type="button" className="choice !flex-row !items-start !gap-4"
+                              aria-pressed={s3Answers[mcQ.id] === opt.label}
+                              onClick={() => handleS3(opt.label)}
                             >
-                              <CheckCircle size={15} />Yozilish
-                            </motion.button>
+                              <span className="ico !w-11 !h-11 shrink-0"><Icon size={20} aria-hidden="true" /></span>
+                              <span className="flex-1 text-[1.02rem] leading-relaxed pt-2">{uz(opt.text)}</span>
+                              <span className="key shrink-0 mt-2" aria-hidden="true">{'ABCD'[i]}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+
+              <p className="mt-10 text-sm ink-3 hidden md:block" aria-hidden="true">
+                Klaviatura: {stage === 1 ? '1 yoki 2' : stage === 2 ? '1–5 baho, Enter — keyingisi' : 'A–D yoki 1–4'}
+              </p>
+            </div>
+          </motion.section>
+        )}
+
+        {/* ═══ HISOBLANMOQDA ═══ */}
+        {view === 'calculating' && (
+          <motion.section key="calc" {...fade} className="relative min-h-[100svh] flex items-center justify-center pt-20 pb-12" aria-busy="true">
+            <div className="wrap max-w-xl text-center">
+              <div className="mx-auto w-full max-w-[22rem]">
+                <HexChart pcts={pcts} reduced={reduced} size={420} />
+              </div>
+              <p className="t-kicker mt-6">Tahlil</p>
+              <p className="t-h3 mt-3" role="status" aria-live="polite">{CALC_STEPS[calcStep]}…</p>
+              <div className="mt-6 h-1 rounded-full overflow-hidden mx-auto max-w-xs" style={{ background: 'var(--line-2)' }}>
+                <motion.div
+                  className="h-full w-full"
+                  style={{ background: 'var(--grad)', originX: 0 }}
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: CALC_MS / 1000, ease: 'linear' }}
+                />
+              </div>
+            </div>
+          </motion.section>
+        )}
+
+        {/* ═══ NATIJA ═══ */}
+        {view === 'result' && outcome && (
+          <motion.div key="result" {...fade} className="relative">
+            {/* 1. Holland kodi */}
+            <section className="pt-28 pb-16 lg:pt-36" aria-labelledby="ct-result-title">
+              <div className="wrap grid gap-12 lg:grid-cols-12 lg:gap-8 items-center">
+                <div className="lg:col-span-6">
+                  <p className="t-kicker">Natija{firstName ? ` · ${firstName}` : ''}</p>
+                  <h1 id="ct-result-title" className="t-h2 mt-5">Sizning Holland kodingiz</h1>
+                  <p className="mono ink-grad mt-4 leading-none tracking-[0.06em] text-[clamp(5rem,15vw,10.5rem)]" style={{ fontWeight: 500 }} aria-label={`Holland kodi: ${hollandCode.join('')}`}>
+                    {hollandCode.join('')}
+                  </p>
+                  <p className="t-lead mt-6 max-w-[34rem]">
+                    <span style={{ color: 'var(--fg)' }}>{hollandCode.map(t => RIASEC_INFO[t].short).join(' → ')}</span>. Bu uch tip kasbiy qiziqishlaringizning ustuvor kombinatsiyasi.
+                  </p>
+
+                  <dl className="mt-10 grid grid-cols-3 gap-px rounded-2xl overflow-hidden max-w-[34rem]" style={{ background: 'var(--line)' }}>
+                    {[
+                      ['Ishonchlilik', `${quality.confidence}%`, 'Javoblar izchilligi'],
+                      ['Farqlanish', uz(diffLabel(quality.differentiation)), `${quality.differentiation}% farq`],
+                      ['Izchillik', uz(consLabel(quality.consistencyDistance)), 'Ustuvor 2 tip yaqinligi'],
+                    ].map(([k, v, h]) => (
+                      <div key={k} className="p-4" style={{ background: 'var(--bg)' }}>
+                        <dt className="text-xs ink-3">{k}</dt>
+                        <dd className="text-xl font-semibold tracking-[-0.02em] mt-1">{v}</dd>
+                        <dd className="text-xs ink-3 mt-1 leading-snug">{h}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className="t-body mt-5 max-w-[34rem] !text-[0.95rem]">
+                    {quality.confidence >= 75
+                      ? 'Javoblaringiz izchil va profilingiz aniq ajralgan — natija yuqori ishonchli.'
+                      : quality.confidence >= 55
+                        ? 'Natija ishonchli, ammo baʼzi tiplar bir-biriga yaqin — kurs tanlashda ikkinchi variantni ham koʻrib chiqing.'
+                        : 'Profilingiz nisbatan tekis chiqdi. Aniqroq natija uchun testni shoshilmasdan qayta topshirishni tavsiya qilamiz.'}
+                  </p>
+
+                  <div className="mt-8 flex flex-wrap gap-3">
+                    <button type="button" onClick={handleDownloadPdf} disabled={generatingPdf} aria-busy={generatingPdf} className="btn btn-primary">
+                      {generatingPdf ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <Download size={18} aria-hidden="true" />}
+                      {generatingPdf ? 'Tayyorlanmoqda…' : 'PDF hisobot'}
+                    </button>
+                    <button type="button" onClick={handleShare} className="btn btn-ghost">
+                      <Share2 size={18} aria-hidden="true" /> Ulashish
+                    </button>
+                  </div>
+                </div>
+                <div className="lg:col-span-6">
+                  <div className="mx-auto max-w-[32rem]">
+                    <HexChart pcts={pcts} reduced={reduced} />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* 2. Mos kurslar */}
+            <section className="py-16 lg:py-24 hairline" aria-labelledby="ct-courses-title">
+              <div className="wrap">
+                <div className="grid gap-6 lg:grid-cols-12 items-end">
+                  <div className="lg:col-span-7">
+                    <p className="t-kicker">01 — Tavsiya</p>
+                    <h2 id="ct-courses-title" className="t-h2 mt-5">Sizga mos kurslar</h2>
+                  </div>
+                  <p className="lg:col-span-5 t-body !text-[0.95rem]">
+                    Moslik profil shakli oʻxshashligi (kosinus) va Holland kodlari mosligi (Iachan indeksi) asosida hisoblangan, yoshingiz boʻyicha saralangan.
+                  </p>
+                </div>
+                {results.length < 3 && ageValid && (
+                  <p className="mt-8 text-sm ink-2 panel !rounded-2xl px-5 py-4">
+                    {ageNum} yosh uchun ayni paytda {results.length} ta kurs mavjud — qolgan yoʻnalishlarimiz 15 yoshdan boshlanadi.
+                  </p>
+                )}
+
+                {results[0] && (() => {
+                  const r = results[0];
+                  const topTypes = [...TYPES].sort((a, b) => r.course.riasec[b] - r.course.riasec[a]).slice(0, 3);
+                  return (
+                    <motion.article
+                      initial={{ opacity: 0, y: reduced ? 0 : 24 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, margin: '-60px' }}
+                      transition={{ duration: 0.6, ease: EASE_OUT }}
+                      className="mt-12 rounded-[28px] p-7 sm:p-10 grid gap-8 md:grid-cols-[1fr_auto] items-center relative overflow-hidden"
+                      style={{ background: 'var(--bg-2)', border: '1px solid rgba(0,97,255,.55)', boxShadow: '0 30px 80px -40px rgba(0,97,255,.7)' }}
+                    >
+                      <div>
+                        <p className="t-kicker !text-[var(--blue-ink)]">01 · Eng mos yoʻnalish</p>
+                        <h3 className="t-h2 !text-[clamp(1.9rem,3.6vw,3rem)] mt-4">{uz(r.course.name)}</h3>
+                        <p className="t-body mt-3 max-w-[40rem]">{uz(r.course.desc)}</p>
+                        <ul className="mt-5 flex flex-wrap gap-2" aria-label="Kurs talab qiladigan tiplar">
+                          {topTypes.map(t => (
+                            <li key={t} className="text-sm px-3 py-1 rounded-full flex items-center gap-2" style={{ border: '1px solid var(--line-2)' }}>
+                              <span className="w-2 h-2 rounded-full" style={{ background: RIASEC_INFO[t].color }} aria-hidden="true" />
+                              {RIASEC_INFO[t].short}
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="mt-5 text-sm ink-2">
+                          Nima uchun: sizning {topTypes.slice(0, 2).map(t => RIASEC_INFO[t].short.toLowerCase()).join(' va ')} qiziqishlaringiz bu kurs talablariga eng yaqin.
+                        </p>
+                        <div className="mt-8 flex flex-wrap gap-3">
+                          <button type="button" className="btn btn-primary" onClick={() => setEnrollCourse({ name: r.course.name, id: r.course.id })}>
+                            Kursga yozilish <ArrowRight size={18} aria-hidden="true" />
+                          </button>
+                          <Link to={r.course.url} className="btn btn-ghost">Kurs haqida</Link>
+                        </div>
+                      </div>
+                      <div className="md:text-right md:pl-6">
+                        <span className="block mono ink-grad leading-none text-[clamp(4rem,9vw,7rem)]" style={{ fontWeight: 500 }}>{r.matchScore}%</span>
+                        <span className="block text-sm ink-3 mt-2">moslik</span>
+                      </div>
+                    </motion.article>
+                  );
+                })()}
+
+                {results.length > 1 && (
+                  <ol className="mt-6">
+                    {results.slice(1).map((r, i) => (
+                      <motion.li
+                        key={r.course.id}
+                        initial={reduced ? false : 'off'}
+                        whileInView="on"
+                        viewport={{ once: true, margin: '-40px' }}
+                        variants={{ off: { opacity: 0, y: 16 }, on: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE_OUT, delay: i * 0.05 } } }}
+                        className="hairline py-6 grid gap-4 sm:grid-cols-[3rem_1fr_auto] sm:items-center"
+                      >
+                        <span className="mono ink-3 text-sm">{String(r.rank).padStart(2, '0')}</span>
+                        <div className="min-w-0">
+                          <h3 className="text-[1.3rem] font-semibold tracking-[-0.02em]">{uz(r.course.name)}</h3>
+                          <p className="text-[0.95rem] ink-2 mt-1">{uz(r.course.desc)}</p>
+                          <div className="mt-3 h-1 rounded-full overflow-hidden max-w-sm" style={{ background: 'var(--line-2)' }} aria-hidden="true">
+                            <motion.div
+                              className="h-full w-full"
+                              style={{ background: 'var(--grad)', originX: 0 }}
+                              variants={{ off: { scaleX: 0 }, on: { scaleX: r.matchScore / 100, transition: { duration: 1, ease: EASE_OUT, delay: 0.15 } } }}
+                              initial={reduced ? { scaleX: r.matchScore / 100 } : undefined}
+                            />
                           </div>
                         </div>
-                      </motion.div>
+                        <div className="flex items-center gap-4 sm:justify-end">
+                          <span className="mono text-2xl" style={{ fontWeight: 500 }}>{r.matchScore}%</span>
+                          <Link to={r.course.url} className="btn btn-ghost !min-h-[44px] !px-4 !text-[0.9rem]" aria-label={`${uz(r.course.name)} — kurs haqida`}>
+                            Batafsil
+                          </Link>
+                          <button type="button" className="btn btn-ghost !min-h-[44px] !px-4 !text-[0.9rem]" onClick={() => setEnrollCourse({ name: r.course.name, id: r.course.id })} aria-label={`${uz(r.course.name)} kursiga yozilish`}>
+                            Yozilish
+                          </button>
+                        </div>
+                      </motion.li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </section>
+
+            {/* 3. To'liq profil */}
+            <section className="py-16 lg:py-24 hairline" aria-labelledby="ct-profile-title">
+              <div className="wrap grid gap-10 lg:grid-cols-12">
+                <div className="lg:col-span-4">
+                  <p className="t-kicker">02 — Profil</p>
+                  <h2 id="ct-profile-title" className="t-h2 mt-5">Olti oʻlchov</h2>
+                  <p className="t-body mt-5">Har bir tip qiziqishlaringizning qancha qismini tashkil etishi. Yuqoridagi uchtasi — sizning kodingiz.</p>
+                </div>
+                <ol className="lg:col-span-8">
+                  {ordered.map((t, i) => {
+                    const info = RIASEC_INFO[t];
+                    const Icon = info.icon;
+                    const lead = i < 3;
+                    return (
+                      <motion.li
+                        key={t}
+                        className="hairline py-6 grid grid-cols-[2.75rem_1fr] gap-4"
+                        initial={reduced ? false : 'off'}
+                        whileInView="on"
+                        viewport={{ once: true, margin: '-40px' }}
+                      >
+                        <span className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: `${info.color}1f`, color: info.color }}>
+                          <Icon size={20} aria-hidden="true" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-baseline justify-between gap-3">
+                            <h3 className={`text-[1.15rem] font-semibold tracking-[-0.015em] ${lead ? '' : 'ink-2'}`}>
+                              <span className="mono mr-2" style={{ color: info.color }}>{t}</span>{uz(info.name)}
+                            </h3>
+                            <span className="mono text-lg shrink-0">{pcts[t]}%</span>
+                          </div>
+                          <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--line-2)' }} aria-hidden="true">
+                            <motion.div
+                              className="h-full w-full rounded-full"
+                              style={{ background: info.color, originX: 0 }}
+                              variants={{ off: { scaleX: 0 }, on: { scaleX: pcts[t] / 100, transition: { duration: 1, ease: EASE_OUT, delay: 0.1 } } }}
+                              initial={reduced ? { scaleX: pcts[t] / 100 } : undefined}
+                            />
+                          </div>
+                          {lead && <p className="t-body mt-3 !text-[0.98rem]">{uz(info.desc)}</p>}
+                          <p className="text-sm ink-3 mt-2">Tipik kasblar: {uz(info.careers)}</p>
+                        </div>
+                      </motion.li>
                     );
                   })}
+                </ol>
+              </div>
+            </section>
+
+            {/* 4. Kuchli tomonlar */}
+            {displayStrengths.length > 0 && (
+              <section className="py-16 lg:py-24 hairline" aria-labelledby="ct-strengths-title">
+                <div className="wrap">
+                  <p className="t-kicker">03 — Kuchli tomonlar</p>
+                  <h2 id="ct-strengths-title" className="t-h2 mt-5 max-w-[16ch]">Sizda allaqachon bor narsalar</h2>
+                  <ul className="mt-12 grid gap-px sm:grid-cols-2 lg:grid-cols-3 rounded-[24px] overflow-hidden" style={{ background: 'var(--line)' }}>
+                    {displayStrengths.map(s => (
+                      <li key={s.name} className="p-6 sm:p-7" style={{ background: 'var(--bg)' }}>
+                        <s.icon size={22} className="ink-cyan" aria-hidden="true" />
+                        <p className="mt-5 text-[1.1rem] font-semibold tracking-[-0.015em]">{uz(s.name)}</p>
+                        <p className="text-[0.95rem] ink-2 mt-1.5 leading-relaxed">{uz(s.desc)}</p>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </motion.div>
+              </section>
+            )}
 
-              <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.5 }} className="flex flex-wrap gap-4 justify-center">
-                <motion.button
-                  whileHover={{ scale:1.04 }} whileTap={{ scale:0.97 }} onClick={restartTest}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-xl border-2 font-semibold transition-all ${isDark ? 'border-slate-600 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
-                >
-                  <RotateCcw size={16} />Testni qayta boshlash
-                </motion.button>
-                <Link to="/kurslar">
-                  <motion.button
-                    whileHover={{ scale:1.04 }} whileTap={{ scale:0.97 }}
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl text-white font-semibold transition-all"
-                    style={{ background: '#0061ff' }}
-                  >
-                    <TrendingUp size={16} />Barcha kurslar
-                  </motion.button>
-                </Link>
-              </motion.div>
-
-            </div>
+            {/* 5. Yakun */}
+            <section className="py-16 lg:py-24 hairline">
+              <div className="wrap flex flex-col lg:flex-row gap-8 lg:items-end justify-between">
+                <div>
+                  <p className="t-kicker">Keyingi qadam</p>
+                  <p className="t-h2 mt-5 max-w-[18ch]">Bepul maslahat uchun biz bilan bogʻlaning.</p>
+                  <p className="t-body mt-4 max-w-[36rem]">Natijangiz asosida mutaxassisimiz siz bilan bogʻlanib, kurs tanlashda yordam beradi.</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Link to="/kurslar" className="btn btn-primary">Barcha kurslar <ArrowRight size={18} aria-hidden="true" /></Link>
+                  <button type="button" onClick={restartTest} className="btn btn-ghost">
+                    <RotateCcw size={16} aria-hidden="true" /> Qayta topshirish
+                  </button>
+                </div>
+              </div>
+            </section>
           </motion.div>
         )}
 
@@ -1498,7 +2022,7 @@ export default function CareerTest() {
           onClose={() => setEnrollCourse(null)}
           courseName={enrollCourse.name}
           extraInfo="Karyera testi natijasi asosida tavsiya etildi"
-          initialName={userName}
+          initialName={userName.trim()}
           initialPhone={userPhone}
         />
       )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Pencil, Trash2, X, Save, FileText, Eye, EyeOff, Bold, Italic, Heading, Code, Link, Image, AlignLeft, Columns } from 'lucide-react';
 import toast from 'react-hot-toast';
+import DOMPurify from 'dompurify';
 import { useTheme } from '../../store/ThemeContext';
 import { uploadImageToAPI } from '../../utils/api';
 
@@ -376,7 +377,7 @@ const ManagePosts: React.FC = () => {
                   {previewMode !== 'edit' && (
                     <div
                       className={`rounded-xl border p-4 text-sm leading-relaxed ${previewMode === 'split' ? 'flex-1 min-h-[300px] overflow-y-auto' : 'min-h-[200px]'} ${isDark ? 'bg-slate-800/50 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
-                      dangerouslySetInnerHTML={{ __html: (form as any)[`content_${lang}`] ? renderMarkdown((form as any)[`content_${lang}`]) : `<span style="opacity:0.4">Preview bu yerda ko'rinadi...</span>` }}
+                      dangerouslySetInnerHTML={{ __html: (form as any)[`content_${lang}`] ? DOMPurify.sanitize(renderMarkdown((form as any)[`content_${lang}`])) : `<span style="opacity:0.4">Preview bu yerda ko'rinadi...</span>` }}
                     />
                   )}
                 </div>

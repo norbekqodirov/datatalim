@@ -488,10 +488,12 @@ app.post('/api/leads', leadsLimiter, (req, res) => {
 
         // Use resolvedRef for response instead of arbitrary `sourceRef`
         const finalResult = { ...lead, resolvedSourceRef: resolvedRef || sourceRef };
+        // Public javob: saqlangan qator va scoring ma'lumoti tashqariga chiqmaydi
+        const publicResult = { success: true, resolvedSourceRef: finalResult.resolvedSourceRef };
 
         if (duplicate) {
-            // Takroriy ariza: Sheets'ga qayta yozilmaydi, mavjud lead bilan muvaffaqiyat javobi qaytadi
-            return res.json({ ...finalResult, duplicate: true });
+            // Takroriy ariza: Sheets'ga qayta yozilmaydi, faqat muvaffaqiyat javobi qaytadi
+            return res.json({ ...publicResult, duplicate: true });
         }
 
         // Asynchronously save to Google Sheets
@@ -499,7 +501,7 @@ app.post('/api/leads', leadsLimiter, (req, res) => {
             console.error("Failed to append lead to Google Sheet in background:", err);
         });
 
-        res.json(finalResult);
+        res.json(publicResult);
     } catch (err) {
         serverError(res, err, 'leads');
     }

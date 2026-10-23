@@ -58,7 +58,7 @@ export const CareerLab: React.FC = () => {
           </p>
           <ul className="mt-8 grid grid-cols-3 gap-px rounded-2xl overflow-hidden" style={{ background: 'var(--line)' }}>
             {[
-              ['≈10', 'daqiqa'],
+              ['≈12', 'daqiqa'],
               ['6', 'oʻlchov'],
               ['0', 'soʻm'],
             ].map(([n, l]) => (

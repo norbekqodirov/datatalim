@@ -226,3 +226,128 @@ html.dark .v2 .bare-input {
 .v2 input::placeholder { color: var(--fg-3) !important; opacity: 1; }
 .v2 input:focus-visible,
 .v2 select:focus-visible { outline: 2px solid var(--cyan-ink); outline-offset: 2px; }
+
+/* ---------- forms (shared) ---------- */
+.v2 { --err: #ff7a7a; }
+html:not(.dark) .v2 { --err: #c62828; }
+.v2 .field {
+  width: 100%;
+  height: 3.5rem;
+  padding: 0 1.25rem;
+  border-radius: 16px;
+  font-size: 1.0625rem;
+  outline: none;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  color: var(--fg);
+  transition: border-color 0.2s var(--ease);
+}
+.v2 .field:focus { border-color: var(--blue-ink) !important; }
+.v2 .field-group {
+  display: flex;
+  align-items: stretch;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  transition: border-color 0.2s var(--ease);
+}
+.v2 .field-group:focus-within { border-color: var(--blue-ink); }
+.v2 .field-group input:focus-visible { outline: none; }
+html .v2 .field[aria-invalid="true"],
+.v2 .field-group[data-invalid] { border-color: var(--err) !important; }
+.v2 .field-err { margin-top: 0.5rem; font-size: 0.875rem; color: var(--err); }
+.v2 .seg {
+  height: 3.5rem;
+  border-radius: 16px;
+  border: 1px solid var(--line-2);
+  background: var(--bg);
+  color: var(--fg-2);
+  font-weight: 500;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.v2 .seg:hover { border-color: var(--fg-3); color: var(--fg); }
+.v2 .seg[aria-checked="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+.v2 .seg[data-invalid] { border-color: var(--err); }
+.v2 .btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+.v2 .btn:disabled:active { transform: none; }
+
+/* ---------- career test ---------- */
+.v2 .t-q {
+  font-size: clamp(1.6rem, 3.4vw, 2.75rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  text-wrap: balance;
+  max-width: 28ch;
+}
+.v2 .choice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.5rem;
+  width: 100%;
+  text-align: left;
+  padding: 1.5rem;
+  border-radius: 24px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.3s var(--ease), border-color 0.2s var(--ease), background-color 0.2s var(--ease), box-shadow 0.3s var(--ease);
+}
+@media (min-width: 768px) { .v2 .choice { padding: 1.75rem 2rem; } }
+.v2 .choice:hover { border-color: var(--line-2); transform: translateY(-3px); }
+.v2 .choice:active { transform: scale(0.985); }
+.v2 .choice[aria-pressed="true"] {
+  border-color: var(--blue);
+  background: rgba(0, 97, 255, 0.12);
+  box-shadow: 0 0 0 1px var(--blue), 0 24px 60px -28px rgba(0, 97, 255, 0.9);
+}
+.v2 .choice .ico {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-3);
+  color: var(--fg-2);
+  transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.v2 .choice:hover .ico { color: var(--cyan-ink); }
+.v2 .choice[aria-pressed="true"] .ico { background: var(--blue); color: #fff; }
+.v2 .choice .key {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.75rem;
+  min-width: 1.85rem;
+  height: 1.85rem;
+  padding: 0 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  color: var(--fg-3);
+}
+.v2 .choice[aria-pressed="true"] .key { background: var(--blue); border-color: var(--blue); color: #fff; }
+.v2 .scale-btn {
+  height: 3.25rem;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  background: var(--bg);
+  color: var(--fg-2);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 1rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 0.18s var(--ease), border-color 0.18s var(--ease), color 0.18s var(--ease), transform 0.18s var(--ease);
+}
+.v2 .scale-btn:hover { border-color: var(--fg-3); color: var(--fg); }
+.v2 .scale-btn:active { transform: scale(0.95); }
+.v2 .scale-btn[data-fill] { background: rgba(0, 97, 255, 0.14); border-color: rgba(0, 97, 255, 0.35); color: var(--fg); }
+.v2 .scale-btn[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
