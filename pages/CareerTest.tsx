@@ -1150,7 +1150,6 @@ export default function CareerTest() {
   const autoSubmittedRef = useRef(saved?.submitted ?? false);
   // Qaysi so'rov muvaffaqiyatli yetib borgani — qayta urinishda faqat yetmaganini yuboramiz
   const sentPartsRef = useRef({ lead: saved?.submitted ?? false, result: saved?.submitted ?? false });
-  const [sendFailures, setSendFailures] = useState(0);
   // Kutilayotgan animatsiya taymerlari. Ular bekor qilinmasa, "Qayta"/"Orqaga"
   // bosilganda eski taymer allaqachon almashgan ekranning holatini o'zgartirib
   // yuboradi va AnimatePresence chiqish animatsiyasida qotib qoladi.
@@ -1191,11 +1190,13 @@ export default function CareerTest() {
   const genderValid = userGender !== '';
   const nameValid = userName.trim().length >= 2;
   const rawPhone = userPhone.replace(/\D/g, '');
-  const phoneValid = rawPhone.length === 9;
+  const phoneValid = /^[2-9]\d{8}$/.test(rawPhone); // server bilan bir xil: operator kodi 2–9
   const canStart = ageValid && genderValid && nameValid && phoneValid;
   const errors = {
     name: tried && !nameValid ? 'Ismingizni kiriting (kamida 2 harf).' : '',
-    phone: tried && !phoneValid ? 'Telefon raqamini toʻliq kiriting: 9 ta raqam.' : '',
+    phone: tried && !phoneValid
+      ? (rawPhone.length !== 9 ? 'Telefon raqamini toʻliq kiriting: 9 ta raqam.' : 'Raqam notoʻgʻri. Masalan: 90 123 45 67.')
+      : '',
     age: tried && !ageValid ? 'Yoshingizni kiriting (10–90).' : '',
     gender: tried && !genderValid ? 'Jinsingizni tanlang.' : '',
   };
@@ -1207,9 +1208,11 @@ export default function CareerTest() {
       v: 1, view, stage, currentQ, s2Page,
       s1: s1Answers, s2: s2Answers, s3: s3Answers, fcSwap, mcOrder,
       name: userName, phone: userPhone, age: userAge, gender: userGender,
-      submitted: autoSubmittedRef.current,
+      // faqat serverga haqiqatan yetib borgach "yuborilgan" deb saqlanadi — so'rov paytida sahifa yangilansa qayta yuboriladi
+      // (server ikkala yo'lda ham 10 daqiqalik takror-filtrga ega)
+      submitted: delivered,
     });
-  }, [view, stage, currentQ, s2Page, s1Answers, s2Answers, s3Answers, fcSwap, mcOrder, userName, userPhone, userAge, userGender, sendFailures]);
+  }, [view, stage, currentQ, s2Page, s1Answers, s2Answers, s3Answers, fcSwap, mcOrder, userName, userPhone, userAge, userGender, delivered]);
 
   // Tiklanganda: foydalanuvchiga xabar va (agar yetib bormagan bo'lsa) natijani yuborish
   useEffect(() => {
@@ -1244,6 +1247,7 @@ export default function CareerTest() {
     clearPending();
     autoSubmittedRef.current = false;
     sentPartsRef.current = { lead: false, result: false };
+    setDelivered(false);
     setTried(false);
     setDir(1);
     setOutcome(null);
@@ -1258,6 +1262,7 @@ export default function CareerTest() {
     clearPending();
     autoSubmittedRef.current = false;
     sentPartsRef.current = { lead: false, result: false };
+    setDelivered(false);
     setConfirmRestart(false);
     setOutcome(null);
     setView('intro'); setStage(1); setCurrentQ(0); setS2Page(0);
@@ -1413,7 +1418,6 @@ export default function CareerTest() {
       if (failed.length === 0) { setDelivered(true); return; }
       console.error('Karyera testi natijasini yuborib boʻlmadi:', failed);
       autoSubmittedRef.current = false;
-      setSendFailures(n => n + 1);
       if (attempt < 2) schedule(() => submitCareerTestAuto(pcts, finalResults, attempt + 1), 5000 * (attempt + 1));
     });
   }
@@ -1560,7 +1564,7 @@ export default function CareerTest() {
             <div className="wrap relative grid gap-12 lg:grid-cols-12 lg:gap-8 items-start">
               <div className="lg:col-span-6">
                 <p className="t-kicker">Karyera laboratoriyasi · Holland RIASEC</p>
-                <h1 id="ct-title" className="t-display mt-6 max-w-[13ch]">
+                <h1 id="ct-title" className="t-display mt-6 max-w-[13ch]" style={{ fontSize: 'clamp(2.1rem, 7vw, 6.25rem)' }}>
                   Kasbingizni <span className="ink-grad">maʼlumot</span> bilan aniqlang.
                 </h1>
                 <p className="t-lead mt-6 max-w-[34rem]">
@@ -2143,6 +2147,7 @@ export default function CareerTest() {
           courseName={enrollCourse.name}
           type={enrollCourse.type}
           extraInfo={`Karyera testi natijasi asosida tavsiya etildi. Holland kodi: ${hollandCode.join('')}`}
+          sourceRef="Karyera_Testi"
           initialName={userName.trim()}
           initialPhone={userPhone}
         />

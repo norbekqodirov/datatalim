@@ -48,6 +48,21 @@ html:not(.dark) .v2 {
   --green-ink: #00804d;
 }
 
+
+/* Poppins loads non-blocking (display=swap). A metric-matched local fallback keeps the swap from
+   re-wrapping headlines — this was the source of the mobile CLS (hero copy grew 27px on swap). */
+@font-face {
+  font-family: 'Poppins Fallback';
+  src: local('Arial'), local('Helvetica Neue'), local('Helvetica'), local('Roboto');
+  size-adjust: 112.2%;
+  ascent-override: 93.6%;
+  descent-override: 31.2%;
+  line-gap-override: 0%;
+}
+.v2 :is(h1, h2, h3, h4, p, a, div, span, li, button, summary, label, dt, dd) {
+  font-family: 'Poppins', 'Poppins Fallback', sans-serif !important;
+}
+
 /* ---------- layout ---------- */
 .v2 .wrap {
   width: 100%;
@@ -384,6 +399,10 @@ html .v2 .field[aria-invalid="true"],
   .v2 .hero-copy .hero-cta .btn { min-height: 44px; padding-inline: 1.1rem; }
 }
 
+/* hero captions sit above the floating back-to-top button on phones */
+.v2 .cap-stage { bottom: 11vh; }
+@media (max-width: 639.98px) { .v2 .cap-stage { bottom: 9.75rem; } }
+
 /* directions (pinned horizontal track): scale type and rhythm with viewport HEIGHT so the
    longest course list always fits inside the panel */
 .v2 .dir-panel { padding: clamp(1.25rem, 4.2vh, 3.5rem) clamp(1.5rem, 3.4vw, 3.5rem); gap: 2rem; }
@@ -391,3 +410,17 @@ html .v2 .field[aria-invalid="true"],
 .v2 .dir-blurb { margin-top: clamp(0.5rem, 1.4vh, 1rem); font-size: clamp(0.95rem, 1.9vh, 1.0625rem); line-height: 1.5; color: var(--fg-2); max-width: 28rem; }
 .v2 .dir-list { padding-top: clamp(0.75rem, 2.4vh, 2rem); }
 .v2 .dir-list a { padding-block: clamp(0.5rem, 1.35vh, 0.9rem); min-height: 44px; }
+
+/* ---------- footer ---------- */
+.v2 .foot-link { color: var(--fg-2); transition: color 0.2s var(--ease), transform 0.3s var(--ease); }
+.v2 .foot-link:hover { color: var(--fg); transform: translate3d(4px, 0, 0); }
+.v2 .foot-chip { color: var(--fg); border: 1px solid var(--line-2); transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease), transform 0.3s var(--ease); }
+.v2 .foot-chip:hover { background: var(--bg-3); border-color: var(--fg-3); transform: translate3d(0, -2px, 0); }
+.v2 .foot-phone { transition: color 0.2s var(--ease); }
+.v2 .foot-phone:hover { color: var(--blue-ink) !important; }
+
+/* headings never overflow their box on 320-360px screens */
+.v2 .t-display, .v2 .t-h2, .v2 .t-caption, .v2 .t-mega { overflow-wrap: break-word; }
+/* "konsultatsiya." must fit the half-width column at every size (≈7.7em wide) */
+.v2 #contact-title { font-size: clamp(1.75rem, 4.9vw, 4.4rem); overflow-wrap: break-word; }
+@media (max-width: 380px) { .v2 #faq-title { font-size: 1.9rem; } }

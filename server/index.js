@@ -513,10 +513,19 @@ app.post('/api/leads', leadsLimiter, (req, res) => {
             return res.json({ ...publicResult, duplicate: true });
         }
 
-        // Asynchronously save to Google Sheets
-        appendLeadToSheet(finalResult).catch(err => {
-            console.error("Failed to append lead to Google Sheet in background:", err);
-        });
+        // Asynchronously save to Google Sheets; yozilmasa ariza yo'qolmasin — Telegram'ga zaxira xabar
+        appendLeadToSheet(finalResult)
+            .then(r => { if (!r?.success) throw new Error(r?.error || 'Sheet sync failed'); })
+            .catch(err => {
+                console.error("Failed to append lead to Google Sheet in background:", err?.message || err);
+                if (!TG_BOT_TOKEN || !TG_CHAT_ID) return;
+                const text = `⚠️ <b>Ariza Sheet'ga yozilmadi</b>
+${escapeHtml(lead.name)} — ${escapeHtml(lead.phone)}
+` +
+                    `Kurs: ${escapeHtml(lead.course_id || '-')}
+Manba: ${escapeHtml(finalResult.resolvedSourceRef || '-')}`;
+                sendTelegramMessage(text).catch(e => console.error('Fallback Telegram failed:', e?.message || e));
+            });
 
         res.json(publicResult);
     } catch (err) {
@@ -555,7 +564,8 @@ app.post('/api/career-test-result', leadsLimiter, async (req, res) => {
             recentCareerTests.delete(dedupKey); // yozilmadi — qayta urinishga ruxsat
             console.error('Career test sheet sync failed:', result?.error);
         }
-        res.json(result?.success ? { success: true } : { success: false, error: 'Sheet sync failed' });
+        if (result?.success) res.json({ success: true });
+        else res.status(502).json({ success: false, error: 'Sheet sync failed' }); // klient qayta urinadi
     } catch (err) {
         recentCareerTests.delete(dedupKey);
         console.error('Career test sheet sync error:', err);

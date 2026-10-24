@@ -100,9 +100,9 @@ const BlogPost: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center pt-32 gap-4">
         <SEO title="Maqola topilmadi" noindex />
-        <p className={`text-lg ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+        <h1 className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
           {lang === 'ru' ? 'Статья не найдена' : lang === 'en' ? 'Post not found' : 'Maqola topilmadi'}
-        </p>
+        </h1>
         <Link to="/blog" className="text-[#0061ff] font-bold hover:underline">
           {lang === 'ru' ? 'Назад к блогу' : lang === 'en' ? 'Back to blog' : 'Blogga qaytish'}
         </Link>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Phone, Mail, Loader2, CheckCircle2, Copy, Check, Clock, ExternalLink, Instagram, Send, Youtube } from 'lucide-react';
+import { MapPin, Phone, Mail, Loader2, CheckCircle2, Copy, Check, Clock, ExternalLink, Instagram, Send } from 'lucide-react';
 import { Button } from '../Button';
 import { useStore } from '../../store/useStore';
 import { sendToTelegram } from '../../utils/telegram';
@@ -161,7 +161,6 @@ export const Contact: React.FC = () => {
                 {[
                   { label: 'Instagram', href: 'https://instagram.com/data_talim_stansiyasi', Icon: Instagram },
                   { label: 'Telegram', href: 'https://t.me/data_talim_stansiyasi', Icon: Send },
-                  { label: 'YouTube', href: '#', Icon: Youtube },
                 ].map((link, i) => (
                   <a
                     key={i}

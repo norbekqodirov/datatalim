@@ -112,3 +112,35 @@ export function v2Toast(extra: Record<string, unknown> = {}) {
     ...extra,
   };
 }
+
+/**
+ * True once the Poppins webfont is in (or after `maxMs`, so a slow font never hides content for long).
+ * Poppins loads non-blocking with display=swap; the hero headline waits for it so the swap cannot
+ * re-wrap it on screen (that re-wrap was the mobile/desktop layout shift).
+ */
+export function useFontReady(maxMs = 1400): boolean {
+  const [ready, setReady] = useState(() => typeof document === 'undefined' || !document.fonts);
+  useEffect(() => {
+    if (ready) return;
+    const fonts = document.fonts;
+    const loaded = () => {
+      let ok = false;
+      fonts.forEach((f) => {
+        if (f.family.replace(/["']/g, '') === 'Poppins' && f.status === 'loaded') ok = true;
+      });
+      return ok;
+    };
+    if (loaded()) {
+      setReady(true);
+      return;
+    }
+    const done = () => loaded() && setReady(true);
+    fonts.addEventListener('loadingdone', done);
+    const t = window.setTimeout(() => setReady(true), maxMs);
+    return () => {
+      fonts.removeEventListener('loadingdone', done);
+      window.clearTimeout(t);
+    };
+  }, [ready, maxMs]);
+  return ready;
+}

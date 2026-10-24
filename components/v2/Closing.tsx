@@ -74,7 +74,7 @@ export const FaqV2: React.FC = () => {
                     onClick={() => setOpen(isOpen ? null : i)}
                     className="w-full flex items-center gap-6 py-6 text-left cursor-pointer min-h-[44px]"
                   >
-                    <span className="flex-1 text-[1.15rem] font-semibold tracking-[-0.015em]">{q(f)}</span>
+                    <span className="flex-1 min-w-0 break-words text-[1.15rem] font-semibold tracking-[-0.015em]">{q(f)}</span>
                     <Plus
                       size={22}
                       aria-hidden="true"
@@ -133,6 +133,8 @@ export const ContactV2: React.FC = () => {
     const next: typeof errors = {};
     if (!name.trim()) next.name = 'Ismingizni kiriting';
     if (digits.length !== 9) next.phone = 'Raqamni toʻliq kiriting: 90 123 45 67';
+    // the server rejects numbers that start with 0 or 1
+    else if (!/^[2-9]\d{8}$/.test(digits)) next.phone = 'Telefon raqam notoʻgʻri. Masalan: 90 123 45 67';
     setErrors(next);
     if (Object.keys(next).length) {
       document.getElementById(next.name ? 'v2-name' : 'v2-phone')?.focus();
@@ -175,7 +177,7 @@ export const ContactV2: React.FC = () => {
       {/* closing star */}
       <Star3D progress={closeP} spin={55} className="absolute -right-[10vw] top-[8%] w-[46vw] max-w-[620px] aspect-square pointer-events-none opacity-[.4] hidden lg:block" />
 
-      <div className="wrap grid lg:grid-cols-12 gap-12 relative z-10">
+      <div className="wrap grid lg:grid-cols-12 gap-12 relative z-10 [&>*]:min-w-0">
         <div className="lg:col-span-6">
           <p className="t-kicker mb-6">10 — Boshlash</p>
           <Mask>

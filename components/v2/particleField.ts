@@ -149,6 +149,17 @@ export class ParticleField {
   /** overall brightness (0..1), e.g. lowered behind text on small screens */
   dim = 1;
   private sdim = 1;
+  /**
+   * Vertical band [top, bottom] in canvas px that the formation must stay inside (below the navbar,
+   * above the caption / headline). When set, the field centres itself in the band and shrinks to fit,
+   * measured from the particles' own projected extent. null = free placement (anchorY, no fit).
+   */
+  band: [number, number] | null = null;
+  private sTop = 0;
+  private sBot = 0;
+  private fit = 1;
+  private extent = 1.3; // projected half-height of the formation in "scale" units (measured)
+  private hist = new Uint16Array(96);
 
   constructor(private canvas: HTMLCanvasElement, opts: FieldOptions) {
     const ctx = canvas.getContext('2d', { alpha: true });
@@ -230,9 +241,27 @@ export class ParticleField {
     const cx = Math.cos(rotX), sx = Math.sin(rotX);
 
     const minDim = Math.min(w, h);
-    const scale = minDim * (0.3 + 0.05 * m1 - 0.07 * m2) * (1 + 0.08 * burst);
+    const baseScale = minDim * (0.3 + 0.05 * m1 - 0.07 * m2) * (1 + 0.08 * burst);
     const ox = w * this.sax;
-    const oy = h * (this.say - 0.14 * clamp01(p * 4)); // lift the shape once captions appear below
+    let oy: number;
+    if (this.band) {
+      // smooth the band edges so stage changes glide instead of jumping
+      const k = still ? 1 : 0.08;
+      if (this.sBot === 0) { this.sTop = this.band[0]; this.sBot = this.band[1]; }
+      this.sTop += (this.band[0] - this.sTop) * k;
+      this.sBot += (this.band[1] - this.sBot) * k;
+      oy = (this.sTop + this.sBot) / 2;
+      const half = Math.max(40, (this.sBot - this.sTop) / 2);
+      const want = Math.min(1, half / (this.extent * baseScale));
+      this.fit += (want - this.fit) * (still ? 1 : 0.12);
+    } else {
+      this.fit = 1;
+      oy = h * (this.say - 0.14 * clamp01(p * 4)); // lift the shape once captions appear below
+    }
+    const scale = baseScale * this.fit;
+    const hist = this.hist;
+    hist.fill(0);
+    let counted = 0;
     const focal = 3.4;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -277,6 +306,9 @@ export class ParticleField {
       const persp = focal / (focal + z2);
       const px = ox + x1 * scale * persp;
       const py = oy - y1 * scale * persp;
+      // |vertical offset| in scale units → histogram (≤ 3 units, 96 bins)
+      const bin = (Math.abs(y1 * persp) * 32) | 0;
+      if (bin < 96) { hist[bin]++; counted++; }
       if (px < -10 || px > w + 10 || py < -10 || py > h + 10) continue;
 
       const depth = clamp01((z2 + 1.8) / 3.6); // 0 near → 1 far
@@ -288,5 +320,18 @@ export class ParticleField {
       ctx.fillRect(px - size / 2, py - size / 2, size, size);
     }
     ctx.globalCompositeOperation = 'source-over';
+
+    // measured extent = 99th percentile of |offset| (a few stray dust motes may bleed past the band)
+    if (this.band && counted > 0) {
+      const target = counted * 0.99;
+      let acc = 0;
+      let b = 0;
+      for (; b < 96; b++) {
+        acc += hist[b];
+        if (acc >= target) break;
+      }
+      const u = (b + 1) / 32;
+      this.extent += (Math.max(0.6, u) - this.extent) * (still ? 1 : 0.1);
+    }
   }
 }

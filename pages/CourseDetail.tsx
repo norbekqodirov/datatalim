@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from '../store/ThemeContext';
 import { useLanguage } from '../i18n';
 import { SEO, SITE_URL, courseSchema, breadcrumbSchema } from '../components/SEO';
-import { PatternBg, FloatingStars, Star1, Star2, BRAND_COLORS } from '../components/BrandElements';
+import { PatternBg, FloatingStars, Star1, Star2, BRAND_COLORS, BRAND_TEXT_LIGHT, BRAND_BTN_GRADIENT } from '../components/BrandElements';
 
 export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
@@ -27,7 +27,7 @@ export default function CourseDetail() {
 
   if (!course) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-black pt-24 px-4 text-center">
         <SEO title="Kurs topilmadi" noindex />
         <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-4">Kurs topilmadi</h1>
         <Button onClick={() => navigate('/kurslar')}>Kurslar ro'yxatiga qaytish</Button>
@@ -36,6 +36,9 @@ export default function CourseDetail() {
   }
 
   const brandColors = BRAND_COLORS[course.category as keyof typeof BRAND_COLORS] || { primary: '#0061ff', secondary: '#60efff' };
+  // Accessible variants: light theme text and white-text gradients need darker tones than the raw brand palette
+  const accentText = isDark ? brandColors.primary : (BRAND_TEXT_LIGHT[course.category] || '#0050d0');
+  const btnGradient = BRAND_BTN_GRADIENT[course.category] || `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})`;
 
   // SEO: kurs sahifasi uchun o'z sarlavha/tavsif/kanonik manzil va Course + BreadcrumbList JSON-LD
   const courseTitle = tField(course.title);
@@ -82,7 +85,7 @@ export default function CourseDetail() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }}>
-              <div className={`inline-block px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider mb-8 shadow-sm backdrop-blur-md border ${isDark ? 'bg-slate-900/90 border-slate-700' : 'bg-white/95 border-slate-200/50'}`} style={{ color: isDark ? brandColors.primary : brandColors.secondary }}>
+              <div className={`inline-block px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider mb-8 shadow-sm backdrop-blur-md border ${isDark ? 'bg-slate-900/90 border-slate-700' : 'bg-white/95 border-slate-200/50'}`} style={{ color: accentText }}>
                 {course.category === 'programming' ? 'Dasturlash' : course.category === 'media' ? 'Media & Dizayn' : course.category === 'finance' ? 'Moliya va Ofis' : 'Bolalar uchun'}
               </div>
               <h1 className={`text-5xl md:text-6xl lg:text-7xl font-black leading-tight mb-8 uppercase tracking-tight text-balance ${isDark ? 'text-white' : 'text-slate-900'}`}>
@@ -113,7 +116,7 @@ export default function CourseDetail() {
                 </div>
               </div>
 
-              <button onClick={() => { setModalType('enroll'); setModalOpen(true); }} className="h-16 px-12 text-xl text-white rounded-2xl w-full sm:w-auto font-black shadow-2xl hover:-translate-y-1 transition-all active:scale-95 border border-white/20" style={{ background: `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})`, boxShadow: `0 20px 40px -10px ${brandColors.primary}50` }}>
+              <button onClick={() => { setModalType('enroll'); setModalOpen(true); }} className="h-16 px-12 text-xl text-white rounded-2xl w-full sm:w-auto font-black shadow-2xl hover:-translate-y-1 transition-all active:scale-95 border border-white/20" style={{ background: btnGradient, boxShadow: `0 20px 40px -10px ${brandColors.primary}50` }}>
                 Kursga yozilish
               </button>
             </motion.div>
@@ -179,7 +182,7 @@ export default function CourseDetail() {
                 {course.modules.map((mod, idx) => (
                   <div key={idx} className={`rounded-[2rem] p-8 border hover:shadow-xl transition-all ${isDark ? 'bg-slate-900/80 border-white/5 hover:border-white/10' : 'bg-white border-slate-100 hover:border-slate-200 shadow-sm'}`}>
                     <h3 className={`text-xl font-black mb-6 flex items-center gap-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      <span className="w-10 h-10 rounded-[10px] flex items-center justify-center text-base shrink-0 text-white font-black" style={{ background: `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})` }}>
+                      <span className="w-10 h-10 rounded-[10px] flex items-center justify-center text-base shrink-0 text-white font-black" style={{ background: btnGradient }}>
                         {idx + 1}
                       </span>
                       {tField(mod.title)}
@@ -220,14 +223,14 @@ export default function CourseDetail() {
                       </div>
                       <div>
                         <h4 className={`font-black text-lg ${isDark ? 'text-white' : 'text-slate-900'}`}>{tField(mentor.name)}</h4>
-                        <p className="text-sm font-bold" style={{ color: brandColors.primary }}>{tField(mentor.role)}</p>
+                        <p className="text-sm font-bold" style={{ color: accentText }}>{tField(mentor.role)}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="relative rounded-[2.5rem] p-8 text-white overflow-hidden shadow-2xl" style={{ background: `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})`, boxShadow: `0 20px 40px -10px ${brandColors.primary}50` }}>
+              <div className="relative rounded-[2.5rem] p-8 text-white overflow-hidden shadow-2xl" style={{ background: btnGradient, boxShadow: `0 20px 40px -10px ${brandColors.primary}50` }}>
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
                 <div className="relative z-10 text-center">
                   <h3 className="text-2xl font-black mb-4">Savollaringiz bormi?</h3>
@@ -235,7 +238,7 @@ export default function CourseDetail() {
                     Kurs haqida batafsil ma'lumot olish uchun biz bilan bog'laning.
                   </p>
                   <a href="tel:+998622277222" className="block w-full py-4 bg-white/10 hover:bg-white backdrop-blur-md rounded-2xl font-black text-lg transition-all group" style={{ color: 'white' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = brandColors.primary; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = BRAND_TEXT_LIGHT[course.category] || '#0050d0'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = 'white'; }}>
                     <span className="flex items-center justify-center gap-2">
                       <Phone size={20} className="group-hover:rotate-12 transition-transform" /> +998 62 227-72-22

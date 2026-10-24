@@ -8,6 +8,21 @@ export const BRAND_COLORS = {
     kids: { primary: '#d73ffb', secondary: '#4f0ead' },
 };
 
+// Accessible variants (WCAG AA) for text / white-text-on-gradient on light surfaces.
+// The raw brand palette has very light tones (mint, cyan, yellow) that fail contrast.
+export const BRAND_TEXT_LIGHT: Record<string, string> = {
+    programming: '#047857',
+    finance: '#0050d0',
+    media: '#be185d',
+    kids: '#6b21a8',
+};
+export const BRAND_BTN_GRADIENT: Record<string, string> = {
+    programming: 'linear-gradient(135deg, #059669, #047857)',
+    finance: 'linear-gradient(135deg, #0061ff, #0047cc)',
+    media: 'linear-gradient(135deg, #ee2a7b, #6228d7)',
+    kids: 'linear-gradient(135deg, #a21caf, #4f0ead)',
+};
+
 // ===== LOGO — Main brand logo =====
 interface LogoProps {
     width?: number;

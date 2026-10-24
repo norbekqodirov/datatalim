@@ -13,14 +13,18 @@ function useCountUp(target: number, duration = 1800, started = false) {
   const [count, setCount] = useState(0);
   useEffect(() => {
     if (!started) return;
-    let start = 0;
-    const step = target / (duration / 16);
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= target) { setCount(target); clearInterval(timer); }
-      else setCount(Math.floor(start));
-    }, 16);
-    return () => clearInterval(timer);
+    // rAF + elapsed time: one state update per frame at most (setInterval could queue
+    // dozens of updates between commits and trip React's "maximum update depth" guard)
+    let raf = 0;
+    let t0 = 0;
+    const tick = (now: number) => {
+      if (!t0) t0 = now;
+      const p = Math.min(1, (now - t0) / duration);
+      setCount(p >= 1 ? target : Math.floor(target * p));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [started, target, duration]);
   return count;
 }

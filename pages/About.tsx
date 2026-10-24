@@ -169,7 +169,7 @@ export default function About() {
       <div className="py-24 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20 relative">
-            <h2 className={`text-4xl md:text-5xl font-black mb-6 uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Bizning <span className="text-transparent bg-clip-text shimmer-text" style={{ backgroundImage: 'linear-gradient(135deg, #3f5efb, #fc466b)' }}>Qadriyatlarimiz</span></h2>
+            <h2 className={`text-[1.6rem] min-[380px]:text-4xl md:text-5xl font-black mb-6 uppercase tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Bizning <span className="text-transparent bg-clip-text shimmer-text" style={{ backgroundImage: 'linear-gradient(135deg, #3f5efb, #fc466b)' }}>Qadriyatlarimiz</span></h2>
             <p className={`text-lg max-w-2xl mx-auto font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
               DATA jamoasini birlashtirib turuvchi va bizni olg'a boshlovchi tamoyillar
             </p>

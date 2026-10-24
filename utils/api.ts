@@ -154,7 +154,9 @@ export const submitCareerTestResult = async (data: {
             body: JSON.stringify(data),
         });
         if (!response.ok) throw new Error('Network response was not ok');
-        return await response.json();
+        const result = await response.json();
+        if (result?.success === false) throw new Error('Career test result was not saved');
+        return result;
     } catch (error) {
         console.error('Failed to submit career test result:', error);
         throw error;

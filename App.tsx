@@ -1,5 +1,5 @@
 import React, { useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
 import { initPixel, trackEvent } from './utils/pixel';
@@ -69,6 +69,13 @@ const PublicLayout = () => {
   const { isDark } = useTheme();
   const location = useLocation();
   const { isChecking } = useTracking(); // Initialize marketing link tracking
+  const navType = useNavigationType();
+
+  // Yangi sahifaga o'tilganda tepadan boshlanadi (orqaga/oldinga — brauzer o'zi tiklaydi, #anchor — o'z joyiga)
+  useEffect(() => {
+    if (navType === 'POP' || location.hash) return;
+    window.scrollTo(0, 0);
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isChecking) {
     return (
@@ -112,9 +119,10 @@ const PixelTracker = () => {
   }, []);
 
   useEffect(() => {
-    // Track PageView on every route change
+    // PageView faqat sahifa (pathname) o'zgarganda; #anchor va admin panel hisoblanmaydi
+    if (location.pathname.startsWith('/paneladmindata')) return;
     trackEvent('PageView', { path: location.pathname });
-  }, [location]);
+  }, [location.pathname]);
 
   return null;
 };

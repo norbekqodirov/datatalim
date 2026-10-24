@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { fetchFromAPI } from '../utils/api'; // Or create a trackClickInAPI specifically, we'll use fetch directly
 
 export function useTracking() {
     const location = useLocation();
     const navigate = useNavigate();
+    // Bir ref kodi bir marta hisoblanadi: redirectdan keyin effekt qayta ishlasa, klik ikki marta sanalmasin
+    const trackedRefRef = useRef<string | null>(null);
     const [isChecking, setIsChecking] = useState(() => {
         const searchParams = new URLSearchParams(location.search);
         return !!searchParams.get('ref');
@@ -15,7 +17,10 @@ export function useTracking() {
         const searchParams = new URLSearchParams(location.search);
         const refCode = searchParams.get('ref');
 
-        if (refCode) {
+        if (refCode && trackedRefRef.current === refCode) {
+            setIsChecking(false);
+        } else if (refCode) {
+            trackedRefRef.current = refCode;
             // Note: We used to block until the backend answered, but that caused 10s-15s loading times on ads
             // NOW: We fire and forget, allowing the UI to render INSTANTLY.
 
@@ -44,7 +49,8 @@ export function useTracking() {
                     // Make sure we only redirect if we aren't on the Apply form or currently typing
                     if (targetUrl && targetUrl !== '/' && location.pathname !== targetUrl && location.pathname === '/') {
                         // Use React Router for an instant client-side transition without reloading the browser
-                        navigate(`${targetUrl}?ref=${refCode}`, { replace: true });
+                        const sep = targetUrl.includes('?') ? '&' : '?';
+                        navigate(`${targetUrl}${sep}ref=${encodeURIComponent(refCode)}`, { replace: true });
                     }
 
                     setIsChecking(false);

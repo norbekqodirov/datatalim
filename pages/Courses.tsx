@@ -4,7 +4,7 @@ import { Code, Video, Calculator, Gamepad2, ArrowRight, Clock, CreditCard } from
 import { motion } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import { useTheme } from '../store/ThemeContext';
-import { PatternBg, FloatingStars, Star1, BRAND_COLORS } from '../components/BrandElements';
+import { PatternBg, FloatingStars, Star1, BRAND_COLORS, BRAND_TEXT_LIGHT, BRAND_BTN_GRADIENT } from '../components/BrandElements';
 import { useLanguage } from '../i18n';
 import { SEO } from '../components/SEO';
 
@@ -104,7 +104,7 @@ export default function Courses() {
                     />
                   )}
                   <div className="absolute top-4 right-4 flex flex-col gap-2">
-                    <span className={`inline-block px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg backdrop-blur-md border ${isDark ? 'bg-slate-900/90 border-slate-700' : 'bg-white/95 border-slate-200/50'}`} style={{ color: isDark ? brandColors.primary : brandColors.secondary }}>
+                    <span className={`inline-block px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg backdrop-blur-md border ${isDark ? 'bg-slate-900/90 border-slate-700' : 'bg-white/95 border-slate-200/50'}`} style={{ color: isDark ? brandColors.primary : (BRAND_TEXT_LIGHT[course.category] || brandColors.secondary) }}>
                       {categories.find(c => c.id === course.category)?.label}
                     </span>
                   </div>
@@ -112,7 +112,7 @@ export default function Courses() {
 
                 <div className="p-8 flex flex-col flex-1 relative z-20">
                   <div className="mb-6">
-                    <h3 className={`text-2xl font-black mb-3 leading-tight transition-colors group-hover:text-[color:var(--brand-color)] ${isDark ? 'text-white' : 'text-slate-900'}`} style={{ '--brand-color': isDark ? brandColors.primary : brandColors.secondary } as React.CSSProperties}>
+                    <h3 className={`text-2xl font-black mb-3 leading-tight transition-colors group-hover:text-[color:var(--brand-color)] ${isDark ? 'text-white' : 'text-slate-900'}`} style={{ '--brand-color': isDark ? brandColors.primary : (BRAND_TEXT_LIGHT[course.category] || brandColors.secondary) } as React.CSSProperties}>
                       <span className="text-balance">{tField(course.title)}</span>
                     </h3>
                     <p className={`text-sm line-clamp-3 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{tField(course.description)}</p>
@@ -136,7 +136,7 @@ export default function Courses() {
                   <Link to={`/kurslar/${course.id}`} className="block mt-auto">
                     <button className={`w-full py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 group/btn border-2 ${isDark ? 'bg-slate-800 border-slate-700 text-white hover:border-transparent hover:text-white' : 'bg-white border-slate-200 text-slate-900 hover:border-transparent hover:text-white'}`} style={{ '--hover-bg': `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})` } as React.CSSProperties}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})`;
+                        e.currentTarget.style.background = BRAND_BTN_GRADIENT[course.category] || `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.secondary})`;
                         (e.currentTarget as any).style.borderColor = 'transparent';
                         if (!isDark) e.currentTarget.style.color = 'white';
                       }}

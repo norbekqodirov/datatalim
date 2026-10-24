@@ -219,7 +219,7 @@ export default function Languages() {
                         <motion.div
                             animate={{ rotate: [0, 90, 0] }}
                             transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                            className="absolute -left-16 top-20 w-32 h-32 rounded-[32px] opacity-[0.06] pointer-events-none" style={{ backgroundColor: RED_PRIMARY }} />
+                            className="hidden md:block absolute -left-16 top-20 w-32 h-32 rounded-[32px] opacity-[0.06] pointer-events-none" style={{ backgroundColor: RED_PRIMARY }} />
 
                         {MOCK_TESTS.map((test, idx) => (
                             <motion.div
@@ -269,7 +269,7 @@ export default function Languages() {
                         <motion.div
                             animate={{ scale: [1, 1.2, 1] }}
                             transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-                            className="absolute -right-12 bottom-20 w-40 h-40 rounded-full opacity-[0.06] pointer-events-none" style={{ backgroundColor: RED_PRIMARY }} />
+                            className="hidden md:block absolute -right-12 bottom-20 w-40 h-40 rounded-full opacity-[0.06] pointer-events-none" style={{ backgroundColor: RED_PRIMARY }} />
 
                         {SUNDAY_EVENTS.map((event, idx) => (
                             <motion.div

@@ -53,7 +53,7 @@ export default function Team() {
             <div className="inline-block px-4 py-2 rounded-xl border border-[#0061ff]/20 text-[#0061ff] font-black text-sm mb-6 tracking-wider uppercase shadow-sm bg-[#0061ff]/5 backdrop-blur-sm">
               Bizning Jamoa
             </div>
-            <h1 className={`text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <h1 className={`text-[1.7rem] min-[400px]:text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Muvaffaqiyatimiz <span className="text-transparent bg-clip-text shimmer-text" style={{ backgroundImage: 'linear-gradient(135deg, #0061ff, #60efff)' }}>siri</span>
             </h1>
             <p className={`text-lg md:text-xl max-w-3xl mx-auto leading-relaxed font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>

@@ -1,11 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useMotionValueEvent, MotionValue } from 'framer-motion';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { ParticleField } from './particleField';
-import { uz, useHtmlDark, useIsDesktop, useMotionReduced } from './utils';
+import { uz, useFontReady, useHtmlDark, useIsDesktop, useMotionReduced } from './utils';
 
 // scroll progress (0..1 over the pinned section) → formation progress (0 chaos, .5 globe, 1 star)
 function formationAt(v: number) {
@@ -16,12 +16,12 @@ function formationAt(v: number) {
   return 1;
 }
 
-const Stage: React.FC<{ p: MotionValue<number>; range: [number, number, number, number]; className?: string; children: React.ReactNode }> = ({ p, range, className, children }) => {
+const Stage: React.FC<{ p: MotionValue<number>; range: [number, number, number, number]; className?: string; children: React.ReactNode; innerRef?: React.Ref<HTMLDivElement> }> = ({ p, range, className, children, innerRef }) => {
   const opacity = useTransform(p, range, [0, 1, 1, 0]);
   const y = useTransform(p, range, [40, 0, 0, -40]);
   const visibility = useTransform(opacity, (o) => (o < 0.02 ? 'hidden' : 'visible'));
   return (
-    <motion.div style={{ opacity, y, visibility }} className={className}>
+    <motion.div ref={innerRef} style={{ opacity, y, visibility }} className={className}>
       {children}
     </motion.div>
   );
@@ -33,9 +33,40 @@ export const HeroSignal: React.FC = () => {
   const dark = useHtmlDark();
   const desktop = useIsDesktop();
   const reduced = useMotionReduced();
+  // hold the entrance until Poppins is in, so the font swap never re-wraps the headline on screen
+  const fontReady = useFontReady();
+  const copyHide: React.CSSProperties = { visibility: fontReady ? 'visible' : 'hidden' };
   const sectionRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fieldRef = useRef<ParticleField | null>(null);
+  const copyRef = useRef<HTMLDivElement>(null);
+  const capBRef = useRef<HTMLDivElement>(null);
+  const capCRef = useRef<HTMLDivElement>(null);
+  const vRef = useRef(0);
+
+  // The formation lives in a vertical band: below the navbar, above whatever text is on screen
+  // (headline on phones, captions otherwise). The field centres itself in it and shrinks to fit.
+  const measureBand = useCallback(() => {
+    const f = fieldRef.current;
+    const canvas = canvasRef.current;
+    if (!f || !canvas) return;
+    const h = canvas.getBoundingClientRect().height;
+    const w = canvas.getBoundingClientRect().width;
+    const phone = w < 1024 && h > w * 1.1;
+    const v = vRef.current;
+    const top = phone ? 58 : 76;
+    let bottom = h - 80;
+    if (v < 0.14) {
+      if (phone) {
+        const c = copyRef.current;
+        if (c) bottom = c.getBoundingClientRect().top - canvas.getBoundingClientRect().top - 6;
+      }
+    } else {
+      const cap = v < 0.56 ? capBRef.current : capCRef.current;
+      if (cap) bottom = cap.offsetTop - (phone ? 10 : 8);
+    }
+    f.band = [top, Math.max(top + 120, bottom)];
+  }, []);
 
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ['start start', 'end end'] });
 
@@ -50,6 +81,7 @@ export const HeroSignal: React.FC = () => {
       return;
     }
     fieldRef.current = field;
+    if (!reduced) requestAnimationFrame(measureBand);
     const portrait = () => window.innerHeight > window.innerWidth * 1.1;
     field.anchorX = desktop ? 0.73 : 0.5;
     // phones: the world floats above the headline instead of hiding behind it
@@ -59,6 +91,7 @@ export const HeroSignal: React.FC = () => {
 
     const onResize = () => {
       field.resize();
+      measureBand();
       if (reduced) field.renderStatic(1);
     };
     window.addEventListener('resize', onResize);
@@ -68,6 +101,9 @@ export const HeroSignal: React.FC = () => {
       field.renderStatic(1);
       return () => window.removeEventListener('resize', onResize);
     }
+
+    // fonts swapping in re-wrap the headline: re-measure so the band follows the copy
+    document.fonts?.ready.then(() => measureBand());
 
     // only animate while the hero is on screen
     let onScreen = false;
@@ -106,6 +142,8 @@ export const HeroSignal: React.FC = () => {
   useMotionValueEvent(scrollYProgress, 'change', (v) => {
     const f = fieldRef.current;
     if (!f || reduced) return;
+    vRef.current = v;
+    measureBand();
     f.progress = formationAt(v);
     f.anchorX = desktop && v < 0.14 ? 0.73 : 0.5;
     const phone = !desktop && window.innerHeight > window.innerWidth * 1.1;
@@ -128,8 +166,8 @@ export const HeroSignal: React.FC = () => {
     return (
       <section ref={sectionRef} className="relative min-h-[100svh] flex items-center overflow-hidden">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden="true" />
-        <div className="wrap relative z-10 pt-32 pb-20">
-          <HeroCopy title={title} subtitle={subtitle} description={description} />
+        <div className="wrap relative z-10 pt-32 pb-20" style={copyHide}>
+          <HeroCopy title={title} subtitle={subtitle} description={description} fontReady={fontReady} />
         </div>
       </section>
     );
@@ -143,13 +181,13 @@ export const HeroSignal: React.FC = () => {
 
         {/* Stage A — headline + CTAs (left), chaos cloud (right) */}
         <Stage p={scrollYProgress} range={[-1, 0, 0.08, 0.16]} className="absolute inset-0 flex items-end pb-[13svh] lg:items-center lg:pb-0">
-          <div className="wrap pt-24">
-            <HeroCopy title={title} subtitle={subtitle} description={description} />
+          <div className="wrap pt-24" style={copyHide}>
+            <HeroCopy title={title} subtitle={subtitle} description={description} copyRef={copyRef} fontReady={fontReady} />
           </div>
         </Stage>
 
         {/* Stage B — the globe */}
-        <Stage p={scrollYProgress} range={[0.2, 0.3, 0.42, 0.5]} className="absolute inset-x-0 bottom-[11vh] text-center">
+        <Stage p={scrollYProgress} range={[0.2, 0.3, 0.42, 0.5]} innerRef={capBRef} className="cap-stage absolute inset-x-0 text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">01 — Maʼlumot</p>
             <h2 className="t-caption max-w-5xl mx-auto">Dunyo maʼlumotdan iborat.</h2>
@@ -157,7 +195,7 @@ export const HeroSignal: React.FC = () => {
         </Stage>
 
         {/* Stage C — the brand star */}
-        <Stage p={scrollYProgress} range={[0.62, 0.72, 0.9, 1.05]} className="absolute inset-x-0 bottom-[11vh] text-center">
+        <Stage p={scrollYProgress} range={[0.62, 0.72, 0.9, 1.05]} innerRef={capCRef} className="cap-stage absolute inset-x-0 text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">02 — Bilim</p>
             <h2 className="t-caption max-w-5xl mx-auto">
@@ -220,12 +258,14 @@ const StoryRail: React.FC<{ p: MotionValue<number> }> = ({ p }) => {
   );
 };
 
-const HeroCopy: React.FC<{ title: string; subtitle: string; description: string }> = ({ title, subtitle, description }) => (
-  <div className="hero-copy max-w-[46rem]">
+const HeroCopy: React.FC<{ title: string; subtitle: string; description: string; copyRef?: React.Ref<HTMLDivElement>; fontReady: boolean }> = ({ title, subtitle, description, copyRef, fontReady }) => {
+  const go = (shown: object) => (fontReady ? shown : undefined);
+  return (
+  <div ref={copyRef} className="hero-copy max-w-[46rem]">
     <motion.p
       className="t-kicker mb-6 flex items-center gap-3"
       initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={go({ opacity: 1, y: 0 })}
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
     >
       <span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--green)', boxShadow: '0 0 12px var(--green)' }} />
@@ -234,7 +274,7 @@ const HeroCopy: React.FC<{ title: string; subtitle: string; description: string 
     <motion.h1
       className="t-display"
       initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={go({ opacity: 1, y: 0 })}
       transition={{ duration: 0.9, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
     >
       {title} <span className="ink-grad">{subtitle}</span>
@@ -242,7 +282,7 @@ const HeroCopy: React.FC<{ title: string; subtitle: string; description: string 
     <motion.p
       className="t-lead mt-7 max-w-[34rem]"
       initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={go({ opacity: 1, y: 0 })}
       transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
     >
       {description}
@@ -250,7 +290,7 @@ const HeroCopy: React.FC<{ title: string; subtitle: string; description: string 
     <motion.div
       className="hero-cta mt-10 flex flex-col sm:flex-row gap-3"
       initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={go({ opacity: 1, y: 0 })}
       transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
     >
       <Link to="/karyera-testi" className="btn btn-primary">
@@ -261,4 +301,5 @@ const HeroCopy: React.FC<{ title: string; subtitle: string; description: string 
       </Link>
     </motion.div>
   </div>
-);
+  );
+};

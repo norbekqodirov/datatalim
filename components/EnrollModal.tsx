@@ -13,11 +13,12 @@ interface EnrollModalProps {
     courseName: string;
     type?: 'enroll' | 'consult';
     extraInfo?: string; // Test natijasi yoki qo'shimcha ma'lumot
+    sourceRef?: string; // Sheet tabini aniq belgilash (masalan, 'Karyera_Testi'); bo'lmasa type bo'yicha
     initialName?: string; // Masalan, karyera testi intro'sida allaqachon kiritilgan ism
     initialPhone?: string; // Formatlangan holatda, masalan "90 123 45 67" (+998 siz)
 }
 
-export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, courseName, type = 'enroll', extraInfo, initialName, initialPhone }) => {
+export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, courseName, type = 'enroll', extraInfo, sourceRef: sourceRefProp, initialName, initialPhone }) => {
     const [formData, setFormData] = useState({ name: initialName || '', phone: initialPhone || '' });
     const [loading, setLoading] = useState(false);
     const [sent, setSent] = useState(false);
@@ -31,6 +32,14 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
 
     // 'Arizangiz qabul qilindi' dan keyingi avtomatik yopilish taymeri — komponent o'chsa ham qolib ketmasin
     useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
+
+    // Qo'lda yopilsa (modal o'chmasdan qolsa ham) taymer va "qabul qilindi" holati tozalanadi —
+    // qayta ochilganda eski muvaffaqiyat ekrani va kutilmagan yopilish bo'lmasin
+    useEffect(() => {
+        if (isOpen) return;
+        if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+        if (sent) { setSent(false); setFormData({ name: '', phone: '' }); }
+    }, [isOpen, sent]);
 
     // dialog behaviour: lock page scroll, focus the first empty field, Esc closes,
     // Tab stays inside, focus returns to the trigger on close
@@ -87,15 +96,16 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
             return;
         }
 
-        if (rawPhone.length !== 9) {
-            toast.error("Telefon raqamni to'liq kiriting: 90 123 45 67", v2Toast());
+        // server bilan bir xil qoida: 9 raqam, operator kodi 2–9 dan boshlanadi
+        if (!/^[2-9]\d{8}$/.test(rawPhone)) {
+            toast.error(rawPhone.length !== 9 ? "Telefon raqamni to'liq kiriting: 90 123 45 67" : "Telefon raqam noto'g'ri. Masalan: 90 123 45 67", v2Toast());
             return;
         }
 
         setLoading(true);
 
         // Determine source explicitly to divide into respective Google Sheet tabs
-        const sourceRef = extraInfo ? 'Karyera_Testi' : (type === 'enroll' ? 'Kursga_Yozilish' : 'Konsultatsiya');
+        const sourceRef = sourceRefProp || (type === 'enroll' ? 'Kursga_Yozilish' : 'Konsultatsiya');
         let crmData: any = null;
 
         const fullPhone = '+998' + rawPhone;
