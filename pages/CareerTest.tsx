@@ -597,7 +597,7 @@ function HexChart({ pcts, reduced, size = 460 }: { pcts: Record<RiasecType, numb
             <text x={lx} y={ly - 7} textAnchor="middle" fontSize="19" className="mono" fill={lead ? 'var(--fg)' : 'var(--fg-3)'} style={{ fontWeight: 500 }}>
               {t}
             </text>
-            <text x={lx} y={ly + 14} textAnchor="middle" fontSize="14.5" fill={lead ? 'var(--fg-2)' : 'var(--fg-3)'}>
+            <text x={lx} y={ly + 14} textAnchor="middle" fontSize="16" fill="var(--fg-2)">
               {RIASEC_INFO[t].short} · {pcts[t]}%
             </text>
           </g>

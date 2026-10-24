@@ -195,7 +195,7 @@ export const ContactV2: React.FC = () => {
                 <Icon size={20} className="shrink-0 mt-1 ink-blue" aria-hidden="true" />
                 <div>
                   <dt className="t-kicker !text-[0.75rem]">{k}</dt>
-                  <dd className="mt-1 leading-relaxed">{href ? <a href={href} className="hover:underline underline-offset-4">{v}</a> : v}</dd>
+                  <dd className="mt-1 leading-relaxed">{href ? <a href={href} className="inline-flex items-center min-h-[44px] -my-2.5 hover:underline underline-offset-4">{v}</a> : v}</dd>
                 </div>
               </div>
             ))}

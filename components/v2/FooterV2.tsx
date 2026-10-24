@@ -32,7 +32,7 @@ export const FooterV2: React.FC = () => {
       <div className="wrap pt-20 pb-10">
         <div className="grid gap-12 lg:grid-cols-12">
           <div className="lg:col-span-4">
-            <Link to="/" aria-label="DATA Taʼlim Stansiyasi — bosh sahifa" className="inline-flex" style={{ color: 'var(--fg)' }}>
+            <Link to="/" aria-label="DATA Taʼlim Stansiyasi — bosh sahifa" className="inline-flex items-center min-h-[44px]" style={{ color: 'var(--fg)' }}>
               <Logo width={150} />
             </Link>
             <p className="t-body mt-6 max-w-sm">
@@ -101,12 +101,12 @@ export const FooterV2: React.FC = () => {
 
         <div className="mt-8 pt-6 flex flex-col sm:flex-row gap-3 justify-between text-sm ink-3" style={{ borderTop: '1px solid var(--line)' }}>
           <span>© {year} DATA Taʼlim Stansiyasi. {t('footer.rights')}</span>
-          <span className="flex items-center gap-5">
+          <span className="flex flex-wrap items-center gap-x-5">
             <button
               type="button"
               onClick={() => setMotionReduced(!reduced)}
               aria-pressed={reduced}
-              className="inline-flex items-center min-h-[44px] hover:underline underline-offset-4 cursor-pointer"
+              className="inline-flex items-center justify-start text-left min-h-[44px] hover:underline underline-offset-4 cursor-pointer"
             >
               {reduced ? 'Animatsiyani yoqish' : 'Harakatni kamaytirish'}
             </button>
