@@ -51,7 +51,7 @@ export const HeroSignal: React.FC = () => {
     }
     fieldRef.current = field;
     field.anchorX = desktop ? 0.73 : 0.5;
-    field.dim = desktop ? 1 : 0.38;
+    field.dim = desktop ? 1 : 0.3;
 
     const onResize = () => {
       field.resize();
@@ -99,7 +99,7 @@ export const HeroSignal: React.FC = () => {
     f.progress = formationAt(v);
     f.anchorX = desktop && v < 0.14 ? 0.73 : 0.5;
     // on narrow screens the cloud sits behind the headline: keep it quiet until the text leaves
-    f.dim = !desktop && v < 0.14 ? 0.38 : 1;
+    f.dim = !desktop && v < 0.14 ? 0.3 : 1;
   });
 
   const hintOpacity = useTransform(scrollYProgress, [0, 0.06], [1, 0]);
@@ -156,7 +156,7 @@ export const HeroSignal: React.FC = () => {
         </Stage>
 
         {/* scroll hint */}
-        <motion.div style={{ opacity: hintOpacity }} className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 pointer-events-none">
+        <motion.div style={{ opacity: hintOpacity }} className="scroll-hint absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 pointer-events-none">
           <span className="t-kicker">Pastga suring</span>
           <span className="block w-px h-10 overflow-hidden" style={{ background: 'var(--line-2)' }}>
             <motion.span
@@ -173,7 +173,7 @@ export const HeroSignal: React.FC = () => {
 };
 
 const HeroCopy: React.FC<{ title: string; subtitle: string; description: string }> = ({ title, subtitle, description }) => (
-  <div className="max-w-[46rem]">
+  <div className="hero-copy max-w-[46rem]">
     <motion.p
       className="t-kicker mb-6 flex items-center gap-3"
       initial={{ opacity: 0, y: 12 }}
@@ -200,7 +200,7 @@ const HeroCopy: React.FC<{ title: string; subtitle: string; description: string 
       {description}
     </motion.p>
     <motion.div
-      className="mt-10 flex flex-col sm:flex-row gap-3"
+      className="hero-cta mt-10 flex flex-col sm:flex-row gap-3"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}

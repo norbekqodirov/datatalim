@@ -58,10 +58,10 @@ export const FooterV2: React.FC = () => {
 
           <nav className="lg:col-span-2" aria-label="Sahifalar">
             <p className="t-kicker mb-5">Sahifalar</p>
-            <ul className="grid gap-3">
+            <ul className="grid">
               {pages.map((p) => (
                 <li key={p.to}>
-                  <Link to={p.to} className="ink-2 hover:underline underline-offset-4">{p.name}</Link>
+                  <Link to={p.to} className="ink-2 inline-flex items-center min-h-[44px] hover:underline underline-offset-4">{p.name}</Link>
                 </li>
               ))}
             </ul>
@@ -69,27 +69,27 @@ export const FooterV2: React.FC = () => {
 
           <nav className="lg:col-span-3" aria-label="Kurslar">
             <p className="t-kicker mb-5">Kurslar</p>
-            <ul className="grid gap-3">
+            <ul className="grid">
               {courses.slice(0, 7).map((c) => (
                 <li key={c.id}>
-                  <Link to={`/kurslar/${c.id}`} className="ink-2 hover:underline underline-offset-4">{uz(tField(c.title))}</Link>
+                  <Link to={`/kurslar/${c.id}`} className="ink-2 inline-flex items-center min-h-[44px] hover:underline underline-offset-4">{uz(tField(c.title))}</Link>
                 </li>
               ))}
               <li>
-                <Link to="/kurslar" className="link-arrow">Barcha kurslar <ArrowUpRight size={16} aria-hidden="true" /></Link>
+                <Link to="/kurslar" className="link-arrow min-h-[44px]">Barcha kurslar <ArrowUpRight size={16} aria-hidden="true" /></Link>
               </li>
             </ul>
           </nav>
 
           <div className="lg:col-span-3">
             <p className="t-kicker mb-5">Aloqa</p>
-            <address className="not-italic grid gap-3 ink-2">
-              <span>{uz(tField(siteContent.contactAddress))}</span>
-              <a href={`tel:${siteContent.contactPhone.replace(/[^\d+]/g, '')}`} className="hover:underline underline-offset-4" style={{ color: 'var(--fg)' }}>
+            <address className="not-italic grid gap-1 ink-2">
+              <span className="py-2">{uz(tField(siteContent.contactAddress))}</span>
+              <a href={`tel:${siteContent.contactPhone.replace(/[^\d+]/g, '')}`} className="inline-flex items-center min-h-[44px] hover:underline underline-offset-4" style={{ color: 'var(--fg)' }}>
                 {siteContent.contactPhone}
               </a>
-              <a href={`mailto:${siteContent.contactEmail}`} className="hover:underline underline-offset-4">{siteContent.contactEmail}</a>
-              <span>{uz(tField(siteContent.contactSchedule))}</span>
+              <a href={`mailto:${siteContent.contactEmail}`} className="inline-flex items-center min-h-[44px] hover:underline underline-offset-4">{siteContent.contactEmail}</a>
+              <span className="py-2">{uz(tField(siteContent.contactSchedule))}</span>
             </address>
           </div>
         </div>
@@ -106,7 +106,7 @@ export const FooterV2: React.FC = () => {
               type="button"
               onClick={() => setMotionReduced(!reduced)}
               aria-pressed={reduced}
-              className="hover:underline underline-offset-4 cursor-pointer"
+              className="inline-flex items-center min-h-[44px] hover:underline underline-offset-4 cursor-pointer"
             >
               {reduced ? 'Animatsiyani yoqish' : 'Harakatni kamaytirish'}
             </button>

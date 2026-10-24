@@ -112,7 +112,7 @@ export const NavbarV2: React.FC = () => {
   const iconBtn = 'w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--bg-3)]';
 
   return (
-    <header className="v2 !bg-transparent fixed top-0 inset-x-0 z-50" style={{ overflow: 'visible' }}>
+    <header className="v2 !bg-transparent fixed top-0 inset-x-0 z-50" style={{ overflow: 'visible' }} onFocusCapture={() => setHidden(false)}>
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 btn btn-primary z-[60]">
         Asosiy mazmunga oʻtish
       </a>
@@ -139,7 +139,7 @@ export const NavbarV2: React.FC = () => {
                   to={l.path === '/#contact' ? '/' : l.path}
                   onClick={(e) => go(e, l.path)}
                   aria-current={active(l.path) && l.path !== '/#contact' ? 'page' : undefined}
-                  className="px-3.5 py-2 rounded-full text-[0.875rem] font-medium transition-colors"
+                  className="inline-flex items-center min-h-[44px] px-3.5 rounded-full text-[0.875rem] font-medium transition-colors hover:text-[var(--fg)]"
                   style={{ color: active(l.path) && l.path !== '/#contact' ? 'var(--fg)' : 'var(--fg-2)' }}
                 >
                   {l.name}
@@ -157,8 +157,8 @@ export const NavbarV2: React.FC = () => {
               <button
                 type="button"
                 className={`${iconBtn} mono text-[0.8rem]`}
-                aria-haspopup="listbox"
                 aria-expanded={langOpen}
+                aria-controls="v2-lang-menu"
                 aria-label={`Til: ${LANGS.find((l) => l.code === lang)?.label}`}
                 onClick={() => setLangOpen((v) => !v)}
               >
@@ -167,7 +167,7 @@ export const NavbarV2: React.FC = () => {
               <AnimatePresence>
                 {langOpen && (
                   <motion.ul
-                    role="listbox"
+                    id="v2-lang-menu"
                     aria-label="Tilni tanlang"
                     initial={{ opacity: 0, y: -6, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -176,14 +176,16 @@ export const NavbarV2: React.FC = () => {
                     className="absolute right-0 mt-2 w-44 p-1.5 rounded-2xl panel shadow-2xl"
                   >
                     {LANGS.map((l) => (
-                      <li key={l.code} role="option" aria-selected={lang === l.code}>
+                      <li key={l.code}>
                         <button
                           type="button"
+                          aria-current={lang === l.code ? 'true' : undefined}
+                          lang={l.code}
                           onClick={() => {
                             setLang(l.code);
                             setLangOpen(false);
                           }}
-                          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm cursor-pointer hover:bg-[var(--bg-3)]"
+                          className="w-full flex items-center justify-between px-3 min-h-[44px] rounded-xl text-sm cursor-pointer hover:bg-[var(--bg-3)]"
                         >
                           {l.label}
                           {lang === l.code && <Check size={16} className="ink-blue" aria-hidden="true" />}
@@ -195,7 +197,7 @@ export const NavbarV2: React.FC = () => {
               </AnimatePresence>
             </div>
 
-            <Link to="/karyera-testi" className="btn btn-primary hidden sm:inline-flex !min-h-[40px] !px-4 !text-[0.875rem] ml-2">
+            <Link to="/karyera-testi" className="btn btn-primary nav-cta !min-h-[44px] !px-4 !text-[0.875rem] ml-2">
               {t('nav.careerTest')}
             </Link>
 

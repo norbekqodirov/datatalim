@@ -89,3 +89,26 @@ export function useMotionReduced(): boolean {
   }, []);
   return reduced;
 }
+
+/**
+ * react-hot-toast options matching the v2 surfaces. Toasts render outside `.v2`
+ * (no CSS variables there), so colours are resolved from <html class="dark"> at call time.
+ */
+export function v2Toast(extra: Record<string, unknown> = {}) {
+  const dark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  return {
+    style: {
+      background: dark ? '#13151b' : '#ffffff',
+      color: dark ? '#f5f7fa' : '#05070d',
+      border: `1px solid ${dark ? 'rgba(255,255,255,.16)' : 'rgba(5,7,13,.16)'}`,
+      borderRadius: '16px',
+      padding: '12px 16px',
+      fontSize: '0.9375rem',
+      lineHeight: 1.45,
+      maxWidth: '26rem',
+      boxShadow: dark ? '0 24px 60px -24px rgba(0,0,0,.9)' : '0 24px 60px -28px rgba(5,7,13,.35)',
+    },
+    iconTheme: { primary: dark ? '#60efff' : '#0061ff', secondary: dark ? '#000000' : '#ffffff' },
+    ...extra,
+  };
+}

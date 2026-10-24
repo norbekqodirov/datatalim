@@ -152,7 +152,7 @@ html:not(.dark) .v2 .ink-grad {
   color: #fff;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset, 0 10px 30px -10px rgba(0, 97, 255, 0.7);
 }
-.v2 .btn-primary:hover { background: #1a72ff; box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 14px 40px -10px rgba(0, 97, 255, 0.85); }
+.v2 .btn-primary:hover { background: #0a6bff; box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 14px 40px -10px rgba(0, 97, 255, 0.85); }
 .v2 .btn-ghost {
   color: var(--fg);
   border: 1px solid var(--line-2);
@@ -167,6 +167,10 @@ html:not(.dark) .v2 .ink-grad {
   font-weight: 600;
 }
 .v2 .link-arrow:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+/* Tailwind utilities live in a cascade layer, so an unlayered `display` on .btn would beat
+   `hidden sm:inline-flex`. These helpers hide things on purpose and win the cascade. */
+@media (max-width: 639.98px) { .v2 .btn.nav-cta { display: none; } }
 
 /* ---------- surfaces ---------- */
 .v2 .hairline { border-top: 1px solid var(--line); }
@@ -243,6 +247,11 @@ html:not(.dark) .v2 { --err: #c62828; }
   transition: border-color 0.2s var(--ease);
 }
 .v2 .field:focus { border-color: var(--blue-ink) !important; }
+.v2 .field:focus-visible,
+.v2 .field-group:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue-ink) 35%, transparent);
+}
+.v2 .field:focus-visible { outline: none; }
 .v2 .field-group {
   display: flex;
   align-items: stretch;
@@ -351,3 +360,22 @@ html .v2 .field[aria-invalid="true"],
 .v2 .scale-btn:active { transform: scale(0.95); }
 .v2 .scale-btn[data-fill] { background: rgba(0, 97, 255, 0.14); border-color: rgba(0, 97, 255, 0.35); color: var(--fg); }
 .v2 .scale-btn[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+/* ---------- short / small viewports ---------- */
+/* hero: never let the pinned screen clip its own copy */
+@media (max-height: 740px) { .v2 .scroll-hint { display: none; } }
+@media (max-height: 560px) {
+  .v2 .hero-copy .t-display { font-size: clamp(1.9rem, 7.5vh, 2.75rem); line-height: 1; }
+  .v2 .hero-copy .t-lead { display: none; }
+  .v2 .hero-copy .t-kicker { margin-bottom: 0.75rem; }
+  .v2 .hero-copy .hero-cta { margin-top: 1.25rem; flex-direction: row; }
+  .v2 .hero-copy .hero-cta .btn { min-height: 44px; padding-inline: 1.1rem; }
+}
+
+/* directions (pinned horizontal track): scale type and rhythm with viewport HEIGHT so the
+   longest course list always fits inside the panel */
+.v2 .dir-panel { padding: clamp(1.25rem, 4.2vh, 3.5rem) clamp(1.5rem, 3.4vw, 3.5rem); gap: 2rem; }
+.v2 .dir-title { font-size: clamp(1.7rem, min(4.1vw, 6.4vh), 3.6rem); line-height: 1.04; letter-spacing: -0.04em; font-weight: 700; margin-top: clamp(0.5rem, 1.6vh, 1.25rem); }
+.v2 .dir-blurb { margin-top: clamp(0.5rem, 1.4vh, 1rem); font-size: clamp(0.95rem, 1.9vh, 1.0625rem); line-height: 1.5; color: var(--fg-2); max-width: 28rem; }
+.v2 .dir-list { padding-top: clamp(0.75rem, 2.4vh, 2rem); }
+.v2 .dir-list a { padding-block: clamp(0.5rem, 1.35vh, 0.9rem); min-height: 44px; }

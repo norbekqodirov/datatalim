@@ -89,7 +89,7 @@ export const TeamStrip: React.FC = () => {
             <p className="t-kicker mb-6">08 — Jamoa</p>
             <h2 id="team-title" className="t-h2 max-w-[18ch]">Sizni kasbga olib chiqadigan odamlar.</h2>
           </div>
-          <Link to="/jamoa" className="link-arrow">Butun jamoa →</Link>
+          <Link to="/jamoa" className="link-arrow min-h-[44px]">Butun jamoa →</Link>
         </div>
         <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px rounded-[var(--radius)] overflow-hidden" style={{ background: 'var(--line)' }}>
           {team.slice(0, 6).map((m, i) => {

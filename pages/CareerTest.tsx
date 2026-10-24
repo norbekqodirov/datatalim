@@ -17,7 +17,7 @@ import { SEO } from '../components/SEO';
 import { EnrollModal } from '../components/EnrollModal';
 import { trackSiteEvent } from '../utils/analytics';
 import { submitLeadToAPI, submitCareerTestResult } from '../utils/api';
-import { uz, useMotionReduced } from '../components/v2/utils';
+import { uz, useMotionReduced, v2Toast } from '../components/v2/utils';
 import { useStore } from '../store/useStore';
 import '../components/v2/v2.css';
 
@@ -1150,7 +1150,7 @@ export default function CareerTest() {
   // Tiklanganda: foydalanuvchiga xabar va (agar yetib bormagan bo'lsa) natijani yuborish
   useEffect(() => {
     if (!saved) return;
-    if (saved.view === 'test') toast('Oldingi javoblaringiz tiklandi — davom eting.', { id: 'ct-restored' });
+    if (saved.view === 'test') toast('Oldingi javoblaringiz tiklandi — davom eting.', v2Toast({ id: 'ct-restored' }));
     if (saved.view === 'result' && outcome && !autoSubmittedRef.current) submitCareerTestAuto(outcome.pcts, outcome.results);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1354,7 +1354,7 @@ export default function CareerTest() {
       doc.save(`Karyera-Testi-Natijasi${userName.trim() ? '-' + userName.trim().replace(/\s+/g, '_') : ''}.pdf`);
     } catch (e) {
       console.error('PDF generation error:', e);
-      toast.error('PDF tayyorlab boʻlmadi. Internetni tekshirib, qayta urinib koʻring.');
+      toast.error('PDF tayyorlab boʻlmadi. Internetni tekshirib, qayta urinib koʻring.', v2Toast());
     } finally {
       setGeneratingPdf(false);
     }
@@ -1369,9 +1369,9 @@ export default function CareerTest() {
         return;
       }
       await navigator.clipboard.writeText(`${text} ${url}`);
-      toast.success('Matn va havola nusxalandi');
+      toast.success('Matn va havola nusxalandi', v2Toast());
     } catch (e) {
-      if ((e as Error)?.name !== 'AbortError') toast.error('Ulashib boʻlmadi');
+      if ((e as Error)?.name !== 'AbortError') toast.error('Ulashib boʻlmadi', v2Toast());
     }
   }
 

@@ -96,10 +96,10 @@ export const CareerLab: React.FC = () => {
               return (
                 <g key={a.k}>
                   <line x1={C} y1={C} x2={x} y2={y} stroke="var(--line)" />
-                  <text x={lx} y={ly - 6} textAnchor="middle" className="mono" fontSize="15" fill="var(--fg)" style={{ fontWeight: 500 }}>
+                  <text x={lx} y={ly - 6} textAnchor="middle" className="mono" fontSize="16" fill="var(--fg)" style={{ fontWeight: 500 }}>
                     {a.k}
                   </text>
-                  <text x={lx} y={ly + 12} textAnchor="middle" fontSize="12" fill="var(--fg-3)">
+                  <text x={lx} y={ly + 12} textAnchor="middle" fontSize="14" fill="var(--fg-2)">
                     {a.name}
                   </text>
                 </g>
@@ -111,8 +111,8 @@ export const CareerLab: React.FC = () => {
               animate={{ points: poly(prof.v) }}
               transition={{ duration: reduced ? 0 : 1.1, ease: [0.22, 1, 0.36, 1] }}
               fill="url(#lab-fill)"
-              stroke="#60efff"
-              strokeWidth={1.5}
+              stroke="var(--cyan-ink)"
+              strokeWidth={2}
               strokeLinejoin="round"
             />
             {prof.v.map((v, i) => {
@@ -125,13 +125,13 @@ export const CareerLab: React.FC = () => {
                   transition={{ duration: reduced ? 0 : 1.1, ease: [0.22, 1, 0.36, 1] }}
                   r={4}
                   fill="var(--bg)"
-                  stroke="#60efff"
-                  strokeWidth={1.5}
+                  stroke="var(--cyan-ink)"
+                  strokeWidth={2}
                 />
               );
             })}
           </svg>
-          <div className="mt-6 text-center" aria-live="polite">
+          <div className="mt-6 text-center">
             <span className="t-kicker">Namuna natija</span>
             <motion.p
               key={prof.label}

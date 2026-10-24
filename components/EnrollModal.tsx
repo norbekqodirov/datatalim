@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { X, Loader2, CheckCircle2, User, Phone } from 'lucide-react';
-import { Button } from './Button';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { X, Loader2, CheckCircle2, Phone } from 'lucide-react';
 import { sendToTelegram } from '../utils/telegram';
 import toast from 'react-hot-toast';
 import { submitLeadToAPI } from '../utils/api';
 import { trackEvent } from '../utils/pixel';
+import { uz, v2Toast } from './v2/utils';
+import './v2/v2.css';
 
 interface EnrollModalProps {
     isOpen: boolean;
@@ -20,6 +21,37 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
     const [formData, setFormData] = useState({ name: initialName || '', phone: initialPhone || '' });
     const [loading, setLoading] = useState(false);
     const [sent, setSent] = useState(false);
+    const titleId = useId();
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const nameRef = useRef<HTMLInputElement>(null);
+    const phoneRef = useRef<HTMLInputElement>(null);
+
+    // dialog behaviour: lock page scroll, focus the first empty field, Esc closes,
+    // Tab stays inside, focus returns to the trigger on close
+    useEffect(() => {
+        if (!isOpen) return;
+        const opener = document.activeElement as HTMLElement | null;
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        const firstField = nameRef.current && !nameRef.current.value ? nameRef.current : (phoneRef.current || nameRef.current);
+        firstField?.focus({ preventScroll: true });
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+            if (e.key !== 'Tab' || !dialogRef.current) return;
+            const f: HTMLElement[] = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), input, a[href]'));
+            if (!f.length) return;
+            const first = f[0], last = f[f.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        };
+        document.addEventListener('keydown', onKey, true);
+        return () => {
+            document.removeEventListener('keydown', onKey, true);
+            document.body.style.overflow = prevOverflow;
+            opener?.focus?.({ preventScroll: true });
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -43,12 +75,12 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         const rawPhone = formData.phone.replace(/\D/g, '');
 
         if (!formData.name.trim()) {
-            toast.error('Ismingizni kiriting!');
+            toast.error('Ismingizni kiriting!', v2Toast());
             return;
         }
 
         if (rawPhone.length !== 9) {
-            toast.error("Telefon raqamni to'liq kiriting: 90 123 45 67");
+            toast.error("Telefon raqamni to'liq kiriting: 90 123 45 67", v2Toast());
             return;
         }
 
@@ -102,7 +134,7 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
 
         if (crmData) {
             trackEvent('Lead', { source: type, course: courseName });
-            toast.success('Arizangiz qabul qilindi! Tez orada siz bilan bog\'lanamiz.');
+            toast.success('Arizangiz qabul qilindi! Tez orada siz bilan bog\'lanamiz.', v2Toast());
             setSent(true);
             setTimeout(() => {
                 setSent(false);
@@ -110,7 +142,7 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
                 onClose();
             }, 3000);
         } else {
-            toast.error('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+            toast.error('Xatolik yuz berdi. Qaytadan urinib ko\'ring.', v2Toast());
         }
     };
 
@@ -120,83 +152,95 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            className="v2 fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4"
+            style={{ background: 'rgba(0,0,0,.62)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
             onClick={handleBackdropClick}
         >
-            <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 relative animate-in fade-in zoom-in-95 duration-300">
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                className="panel relative w-full max-w-md max-h-[100svh] overflow-y-auto p-6 pt-8 sm:p-9 rounded-b-none sm:rounded-[28px] animate-in fade-in zoom-in-95 duration-300"
+                style={{ background: 'var(--bg-2)', borderColor: 'var(--line-2)', boxShadow: '0 40px 120px -30px rgba(0,0,0,.85)' }}
+            >
                 <button
+                    type="button"
                     onClick={onClose}
-                    className="absolute top-5 right-5 w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+                    aria-label="Yopish"
+                    className="absolute top-3 right-3 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--bg-3)]"
+                    style={{ color: 'var(--fg-2)' }}
                 >
-                    <X size={20} />
+                    <X size={20} aria-hidden="true" />
                 </button>
 
                 {sent ? (
-                    <div className="flex flex-col items-center text-center py-8">
-                        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
-                            <CheckCircle2 className="text-green-600" size={40} />
-                        </div>
-                        <h3 className="text-2xl font-black text-slate-900 mb-3">Ariza qabul qilindi!</h3>
-                        <p className="text-slate-500">Mutaxassislarimiz tez orada siz bilan bog'lanadi.</p>
+                    <div className="flex flex-col items-center text-center py-8" role="status">
+                        <span className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ background: 'var(--green)' }}>
+                            <CheckCircle2 color="#fff" size={34} aria-hidden="true" />
+                        </span>
+                        <h3 id={titleId} className="t-h3">Ariza qabul qilindi!</h3>
+                        <p className="t-body mt-3">Mutaxassislarimiz tez orada siz bilan bog{'\u02BB'}lanadi.</p>
                     </div>
                 ) : (
                     <>
-                        <div className="mb-8">
-                            <h3 className="text-2xl font-black text-slate-900 mb-2">
+                        <div className="mb-7 pr-10">
+                            <h3 id={titleId} className="t-h3">
                                 {type === 'enroll' ? 'Kursga yozilish' : 'Bepul konsultatsiya'}
                             </h3>
-                            <p className="text-slate-500 text-sm">
-                                <span className="font-bold text-blue-600">{courseName}</span> — ma'lumotlaringizni qoldiring
+                            <p className="t-body mt-2 !text-[0.95rem]">
+                                <span className="font-semibold" style={{ color: 'var(--fg)' }}>{uz(courseName)}</span> — ma{'\u02BC'}lumotlaringizni qoldiring
                             </p>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-5">
+                        <form onSubmit={handleSubmit} noValidate className="grid gap-5">
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Ismingiz</label>
-                                <div className="relative">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        value={formData.name}
-                                        onChange={handleChange}
-                                        className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-[#0061ff] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                                        placeholder="To'liq ismingiz"
-                                        required
-                                    />
-                                </div>
+                                <label htmlFor={`${titleId}-name`} className="block text-sm font-medium mb-2">Ismingiz</label>
+                                <input
+                                    ref={nameRef}
+                                    id={`${titleId}-name`}
+                                    type="text"
+                                    name="name"
+                                    autoComplete="given-name"
+                                    maxLength={60}
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    className="field"
+                                    placeholder="Toʻliq ismingiz"
+                                    required
+                                />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Telefon raqamingiz</label>
-                                <div className="relative flex items-center w-full rounded-xl border border-slate-200 focus-within:border-[#0061ff] focus-within:ring-2 focus-within:ring-blue-100 transition-all overflow-hidden bg-white">
-                                    <div className="pl-4 pr-3 py-3 border-r border-slate-200 text-slate-600 font-medium flex items-center gap-2 bg-slate-50">
-                                        <Phone size={16} className="text-slate-400" />
-                                        <span>+998</span>
-                                    </div>
+                                <label htmlFor={`${titleId}-phone`} className="block text-sm font-medium mb-2">Telefon raqamingiz</label>
+                                <div className="field-group">
+                                    <span className="flex items-center gap-2 pl-4 pr-2 mono ink-3 select-none" aria-hidden="true">
+                                        <Phone size={16} /> +998
+                                    </span>
                                     <input
+                                        ref={phoneRef}
+                                        id={`${titleId}-phone`}
                                         type="tel"
                                         name="phone"
+                                        inputMode="numeric"
+                                        autoComplete="tel-national"
                                         value={formData.phone}
                                         onChange={handlePhoneChange}
-                                        className="w-full pl-3 pr-4 py-3 outline-none bg-transparent"
+                                        className="bare-input flex-1 min-w-0 h-14 pr-5 outline-none text-[1.0625rem]"
+                                        style={{ background: 'transparent', border: 0, color: 'var(--fg)' }}
                                         placeholder="90 123 45 67"
                                         required
                                     />
                                 </div>
                             </div>
-                            <Button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full h-14 bg-[#0061ff] hover:bg-blue-700 text-white text-lg rounded-xl shadow-lg shadow-blue-200 disabled:opacity-50"
-                            >
+                            <button type="submit" disabled={loading} aria-busy={loading} className="btn btn-primary w-full mt-1">
                                 {loading ? (
-                                    <span className="flex items-center gap-2">
-                                        <Loader2 className="animate-spin" size={20} /> Yuborilmoqda...
-                                    </span>
+                                    <>
+                                        <Loader2 className="animate-spin" size={18} aria-hidden="true" /> Yuborilmoqda...
+                                    </>
                                 ) : (
                                     type === 'enroll' ? 'Yozilish' : 'Konsultatsiya olish'
                                 )}
-                            </Button>
+                            </button>
                         </form>
                     </>
                 )}

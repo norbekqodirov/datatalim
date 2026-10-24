@@ -31,7 +31,7 @@ export const appendLeadToSheet = async (leadData) => {
             name: safeCell(leadData.name),
             phone: leadData.phone,
             courseId: safeCell(leadData.course_id || '-'),
-            sourceRef: leadData.source_ref || 'Umumiy'
+            sourceRef: safeCell(leadData.source_ref || 'Umumiy')
         };
 
         const response = await fetch(GOOGLE_SCRIPT_URL, {

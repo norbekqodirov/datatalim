@@ -77,7 +77,8 @@ let lastAssignedManager = 'B'; // Round-robin: alternates between A and B
 const sanitize = (str) => {
     if (typeof str !== 'string') return str;
     // eslint-disable-next-line no-control-regex
-    return str.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().replace(/<[^>]*>/g, '').substring(0, 500);
+    // Avval uzunlikni cheklaymiz: yopilmagan '<' ko'p bo'lsa `<[^>]*>` O(n^2) ishlaydi (ReDoS).
+    return str.substring(0, 2000).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().replace(/<[^>]*>/g, '').substring(0, 500);
 };
 
 // sanitize() faqat satr uchun ishlaydi; satr bo'lmagan qiymat (obyekt, massiv) bo'sh satr bo'ladi
@@ -194,7 +195,11 @@ app.use(cors((req, callback) => {
     const origin = req.headers.origin;
     callback(null, { origin: !origin || isAllowedOrigin(origin, req) });
 }));
-app.use(express.json({ limit: '5mb' }));
+// Ochiq (autentifikatsiyasiz) POST yo'llari uchun kichik limit; katta (5 MB) limit faqat admin kontenti uchun.
+const jsonSmall = express.json({ limit: '32kb' });
+const jsonLarge = express.json({ limit: '5mb' });
+const SMALL_BODY_PATHS = /^\/api\/(leads|career-test-result|notify-telegram|track\/click|analytics\/track|admin\/login|admin\/change-password)\/?$/;
+app.use((req, res, next) => (SMALL_BODY_PATHS.test(req.path) ? jsonSmall : jsonLarge)(req, res, next));
 app.use((req, res, next) => { if (req.body === undefined) req.body = {}; next(); }); // Express 5: body yo'q bo'lsa undefined
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     index: false,
@@ -263,6 +268,7 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
     if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
         return res.status(400).json({ error: 'Username and password required' });
     }
+    if (username.length > 100 || password.length > 200) return res.status(401).json({ error: 'Invalid credentials' });
 
     try {
         const user = db.prepare('SELECT * FROM admin_users WHERE username = ?').get(username);
@@ -284,6 +290,7 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
+    res.set('Cache-Control', 'no-store'); // admin javoblari brauzer/proksi keshida qolmasin
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -324,32 +331,42 @@ app.get('/api/marketing-links', authenticateToken, (req, res) => {
 });
 
 app.post('/api/marketing-links', authenticateToken, (req, res) => {
-    const name = sanitize(req.body.name);
-    const targetUrl = sanitize(req.body.targetUrl);
-    const category = sanitize(req.body.category);
+    const name = cleanText(req.body.name);
+    const targetUrl = cleanText(req.body.targetUrl);
+    const category = cleanText(req.body.category);
     if (!name) return res.status(400).json({ error: 'Name is required' });
-
-    // Generate a purely random 6-character ref code
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let refCode = '';
-    for (let i = 0; i < 6; i++) {
-        refCode += chars.charAt(Math.floor(Math.random() * chars.length));
+    // Faqat saytning ichki yo'li ("/ariza", "/ariza?x=1"): "//host", "javascript:", "https://..." qabul qilinmaydi (open redirect himoyasi)
+    if (targetUrl && !/^\/(?!\/)[A-Za-z0-9\-._~!$&'()*+,;=:@%/?#]*$/.test(targetUrl)) {
+        return res.status(400).json({ error: 'targetUrl must be a site path starting with "/"' });
     }
+    if (category && !['IT', 'Language'].includes(category)) return res.status(400).json({ error: 'Invalid category' });
     const finalTargetUrl = targetUrl || '/';
+    const linkCategory = category || 'IT';
 
+    // Kriptografik tasodifiy 6 belgili ref kod; UNIQUE to'qnashuvida qayta uriniladi
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     try {
-        const linkCategory = category || 'IT';
-        const info = db.prepare('INSERT INTO marketing_links (name, ref_code, target_url, category) VALUES (?, ?, ?, ?)').run(name, refCode, finalTargetUrl, linkCategory);
-        const newLink = db.prepare('SELECT * FROM marketing_links WHERE id = ?').get(info.lastInsertRowid);
-        res.json(newLink);
+        for (let attempt = 0; attempt < 5; attempt++) {
+            let refCode = '';
+            for (let i = 0; i < 6; i++) refCode += chars.charAt(crypto.randomInt(chars.length));
+            try {
+                const info = db.prepare('INSERT INTO marketing_links (name, ref_code, target_url, category) VALUES (?, ?, ?, ?)').run(name, refCode, finalTargetUrl, linkCategory);
+                return res.json(db.prepare('SELECT * FROM marketing_links WHERE id = ?').get(info.lastInsertRowid));
+            } catch (err) {
+                if (!isUniqueViolation(err)) throw err;
+            }
+        }
+        res.status(503).json({ error: 'Could not generate a unique ref code, try again' });
     } catch (err) {
         serverError(res, err, 'marketing-links create');
     }
 });
 
 app.delete('/api/marketing-links/:id', authenticateToken, (req, res) => {
+    const id = parsePostId(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
     try {
-        db.prepare('DELETE FROM marketing_links WHERE id = ?').run(req.params.id);
+        db.prepare('DELETE FROM marketing_links WHERE id = ?').run(id);
         res.json({ success: true });
     } catch (err) {
         serverError(res, err, 'marketing-links delete');
@@ -516,7 +533,7 @@ app.post('/api/career-test-result', leadsLimiter, async (req, res) => {
     const name = cleanText(req.body.name);
     const gender = ['male', 'female'].includes(req.body.gender) ? req.body.gender : '';
     const age = /^\d{1,3}$/.test(String(req.body.age ?? '').trim()) ? String(req.body.age).trim() : '';
-    const hollandCode = /^[A-Za-z]{1,6}$/.test(String(req.body.hollandCode ?? '')) ? req.body.hollandCode : '';
+    const hollandCode = typeof req.body.hollandCode === 'string' && /^[A-Za-z]{1,6}$/.test(req.body.hollandCode) ? req.body.hollandCode : '';
     const courses = Array.isArray(req.body.courses) ? req.body.courses.slice(0, 3).map(c => cleanText(c).slice(0, 120)) : [];
 
     if (!name || !req.body.phone) return res.status(400).json({ error: 'Name and phone are required' });
@@ -530,12 +547,17 @@ app.post('/api/career-test-result', leadsLimiter, async (req, res) => {
     const dedupKey = `${phone}|${hollandCode}`;
     if (recentCareerTests.has(dedupKey)) return res.json({ success: true, duplicate: true });
 
+    // Kalit await'dan OLDIN qo'yiladi: bir vaqtdagi ikkita bir xil so'rov Sheet'ga ikki marta yozmasin
+    recentCareerTests.set(dedupKey, now);
     try {
         const result = await appendCareerTestToSheet({ name, phone, gender, age, hollandCode, courses });
-        if (result?.success) recentCareerTests.set(dedupKey, now);
-        else console.error('Career test sheet sync failed:', result?.error);
-        res.json(result?.success ? result : { success: false, error: 'Sheet sync failed' });
+        if (!result?.success) {
+            recentCareerTests.delete(dedupKey); // yozilmadi — qayta urinishga ruxsat
+            console.error('Career test sheet sync failed:', result?.error);
+        }
+        res.json(result?.success ? { success: true } : { success: false, error: 'Sheet sync failed' });
     } catch (err) {
+        recentCareerTests.delete(dedupKey);
         console.error('Career test sheet sync error:', err);
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
@@ -687,6 +709,7 @@ app.get('/api/posts', (req, res) => {
     try {
         // Qoralamalar faqat yaroqli admin tokeni bilan ko'rinadi (admin panel shu endpointdan foydalanadi)
         const includeDrafts = isAdminRequest(req) && req.query.published !== '1';
+        if (includeDrafts) res.set('Cache-Control', 'no-store');
         const rows = includeDrafts
             ? db.prepare('SELECT * FROM posts ORDER BY created_at DESC').all()
             : db.prepare('SELECT * FROM posts WHERE is_published = 1 ORDER BY published_at DESC').all();
@@ -782,7 +805,8 @@ app.post('/api/admin/change-password', authenticateToken, passwordLimiter, async
             return res.status(400).json({ error: 'Both passwords required' });
         }
         if (newPassword.length < 10) return res.status(400).json({ error: 'Password must be at least 10 characters' });
-        if (newPassword.length > 128) return res.status(400).json({ error: 'Password is too long (max 128 characters)' });
+        // bcrypt faqat birinchi 72 baytni hisobga oladi: undan uzun parol "yashirin" qirqilmasin
+        if (Buffer.byteLength(newPassword, 'utf8') > 72) return res.status(400).json({ error: 'Password is too long (max 72 bytes)' });
         // Token egasining o'z yozuvi (avval doim id = 1 o'zgarardi)
         const user = db.prepare('SELECT * FROM admin_users WHERE id = ?').get(req.user.id);
         if (!user) return res.status(404).json({ error: 'Admin user not found' });
@@ -935,7 +959,7 @@ app.post('/api/upload', authenticateToken, upload.single('image'), async (req, r
         const { default: sharp } = await import('sharp');
 
         // Faylni buferga o'qib beramiz (<= 8 MB): Windows'da libvips faylni band qilib qo'yib, o'chirishga xalaqit bermasligi uchun
-        await sharp(await fs.promises.readFile(originalPath))
+        await sharp(await fs.promises.readFile(originalPath), { limitInputPixels: 50_000_000 }) // dekompressiya-bomba himoyasi
             .resize({ width: 1920, withoutEnlargement: true })
             .webp({ quality: 85 })
             .toFile(webpPath);
@@ -1045,13 +1069,23 @@ app.use((err, req, res, next) => {
     if (err.status === 415 && err.expose) return res.status(415).json({ error: err.message });
     if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Request body too large' });
     if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON body' });
+    // Boshqa mijoz xatolari (masalan /uploads/%E0%A4 -> 400, noto'g'ri charset -> 415): 500 emas, mos 4xx
+    const clientStatus = err.statusCode || err.status;
+    if (Number.isInteger(clientStatus) && clientStatus >= 400 && clientStatus < 500) return res.status(clientStatus).json({ error: 'Bad request' });
     console.error('[API xato]', req.method, req.originalUrl, err);
     res.status(500).json({ error: 'Internal server error' });
 });
 
 // Start server
-const server = app.listen(PORT, () => {
-    console.log(`✅ Backend server running at http://localhost:${PORT}`);
+// Productionda faqat loopback'da tinglaymiz: nginx orqali kirilsin, :4000 to'g'ridan-to'g'ri ochiq bo'lmasin
+// (aks holda X-Forwarded-For soxtalashtirilib rate limit aylanib o'tilishi mumkin). HOST env bilan o'zgartiriladi.
+const HOST = process.env.HOST || (IS_PROD ? '127.0.0.1' : undefined);
+const onListen = () => console.log(`✅ Backend server running at http://${HOST || 'localhost'}:${PORT}`);
+const server = HOST ? app.listen(PORT, HOST, onListen) : app.listen(PORT, onListen);
+
+// Tutilmagan promise rad etilishi jarayonni yiqitmasin (log qilinadi)
+process.on('unhandledRejection', (reason) => {
+    console.error('[unhandledRejection]', reason);
 });
 
 // Graceful shutdown (pm2 restart / SIGTERM): yangi so'rovlarni to'xtatib, bazani yopamiz

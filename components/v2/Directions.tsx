@@ -39,7 +39,8 @@ const CATS: { id: Course['category']; title: string; blurb: string; color: strin
 ];
 
 export const Directions: React.FC = () => {
-  const desktop = useIsDesktop();
+  // short windows can't hold a pinned card with a full course list: fall back to the vertical layout
+  const desktop = useIsDesktop('(min-width: 1024px) and (min-height: 640px)');
   const reduced = useMotionReduced();
   const pinned = desktop && !reduced;
   return pinned ? <PinnedTrack /> : <StackedList />;
@@ -69,6 +70,20 @@ const PinnedTrack: React.FC = () => {
     };
   }, []);
 
+  // Keyboard focus on a card that is currently scrolled off to the side: scroll the page to the
+  // matching track position (otherwise the browser scrolls the clipped box sideways and breaks the scene).
+  const onFocusIn = (e: React.FocusEvent<HTMLDivElement>) => {
+    const art = (e.target as HTMLElement).closest('article');
+    const track = trackRef.current;
+    const sec = sectionRef.current;
+    if (!art || !track || !sec || shift <= 0) return;
+    e.currentTarget.scrollLeft = 0;
+    const left = art.getBoundingClientRect().left - track.getBoundingClientRect().left;
+    const gutter = parseFloat(getComputedStyle(sec).getPropertyValue('--gutter')) || 40;
+    const frac = Math.min(1, Math.max(0, (left - gutter) / shift));
+    window.scrollTo({ top: sec.getBoundingClientRect().top + window.scrollY + frac * shift });
+  };
+
   return (
     <section
       ref={sectionRef}
@@ -77,7 +92,7 @@ const PinnedTrack: React.FC = () => {
       style={{ height: `calc(${shift}px + 100vh)` }}
       aria-label="Taʼlim yoʻnalishlari"
     >
-      <div className="sticky top-0 h-screen overflow-hidden flex items-center">
+      <div className="sticky top-0 h-screen overflow-hidden flex items-center" onFocus={onFocusIn}>
         <motion.div ref={trackRef} style={{ x }} className="flex items-stretch gap-6 pl-[var(--gutter)] pr-[12vw] will-change-transform">
           <IntroPanel />
           {CATS.map((c, i) => (
@@ -100,7 +115,7 @@ const IntroPanel: React.FC = () => {
         <br />
         <span className="ink-3">{courses.length || 14} ta kurs.</span>
       </h2>
-      <p className="t-lead mt-6 max-w-md">Har biri bozorda talab qilinadigan kasbga olib boradi. Oʻngga suring.</p>
+      <p className="t-lead mt-6 max-w-md">Har biri bozorda talab qilinadigan kasbga olib boradi. Pastga aylantiring.</p>
     </div>
   );
 };
@@ -118,7 +133,7 @@ const CategoryPanel: React.FC<{ cat: (typeof CATS)[number]; index: number; progr
 
   return (
     <article
-      className="shrink-0 w-[min(76rem,82vw)] h-[78vh] panel relative overflow-hidden grid grid-cols-12 gap-8 p-10 xl:p-14"
+      className="dir-panel shrink-0 w-[min(76rem,82vw)] h-[78vh] panel relative overflow-hidden grid grid-cols-12"
       aria-labelledby={`cat-${cat.id}`}
     >
       {/* category glow */}
@@ -132,13 +147,13 @@ const CategoryPanel: React.FC<{ cat: (typeof CATS)[number]; index: number; progr
         <span className={`mono ${cat.ink}`} style={{ fontSize: '0.95rem', letterSpacing: '0.1em' }}>
           {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
         </span>
-        <h3 id={`cat-${cat.id}`} className="t-h2 mt-5">{cat.title}</h3>
-        <p className="t-body mt-4 max-w-md">{cat.blurb}</p>
+        <h3 id={`cat-${cat.id}`} className="dir-title">{cat.title}</h3>
+        <p className="dir-blurb">{cat.blurb}</p>
 
-        <ul className="mt-auto pt-8 min-h-0 overflow-hidden">
+        <ul className="dir-list mt-auto min-h-0 overflow-hidden">
           {list.map((c) => (
             <li key={c.id} className="hairline">
-              <Link to={`/kurslar/${c.id}`} className="group flex items-center gap-4 py-3.5">
+              <Link to={`/kurslar/${c.id}`} className="group flex items-center gap-4">
                 <span className="flex-1 font-semibold text-[1.05rem] tracking-[-0.01em] group-hover:underline underline-offset-4">
                   {uz(tField(c.title))}
                 </span>
@@ -194,7 +209,7 @@ const StackedList: React.FC = () => {
         <h2 className="t-display">
           Toʻrt yoʻnalish. <span className="ink-3">{courses.length || 14} ta kurs.</span>
         </h2>
-        <div className="mt-12 grid lg:grid-cols-2 gap-5">
+        <div className="mt-12 grid md:grid-cols-2 gap-5">
           {CATS.map((cat, index) => {
             const list = courses.filter((c) => c.category === cat.id);
             const cover = list.find((c) => c.coverImage);

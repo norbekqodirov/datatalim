@@ -71,7 +71,7 @@ export const Numbers: React.FC = () => {
                 <span className={`block mono ${s.ink}`} style={{ fontSize: 'clamp(3rem, 6vw, 5.5rem)', lineHeight: 1, letterSpacing: '-0.04em', fontWeight: 500 }}>
                   {s.n}
                 </span>
-                <span className="block t-body mt-4 max-w-[16rem]">{s.label}</span>
+                <span className="block t-body mt-4 max-w-[16rem]" aria-hidden="true">{s.label}</span>
               </dd>
             </motion.div>
           ))}

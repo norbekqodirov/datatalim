@@ -7,7 +7,7 @@ import { useLanguage } from '../../i18n';
 import { submitLeadToAPI } from '../../utils/api';
 import { sendToTelegram } from '../../utils/telegram';
 import { trackEvent } from '../../utils/pixel';
-import { uz } from './utils';
+import { uz, v2Toast } from './utils';
 
 // ------------------------------------------------------------------ FAQ
 interface FAQItem {
@@ -148,7 +148,7 @@ export const ContactV2: React.FC = () => {
 
     if (!crm) {
       setState('idle');
-      toast.error('Yuborilmadi. Internetni tekshirib, qayta urinib koʻring yoki qoʻngʻiroq qiling.');
+      toast.error('Yuborilmadi. Internetni tekshirib, qayta urinib koʻring yoki qoʻngʻiroq qiling.', v2Toast());
       return;
     }
 
@@ -166,8 +166,6 @@ export const ContactV2: React.FC = () => {
     setCourse('');
   };
 
-  const field = 'w-full h-14 px-5 rounded-2xl text-[1.0625rem] outline-none transition-[border-color,box-shadow] duration-200';
-  const fieldStyle: React.CSSProperties = { background: 'var(--bg)', border: '1px solid var(--line-2)', color: 'var(--fg)' };
 
   return (
     <section id="contact" className="relative py-[14vh] overflow-hidden" aria-labelledby="contact-title">
@@ -229,16 +227,16 @@ export const ContactV2: React.FC = () => {
                     onChange={(e) => setName(e.target.value)}
                     aria-invalid={!!errors.name}
                     aria-describedby={errors.name ? 'v2-name-err' : undefined}
-                    className={field}
-                    style={fieldStyle}
+                    maxLength={60}
+                    className="field"
                     placeholder="Masalan, Dilnoza"
                   />
-                  {errors.name && <p id="v2-name-err" role="alert" className="text-sm mt-2" style={{ color: '#ff6b6b' }}>{errors.name}</p>}
+                  {errors.name && <p id="v2-name-err" role="alert" className="field-err">{errors.name}</p>}
                 </div>
                 <div>
                   <label htmlFor="v2-phone" className="block text-sm font-medium mb-2">Telefon raqamingiz</label>
-                  <div className="flex items-stretch rounded-2xl overflow-hidden" style={fieldStyle}>
-                    <span className="flex items-center pl-5 pr-2 mono ink-3 select-none">+998</span>
+                  <div className="field-group" data-invalid={!!errors.phone || undefined}>
+                    <span className="flex items-center pl-5 pr-2 mono ink-3 select-none" aria-hidden="true">+998</span>
                     <input
                       id="v2-phone"
                       name="phone"
@@ -249,18 +247,18 @@ export const ContactV2: React.FC = () => {
                       onChange={(e) => setPhone(formatPhone(e.target.value))}
                       aria-invalid={!!errors.phone}
                       aria-describedby={errors.phone ? 'v2-phone-err' : undefined}
-                      className="bare-input flex-1 h-14 pr-5 outline-none text-[1.0625rem]"
+                      className="bare-input flex-1 min-w-0 h-14 pr-5 outline-none text-[1.0625rem]"
                       style={{ background: 'transparent', border: 0, color: 'var(--fg)' }}
                       placeholder="90 123 45 67"
                     />
                   </div>
-                  {errors.phone && <p id="v2-phone-err" role="alert" className="text-sm mt-2" style={{ color: '#ff6b6b' }}>{errors.phone}</p>}
+                  {errors.phone && <p id="v2-phone-err" role="alert" className="field-err">{errors.phone}</p>}
                 </div>
                 <div>
                   <label htmlFor="v2-course" className="block text-sm font-medium mb-2">
                     Qiziqqan kurs <span className="ink-3 font-normal">(ixtiyoriy)</span>
                   </label>
-                  <select id="v2-course" value={course} onChange={(e) => setCourse(e.target.value)} className={`${field} cursor-pointer`} style={fieldStyle}>
+                  <select id="v2-course" value={course} onChange={(e) => setCourse(e.target.value)} className="field cursor-pointer">
                     <option value="">Hali bilmayman — maslahat kerak</option>
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>{uz(tField(c.title))}</option>
