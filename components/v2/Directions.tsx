@@ -85,7 +85,7 @@ const PinnedTrack: React.FC = () => {
             <div>
               <p className="t-kicker mb-4">04 — Yoʻnalishlar</p>
               <h2 className="dx-title">
-                Toʻrt yoʻnalish. <span className="ink-3">{courses.length || 14} ta kurs.</span>
+                Toʻrt yoʻnalish. <span className="ink-3 whitespace-nowrap">{courses.length || 14} ta kurs.</span>
               </h2>
             </div>
             <p className="t-body max-w-[22rem] text-right hidden xl:block">Har biri bozorda talab qilinadigan kasbga olib boradi.</p>
@@ -137,18 +137,23 @@ const DirTab: React.FC<{ cat: (typeof CATS)[number]; i: number; active: boolean;
   );
 };
 
+// Har yoʻnalishning fonsiz 3D obyekti (public/images/v2/dirs). Fayl topilmasa kurs muqovasi qoʻyiladi.
+const dirArt = (id: string) => `/images/v2/dirs/dir-${id}.webp`;
+
 const Stage: React.FC<{ index: number }> = ({ index }) => {
   const { courses } = useStore();
   const { tField } = useLanguage();
+  const reduced = useMotionReduced();
   const cat = CATS[index];
   const list = courses.filter((c) => c.category === cat.id);
-  const hero = list.find((c) => c.coverImage);
+  const fallback = list.find((c) => c.coverImage);
+  const [broken, setBroken] = useState<Record<string, boolean>>({});
 
-  // kursorga qarab yengil 3D egilish
+  // kursorga qarab obyekt egiladi
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
-  const rx = useSpring(useTransform(my, [-0.5, 0.5], [9, -9]), { stiffness: 140, damping: 18 });
-  const ry = useSpring(useTransform(mx, [-0.5, 0.5], [-12, 12]), { stiffness: 140, damping: 18 });
+  const rx = useSpring(useTransform(my, [-0.5, 0.5], [10, -10]), { stiffness: 120, damping: 16 });
+  const ry = useSpring(useTransform(mx, [-0.5, 0.5], [-14, 14]), { stiffness: 120, damping: 16 });
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     mx.set((e.clientX - r.left) / r.width - 0.5);
@@ -159,58 +164,69 @@ const Stage: React.FC<{ index: number }> = ({ index }) => {
     my.set(0);
   };
 
-  return (
-    <div className="dx-stage panel" role="tabpanel" aria-label={cat.title} onPointerMove={onMove} onPointerLeave={onLeave}>
-      <motion.span
-        className="dx-glow"
-        aria-hidden="true"
-        animate={{ background: `radial-gradient(circle at 28% 45%, ${cat.color}45 0%, transparent 60%)` }}
-        transition={{ duration: 0.8 }}
-      />
-      <span className="dx-ghost mono" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+  const art = broken[cat.id] ? (fallback ? optimizedCover(fallback.coverImage) : '') : dirArt(cat.id);
 
-      <div className="relative z-10 grid grid-cols-12 gap-7 h-full">
-        <div className="col-span-5 flex items-center justify-center" style={{ perspective: '1000px' }} aria-hidden="true">
+  return (
+    <div className="dx-stage" role="tabpanel" aria-label={cat.title} onPointerMove={onMove} onPointerLeave={onLeave}>
+      {/* fon qatlami alohida kesiladi — obyekt esa ramkadan chiqib turishi mumkin */}
+      <div className="dx-stage-bg panel" aria-hidden="true">
+        <motion.span
+          className="dx-glow"
+          animate={{ background: `radial-gradient(60% 70% at 30% 55%, ${cat.color}38 0%, transparent 70%)` }}
+          transition={{ duration: 0.8 }}
+        />
+        <span className="dx-ghost mono">{String(index + 1).padStart(2, '0')}</span>
+      </div>
+
+      <div className="relative grid grid-cols-12 gap-6 h-full">
+        <div className="col-span-6 relative" style={{ perspective: '1100px' }} aria-hidden="true">
+          <span className="dx-shadow" style={{ background: `radial-gradient(closest-side, ${cat.color}55, transparent)` }} />
           <AnimatePresence mode="popLayout" initial={false}>
-            {hero && (
+            {art && (
               <motion.div
-                key={cat.id}
-                className="dx-cover"
+                key={cat.id + (broken[cat.id] ? '-f' : '')}
+                className={`dx-art ${broken[cat.id] ? 'is-boxed' : ''}`}
                 style={{ rotateX: rx, rotateY: ry }}
-                initial={{ opacity: 0, scale: 0.86, rotateZ: -6, y: 30 }}
+                initial={{ opacity: 0, scale: 0.8, rotateZ: -10, y: 40 }}
                 animate={{ opacity: 1, scale: 1, rotateZ: 0, y: 0 }}
-                exit={{ opacity: 0, scale: 1.06, y: -20 }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                exit={{ opacity: 0, scale: 1.08, y: -30, filter: 'blur(6px)' }}
+                transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
               >
-                <img src={optimizedCover(hero.coverImage)} alt="" width={640} height={640} decoding="async" className="w-full h-full object-cover" />
+                <motion.img
+                  src={art}
+                  alt=""
+                  width={640}
+                  height={640}
+                  decoding="async"
+                  onError={() => setBroken((b) => ({ ...b, [cat.id]: true }))}
+                  className="w-full h-full object-contain"
+                  animate={reduced ? undefined : { y: [-10, 10, -10] }}
+                  transition={reduced ? undefined : { duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        <div className="col-span-7 flex flex-col min-h-0">
-          <p className={`mono text-[0.78rem] tracking-[0.12em] mb-3 ${cat.ink}`}>KURSLAR</p>
+        <div className="col-span-6 flex flex-col justify-center min-h-0 py-2 pr-1">
+          <p className={`mono text-[0.78rem] tracking-[0.14em] ${cat.ink}`}>KURSLAR · {String(list.length).padStart(2, '0')}</p>
           <AnimatePresence mode="wait" initial={false}>
             <motion.ul
               key={cat.id}
-              className="dx-list"
+              className="dx-list mt-3"
               initial="hide"
               animate="show"
               exit="hide"
               variants={{ show: { transition: { staggerChildren: 0.05 } }, hide: {} }}
             >
-              {list.map((c) => (
+              {list.map((c, i) => (
                 <motion.li
                   key={c.id}
                   variants={{ hide: { opacity: 0, x: 18 }, show: { opacity: 1, x: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } } }}
                 >
                   <Link to={`/kurslar/${c.id}`} className="dx-row group">
-                    {c.coverImage ? (
-                      <img src={optimizedCover(c.coverImage)} alt="" width={44} height={44} loading="lazy" decoding="async" className="dx-thumb" />
-                    ) : (
-                      <span className="dx-thumb" aria-hidden="true" />
-                    )}
-                    <span className="flex-1 min-w-0 font-semibold text-[1rem] leading-snug truncate group-hover:underline underline-offset-4">{uz(tField(c.title))}</span>
+                    <span className="mono ink-3 text-[0.75rem] w-6 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="flex-1 min-w-0 font-semibold leading-snug group-hover:underline underline-offset-4">{uz(tField(c.title))}</span>
                     <span className="mono ink-3 text-[0.78rem] shrink-0">{uz(tField(c.duration)).split(/[.(]/)[0].trim()}</span>
                     <ArrowUpRight size={17} className="ink-3 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
                   </Link>
@@ -219,11 +235,11 @@ const Stage: React.FC<{ index: number }> = ({ index }) => {
             </motion.ul>
           </AnimatePresence>
 
-          <div className="mt-auto pt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
+          <div className="mt-6">
             <button type="button" onClick={() => openConsult(cat.title)} className="btn btn-primary !min-h-[48px]">
               Mos kursni tanlashda yordam <ArrowRight size={18} aria-hidden="true" />
             </button>
-            <span className="mono ink-3 text-[0.78rem]">{list.length} ta kurs · bepul konsultatsiya</span>
+            <p className="mono ink-3 text-[0.75rem] mt-3">Bepul konsultatsiya · 1 ish kunida qoʻngʻiroq</p>
           </div>
         </div>
       </div>
@@ -255,11 +271,19 @@ const StackedList: React.FC = () => {
                 viewport={{ once: true, margin: '-8% 0px' }}
                 transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
               >
-                {cover && (
-                  <div className="aspect-[16/9] overflow-hidden">
-                    <img src={optimizedCover(cover.coverImage)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" width={800} height={450} />
-                  </div>
-                )}
+                <div className="relative aspect-[16/10] flex items-center justify-center overflow-hidden" aria-hidden="true"
+                  style={{ background: `radial-gradient(60% 70% at 50% 60%, ${cat.color}33, transparent 70%)` }}>
+                  <img
+                    src={dirArt(cat.id)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    width={400}
+                    height={400}
+                    className="h-[92%] w-auto object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.45)]"
+                    onError={(e) => { if (cover?.coverImage) { e.currentTarget.onerror = null; e.currentTarget.src = optimizedCover(cover.coverImage); } }}
+                  />
+                </div>
                 <div className="p-6">
                   <span className={`mono ${cat.ink} text-sm`}>{String(index + 1).padStart(2, '0')} / 04</span>
                   <h3 className="t-h3 mt-3">{cat.title}</h3>
