@@ -141,3 +141,4 @@ html:not(.dark) .v2 .pcover-star-sm path { fill: var(--ta); }
 .v2 .prose-v2 .embed, .v2 .prose-v2 iframe { width: 100%; }
 .v2 .prose-v2 iframe { aspect-ratio: 16 / 9; height: auto; border: 0; border-radius: 20px; display: block; }
 .v2 .prose-end-star { width: 0.9rem; height: 0.9rem; display: block; margin-top: 2rem; margin-inline: auto; color: var(--cyan-ink); }
+.v2 .post-link.grid { display: grid; }

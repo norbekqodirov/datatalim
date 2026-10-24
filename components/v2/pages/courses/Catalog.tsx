@@ -29,7 +29,7 @@ export const CoursesCatalog: React.FC = () => {
       <section id="katalog" className="relative pb-[10vh] scroll-mt-20" aria-label="Kurslar katalogi">
         <div className="wrap">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-            <div role="group" aria-label="Yoʻnalish boʻyicha filtr" className="flex flex-wrap gap-2">
+            <div role="group" aria-label="Yoʻnalish boʻyicha filtr" className="chips">
               {filters.map((f) => {
                 const on = cat === f.id;
                 return (
@@ -95,7 +95,7 @@ const Hero: React.FC<{ total: number; reduced: boolean }> = ({ total, reduced })
   const still = useMotionValue(0.5);
 
   return (
-    <section ref={ref} className="relative flex min-h-[82svh] items-center overflow-hidden pb-16 pt-28 lg:pb-24" aria-labelledby="kurslar-title">
+    <section ref={ref} className="relative flex min-h-[68svh] items-center overflow-hidden pb-16 pt-28 lg:pb-24" aria-labelledby="kurslar-title">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"

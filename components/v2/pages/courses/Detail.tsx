@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useScroll, useTransform } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Phone } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Phone, Users, Layers, Award } from 'lucide-react';
 import type { Course } from '../../../../data/courses';
 import { useStore } from '../../../../store/useStore';
 import { useLanguage } from '../../../../i18n';
@@ -34,7 +34,11 @@ const PriceFig: React.FC<{ raw: string; className?: string }> = ({ raw, classNam
   );
 };
 
-export const CourseDetailView: React.FC<{ course: Course; onEnroll: () => void }> = ({ course, onEnroll }) => {
+type OpenModal = (type: 'enroll' | 'consult') => void;
+
+export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> = ({ course, onOpen }) => {
+  const onEnroll = () => onOpen('enroll');
+  const onConsult = () => onOpen('consult');
   const { tField } = useLanguage();
   const { courses, siteContent } = useStore();
   const reduced = useMotionReduced();
@@ -53,33 +57,14 @@ export const CourseDetailView: React.FC<{ course: Course; onEnroll: () => void }
   const showBar = !ctaVisible && !closingVisible;
 
   return (
-    <div data-cat={course.category}>
-      <Hero course={course} onEnroll={onEnroll} ctaRef={heroCtaRef} reduced={reduced} phone={phone} tel={tel} />
+    <div data-cat={course.category} className="cd-page pb-24 lg:pb-0">
+      <Hero course={course} onEnroll={onEnroll} onConsult={onConsult} ctaRef={heroCtaRef} reduced={reduced} phone={phone} tel={tel} />
 
-      <div className="wrap pb-[8vh] pt-4 lg:pt-12">
+      <Outcomes course={course} reduced={reduced} />
+
+      <div className="wrap pb-[8vh] pt-[10vh] lg:pt-[10vh]">
         <div className="grid gap-12 lg:grid-cols-12 lg:gap-14">
           <div className="min-w-0 space-y-[12vh] lg:col-span-8">
-            {course.technologies.length > 0 && (
-              <section aria-labelledby="tech-title">
-                <SectionHead kicker="01 — Texnologiyalar" id="tech-title">Nimalar oʻrgatiladi?</SectionHead>
-                <ul className="mt-8 flex flex-wrap gap-3">
-                  {course.technologies.map((tech, i) => (
-                    <motion.li
-                      key={`${tech}-${i}`}
-                      className="tech"
-                      initial={reduced ? false : { opacity: 0, y: 22 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, margin: '0px 0px -8% 0px' }}
-                      transition={{ duration: 0.6, delay: Math.min(i, 8) * 0.05, ease: [0.22, 1, 0.36, 1] }}
-                    >
-                      <StarMark size={14} className="cat-ink" />
-                      {uz(tech)}
-                    </motion.li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
             {course.modules.length > 0 && (
               <section aria-labelledby="plan-title">
                 <SectionHead kicker="02 — Dastur" id="plan-title">Dars rejasi</SectionHead>
@@ -164,15 +149,21 @@ export const CourseDetailView: React.FC<{ course: Course; onEnroll: () => void }
                   <button type="button" onClick={onEnroll} className="btn btn-primary mt-7 w-full">
                     Kursga yozilish <ArrowRight size={18} aria-hidden="true" />
                   </button>
-                  <a href={tel} className="btn btn-ghost mt-3 w-full">
-                    <Phone size={17} aria-hidden="true" /> <span className="mono">{phone}</span>
-                  </a>
+                  <button type="button" onClick={onConsult} className="btn btn-ghost mt-3 w-full">
+                    Bepul konsultatsiya
+                  </button>
+                  <p className="mt-4 text-center text-[0.9rem]" style={{ color: 'var(--fg-2)' }}>
+                    Yoki qoʻngʻiroq qiling:{' '}
+                    <a href={tel} className="mono inline-flex min-h-[44px] items-center underline underline-offset-4">{phone}</a>
+                  </p>
                 </div>
               </div>
             </div>
           </aside>
         </div>
       </div>
+
+      <Format />
 
       {related.length > 0 && (
         <section className="relative pb-[12vh]" aria-labelledby="related-title">
@@ -197,7 +188,7 @@ export const CourseDetailView: React.FC<{ course: Course; onEnroll: () => void }
         </section>
       )}
 
-      <Closing ref={closingRef} course={course} title={title} onEnroll={onEnroll} phone={phone} tel={tel} reduced={reduced} />
+      <Closing ref={closingRef} course={course} title={title} onEnroll={onEnroll} onConsult={onConsult} phone={phone} tel={tel} reduced={reduced} />
 
       {/* mobil: pastki yozilish paneli */}
       <AnimatePresence>
@@ -229,11 +220,12 @@ export const CourseDetailView: React.FC<{ course: Course; onEnroll: () => void }
 const Hero: React.FC<{
   course: Course;
   onEnroll: () => void;
+  onConsult: () => void;
   ctaRef: React.RefObject<HTMLDivElement | null>;
   reduced: boolean;
   phone: string;
   tel: string;
-}> = ({ course, onEnroll, ctaRef, reduced, phone, tel }) => {
+}> = ({ course, onEnroll, onConsult, ctaRef, reduced, phone, tel }) => {
   const { tField } = useLanguage();
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress: hp } = useScroll({ target: ref, offset: ['start start', 'end start'] });
@@ -266,20 +258,24 @@ const Hero: React.FC<{
           <motion.div className="min-w-0 lg:col-span-7" style={reduced ? undefined : { y: textY, opacity: textOp }}>
             <p className="t-kicker cat-ink mb-6">{uz(CAT_LABEL[course.category])}</p>
             <Mask>
-              <h1 id="course-title" className="cd-title">{uz(tField(course.title))}</h1>
+              <h1 id="course-title" className="cd-title max-w-[14ch]">{uz(tField(course.title))}</h1>
             </Mask>
             <p className="t-lead mt-7 max-w-[36rem]">{uz(tField(course.description))}</p>
             <div ref={ctaRef} className="hero-cta mt-9 flex flex-col gap-3 sm:flex-row">
               <button type="button" onClick={onEnroll} className="btn btn-primary">
                 Kursga yozilish <ArrowRight size={18} aria-hidden="true" />
               </button>
-              <a href={tel} className="btn btn-ghost">
-                <Phone size={17} aria-hidden="true" /> <span className="mono">{phone}</span>
-              </a>
+              <button type="button" onClick={onConsult} className="btn btn-ghost">
+                Bepul konsultatsiya
+              </button>
             </div>
+            <p className="mt-4 text-[0.95rem]" style={{ color: 'var(--fg-2)' }}>
+              <Phone size={15} className="mr-2 inline align-[-2px]" aria-hidden="true" />
+              <a href={tel} className="mono inline-flex min-h-[44px] items-center underline underline-offset-4">{phone}</a>
+            </p>
           </motion.div>
 
-          <div className="relative mx-auto w-full max-w-[34rem] lg:col-span-5 lg:max-w-none" style={{ perspective: '1400px' }}>
+          <div className="relative mx-auto w-full max-w-[28rem] lg:col-span-5 lg:max-w-[30rem] lg:justify-self-center" style={{ perspective: '1400px' }}>
             <motion.div
               className="relative"
               initial={reduced ? false : { opacity: 0, y: 40, rotateY: 14 }}
@@ -351,8 +347,8 @@ const Hero: React.FC<{
 // ---------------------------------------------------------------- yopuvchi blok
 const Closing = React.forwardRef<
   HTMLElement,
-  { course: Course; title: string; onEnroll: () => void; phone: string; tel: string; reduced: boolean }
->(({ title, onEnroll, phone, tel, reduced }, ref) => (
+  { course: Course; title: string; onEnroll: () => void; onConsult: () => void; phone: string; tel: string; reduced: boolean }
+>(({ title, onEnroll, onConsult, phone, tel }, ref) => (
   <section ref={ref} className="relative overflow-hidden py-[12vh]" aria-labelledby="close-title">
     <div className="hairline absolute inset-x-0 top-0" aria-hidden="true" />
     <div
@@ -361,22 +357,26 @@ const Closing = React.forwardRef<
       style={{ background: 'radial-gradient(60% 70% at 50% 100%, color-mix(in srgb, var(--cat) 20%, transparent), transparent 70%)' }}
     />
     <div className="wrap relative z-10 text-center">
-      <p className="t-kicker mb-6">Savollaringiz bormi?</p>
+      <p className="t-kicker mb-6">Keyingi qadam</p>
       <Mask>
         <h2 id="close-title" className="t-h2 mx-auto max-w-[18ch] text-balance">
           {title} — <span className="ink-grad">kursga yoziling.</span>
         </h2>
       </Mask>
-      <p className="t-lead mx-auto mt-6 max-w-[34rem]">Kurs haqida batafsil maʼlumot olish uchun biz bilan bogʻlaning.</p>
+      <p className="t-lead mx-auto mt-6 max-w-[34rem]">Joy band qilish yoki savol berish uchun ariza qoldiring, administrator siz bilan bogʻlanadi.</p>
       <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <button type="button" onClick={onEnroll} className="btn btn-primary">
           Kursga yozilish <ArrowRight size={18} aria-hidden="true" />
         </button>
-        <a href={tel} className="btn btn-ghost">
-          <Phone size={17} aria-hidden="true" /> <span className="mono">{phone}</span>
-        </a>
+        <button type="button" onClick={onConsult} className="btn btn-ghost">
+          Bepul konsultatsiya
+        </button>
       </div>
-      <p className="mt-8">
+      <p className="mt-6 text-[0.95rem]" style={{ color: 'var(--fg-2)' }}>
+        Yoki qoʻngʻiroq qiling:{' '}
+        <a href={tel} className="mono inline-flex min-h-[44px] items-center underline underline-offset-4">{phone}</a>
+      </p>
+      <p className="mt-2">
         <Link to="/karyera-testi" className="link-arrow min-h-[44px]">
           Qaysi kasb sizga mos? Karyera testi <ArrowRight size={18} aria-hidden="true" />
         </Link>
@@ -385,3 +385,76 @@ const Closing = React.forwardRef<
   </section>
 ));
 Closing.displayName = 'Closing';
+
+// ---------------------------------------------------------------- kurs oxirida nima qila olasiz (bento, faqat modul ma'lumotidan)
+const Outcomes: React.FC<{ course: Course; reduced: boolean }> = ({ course, reduced }) => {
+  const { tField } = useLanguage();
+  const mods = course.modules;
+  if (mods.length === 0 && course.technologies.length === 0) return null;
+  const n = mods.length;
+  const lastLg = n % 3 === 1 ? 'lg:col-span-3' : n % 3 === 2 ? 'lg:col-span-2' : '';
+  const lastSm = n % 2 === 1 ? 'sm:col-span-2' : '';
+  return (
+    <section className="wrap pt-[8vh]" aria-labelledby="out-title">
+      <SectionHead kicker="01 — Natija" id="out-title">
+        Kurs oxirida <span className="ink-grad">nima qila olasiz</span>
+      </SectionHead>
+      <p className="t-lead mt-5 max-w-[38rem]">Dasturdagi har bir modul alohida amaliy koʻnikmaga aylanadi.</p>
+      {n > 0 && (
+        <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {mods.map((m, i) => {
+            const last = i === n - 1 && n > 1;
+            return (
+              <motion.li
+                key={i}
+                className={`out-card min-w-0 ${last ? `${lastSm} ${lastLg}`.trim() : ''}`}
+                initial={reduced ? false : { opacity: 0, y: 28 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '0px 0px -8% 0px' }}
+                transition={{ duration: 0.6, delay: (i % 3) * 0.07, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <span className="out-n mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                <h3 className="t-h3 mt-6 text-balance" style={{ fontSize: 'clamp(1.15rem, 1.6vw, 1.45rem)' }}>{uz(tField(m.title))}</h3>
+                <p className="mono ink-3 mt-3 text-sm">{m.lessons.length} ta dars</p>
+              </motion.li>
+            );
+          })}
+        </ul>
+      )}
+      {course.technologies.length > 0 && (
+        <div className="mt-10">
+          <p className="t-kicker mb-4">Ishlatiladigan asboblar</p>
+          <ul className="flex flex-wrap gap-3">
+            {course.technologies.map((tech, i) => (
+              <li key={`${tech}-${i}`} className="tech">
+                <StarMark size={14} className="cat-ink" />
+                {uz(tech)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+};
+
+// ---------------------------------------------------------------- format (saytda allaqachon aytilgan umumiy tasdiqlar)
+const FORMAT = [
+  { Icon: Users, t: 'Kichik guruhlar', d: 'Darslar oflayn, kichik guruhlarda oʻtadi: ustoz har bir oʻquvchiga eʼtibor bera oladi.' },
+  { Icon: Layers, t: 'Real loyiha', d: 'Har bir kurs amaliy loyiha bilan tugaydi, portfolio oʻqish davomida yigʻiladi.' },
+  { Icon: Award, t: 'Sertifikat', d: 'Yakuniy imtihondan oʻtgan oʻquvchilarga DATA Taʼlim Stansiyasi sertifikati beriladi.' },
+];
+const Format: React.FC = () => (
+  <section className="wrap pb-[10vh]" aria-labelledby="fmt-title">
+    <SectionHead kicker="04 — Format" id="fmt-title">Qanday <span className="ink-grad">oʻqiladi</span></SectionHead>
+    <ul className="mt-10 grid gap-4 md:grid-cols-3">
+      {FORMAT.map(({ Icon, t, d }) => (
+        <li key={t} className="out-card min-w-0">
+          <span className="out-ico" aria-hidden="true"><Icon size={22} /></span>
+          <h3 className="t-h3 mt-6" style={{ fontSize: 'clamp(1.15rem, 1.6vw, 1.45rem)' }}>{t}</h3>
+          <p className="t-body mt-3 text-[0.975rem]">{d}</p>
+        </li>
+      ))}
+    </ul>
+  </section>
+);

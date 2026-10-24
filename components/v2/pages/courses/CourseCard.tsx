@@ -72,10 +72,10 @@ export const CourseCard: React.FC<{ course: Course; index: number }> = ({ course
             </div>
           </dl>
 
-          <div className="hairline mt-6 flex items-center justify-between pt-5">
-            <span className="font-semibold tracking-[-0.01em]">Batafsil maʼlumot</span>
-            <span className="cc-arrow" aria-hidden="true">
-              <ArrowRight size={18} />
+          <div className="hairline mt-6 pt-5">
+            <span className="cc-cta">
+              Batafsil va yozilish
+              <ArrowRight size={18} aria-hidden="true" />
             </span>
           </div>
         </div>

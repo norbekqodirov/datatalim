@@ -28,6 +28,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollProgress } from './components/ScrollProgress';
 import { BackToTop } from './components/BackToTop';
 import { GlobalSearch } from './components/GlobalSearch';
+import { ConsultHost } from './components/v2/consult';
 
 // Admin
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -101,6 +102,7 @@ const PublicLayout = () => {
         </ErrorBoundary>
       </main>
       <Footer />
+      <ConsultHost />
     </div>
   );
 };

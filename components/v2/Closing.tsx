@@ -7,6 +7,7 @@ import { useLanguage } from '../../i18n';
 import { submitLeadToAPI } from '../../utils/api';
 import { trackEvent } from '../../utils/pixel';
 import { uz, v2Toast } from './utils';
+import { StartSteps } from './Sales';
 import { Mask, Star3D } from './fx';
 
 // ------------------------------------------------------------------ FAQ
@@ -167,9 +168,9 @@ export const ContactV2: React.FC = () => {
   return (
     <section ref={closeRef} id="contact" className="relative py-[14vh] overflow-hidden" aria-labelledby="contact-title">
       {/* closing star */}
-      <Star3D progress={closeP} spin={55} className="absolute -right-[10vw] top-[8%] w-[46vw] max-w-[620px] aspect-square pointer-events-none opacity-[.4] hidden lg:block" />
+      <Star3D progress={closeP} spin={55} className="absolute -left-[14vw] bottom-[-6%] w-[40vw] max-w-[560px] aspect-square pointer-events-none opacity-[.22] hidden lg:block" />
 
-      <div className="wrap grid lg:grid-cols-12 gap-12 relative z-10 [&>*]:min-w-0">
+      <div className="wrap grid lg:grid-cols-12 gap-12 lg:items-center relative z-10 [&>*]:min-w-0">
         <div className="lg:col-span-6">
           <p className="t-kicker mb-6">10 — Boshlash</p>
           <Mask>
@@ -179,22 +180,7 @@ export const ContactV2: React.FC = () => {
           </Mask>
           <p className="t-lead mt-6 max-w-lg">Raqamingizni qoldiring: menejer 1 ish kuni ichida qoʻngʻiroq qilib, sizga mos kurs va jadvalni tanlab beradi.</p>
 
-          <dl className="mt-12 grid sm:grid-cols-2 gap-x-8 gap-y-6">
-            {[
-              { icon: MapPin, k: 'Manzil', v: `${uz(tField(siteContent.contactAddress))}. ${uz(tField(siteContent.contactLandmark))}` },
-              { icon: Clock, k: 'Ish vaqti', v: uz(tField(siteContent.contactSchedule)) },
-              { icon: Phone, k: 'Telefon', v: siteContent.contactPhone, href: `tel:${siteContent.contactPhone.replace(/[^\d+]/g, '')}` },
-              { icon: Mail, k: 'Email', v: siteContent.contactEmail, href: `mailto:${siteContent.contactEmail}` },
-            ].map(({ icon: Icon, k, v, href }) => (
-              <div key={k} className="flex gap-4">
-                <Icon size={20} className="shrink-0 mt-1 ink-blue" aria-hidden="true" />
-                <div>
-                  <dt className="t-kicker !text-[0.75rem]">{k}</dt>
-                  <dd className="mt-1 leading-relaxed">{href ? <a href={href} className="inline-flex items-center min-h-[44px] -my-2.5 hover:underline underline-offset-4">{v}</a> : v}</dd>
-                </div>
-              </div>
-            ))}
-          </dl>
+          <StartSteps />
         </div>
 
         <div className="lg:col-span-5 lg:col-start-8">
@@ -270,6 +256,23 @@ export const ContactV2: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <dl className="wrap relative z-10 mt-16 pt-10 hairline grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
+        {[
+          { icon: MapPin, k: 'Manzil', v: `${uz(tField(siteContent.contactAddress))}. ${uz(tField(siteContent.contactLandmark))}` },
+          { icon: Clock, k: 'Ish vaqti', v: uz(tField(siteContent.contactSchedule)) },
+          { icon: Phone, k: 'Telefon', v: siteContent.contactPhone, href: `tel:${siteContent.contactPhone.replace(/[^\d+]/g, '')}` },
+          { icon: Mail, k: 'Email', v: siteContent.contactEmail, href: `mailto:${siteContent.contactEmail}` },
+        ].map(({ icon: Icon, k, v, href }) => (
+          <div key={k} className="flex gap-4">
+            <Icon size={20} className="shrink-0 mt-1 ink-blue" aria-hidden="true" />
+            <div>
+              <dt className="t-kicker !text-[0.75rem]">{k}</dt>
+              <dd className="mt-1 leading-relaxed">{href ? <a href={href} className="inline-flex items-center min-h-[44px] -my-2.5 hover:underline underline-offset-4">{v}</a> : v}</dd>
+            </div>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 };

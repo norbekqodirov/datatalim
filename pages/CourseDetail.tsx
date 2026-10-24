@@ -12,7 +12,7 @@ import '../components/v2/v2.css';
 export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType] = useState<'enroll' | 'consult'>('enroll');
+  const [modalType, setModalType] = useState<'enroll' | 'consult'>('enroll');
   const { tField } = useLanguage();
   const { courses } = useStore();
 
@@ -67,7 +67,7 @@ export default function CourseDetail() {
         }}
       />
 
-      <CourseDetailView course={course} onEnroll={() => setModalOpen(true)} />
+      <CourseDetailView course={course} onOpen={(t) => { setModalType(t); setModalOpen(true); }} />
 
       <EnrollModal
         isOpen={modalOpen}

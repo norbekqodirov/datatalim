@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useMotionValueEvent, MotionValue } from 'framer-motion';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Check, Sparkles } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { ParticleField } from './particleField';
@@ -300,6 +300,19 @@ const HeroCopy: React.FC<{ title: string; subtitle: string; description: string;
         Kurslarni koʻrish <ArrowRight size={18} aria-hidden="true" />
       </Link>
     </motion.div>
+    {/* qaror oldidan ishonch: saytda allaqachon aytilgan uchta vaʼda */}
+    <motion.ul
+      className="hero-proof mt-8 flex flex-wrap gap-x-5 gap-y-2"
+      initial={{ opacity: 0 }}
+      animate={go({ opacity: 1 })}
+      transition={{ duration: 0.8, delay: 0.45 }}
+    >
+      {['Kichik guruhlar', 'Real loyiha', 'Sertifikat + portfolio'].map((t) => (
+        <li key={t} className="flex items-center gap-2 text-[0.85rem]" style={{ color: 'var(--fg-2)' }}>
+          <Check size={15} className="ink-green" aria-hidden="true" /> {t}
+        </li>
+      ))}
+    </motion.ul>
   </div>
   );
 };

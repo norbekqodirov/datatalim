@@ -5,6 +5,7 @@ import { motion, useScroll, useSpring } from 'framer-motion';
 import toast from 'react-hot-toast';
 import DOMPurify from 'dompurify';
 import { SEO, articleSchema, SITE_URL } from '../components/SEO';
+import { EnrollModal } from '../components/EnrollModal';
 import { useLanguage } from '../i18n';
 import { uz, useMotionReduced, v2Toast } from '../components/v2/utils';
 import { Mask } from '../components/v2/fx';
@@ -116,6 +117,7 @@ const BlogPost: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [others, setOthers] = useState<Post[]>([]);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [consult, setConsult] = useState(false);
 
   useEffect(() => {
     let alive = true; // maqola almashganda eski javob yangisini bosib ketmasin
@@ -267,6 +269,33 @@ const BlogPost: React.FC = () => {
           <div ref={bodyRef} className="prose-v2" dangerouslySetInnerHTML={{ __html: html }} />
           <Star4 className="prose-end-star" />
 
+          {/* in-article CTA, matched to the post category */}
+          {(() => {
+            const cat = (post.category || '').toLowerCase();
+            const kind = /til|lang|ielts|english/.test(cat) ? 'lang' : /dizayn|design|media|smm|grafik/.test(cat) ? 'media' : 'general';
+            const copy = {
+              lang: { k: 'Til kurslari', h: 'Xorijiy tilni ustoz bilan oʻrganing', p: "Ingliz, rus, koreys va nemis tili kurslari, bepul mock testlar va yakshanba tadbirlari.", to: '/til-kurslari', label: 'Til kurslarini koʻrish' },
+              media: { k: 'Media va dizayn', h: 'Amaliy loyihalar bilan boshlang', p: "Grafik dizayn, SMM va mobilografiya kurslari: kichik guruhlar va amaliyotchi ustozlar.", to: '/kurslar', label: 'Kurslarni koʻrish' },
+              general: { k: 'Keyingi qadam', h: 'Yoʻnalishni ustoz bilan birga tanlang', p: "Bepul konsultatsiyada maqsadingizga mos kursni aniqlab beramiz. Kichik guruhlar, amaliyotchi ustozlar, sertifikat.", to: '', label: 'Bepul konsultatsiya' },
+            }[kind];
+            return (
+              <div className="mx-auto mt-14 max-w-[68ch] panel relative overflow-hidden p-7 sm:p-9">
+                <Star4 className="pointer-events-none absolute -left-10 -bottom-12 w-48 h-48 opacity-[0.07] ink-cyan" />
+                <p className="t-kicker mb-4 relative">{copy.k}</p>
+                <h2 className="t-h3 relative">{uz(copy.h)}</h2>
+                <p className="t-body mt-3 relative">{uz(copy.p)}</p>
+                <div className="mt-6 flex flex-wrap gap-3 relative">
+                  {copy.to ? (
+                    <Link to={copy.to} className="btn btn-primary">{copy.label} <ArrowRight size={18} aria-hidden="true" /></Link>
+                  ) : (
+                    <button type="button" className="btn btn-primary" onClick={() => setConsult(true)}>{copy.label} <ArrowRight size={18} aria-hidden="true" /></button>
+                  )}
+                  {kind !== 'general' && <button type="button" className="btn btn-ghost" onClick={() => setConsult(true)}>Bepul konsultatsiya</button>}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="mx-auto mt-12 max-w-[68ch] hairline pt-8 flex flex-wrap items-center justify-between gap-4">
             <p className="t-kicker">Maqola yoqdimi?</p>
             <ShareBar title={title} />
@@ -330,7 +359,7 @@ const BlogPost: React.FC = () => {
                 <p className="t-lead mt-6 max-w-lg">
                   {uz("Holland RIASEC metodikasi asosidagi test qiziqishlaringizni olti o'lchovda baholaydi va sizga mos yo'nalishni ko'rsatadi.")}
                 </p>
-                <Link to="/karyera-testi" className="btn btn-primary mt-9">
+                <Link to="/karyera-testi" className="btn btn-ghost mt-9">
                   Testni boshlash <ArrowRight size={18} aria-hidden="true" />
                 </Link>
               </div>
@@ -350,6 +379,7 @@ const BlogPost: React.FC = () => {
           </Reveal>
         </div>
       </section>
+      <EnrollModal isOpen={consult} onClose={() => setConsult(false)} courseName="Bepul konsultatsiya" extraInfo={`Blog: ${title}`} type="consult" />
     </div>
   );
 };

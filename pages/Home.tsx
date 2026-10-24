@@ -2,7 +2,8 @@ import React from 'react';
 import { useStore } from '../store/useStore';
 import { SEO } from '../components/SEO';
 import { HeroSignal } from '../components/v2/HeroSignal';
-import { Manifesto, Numbers } from '../components/v2/Manifesto';
+import { Manifesto } from '../components/v2/Manifesto';
+import { ProofBento, CourseMarquee, MobileCtaBar } from '../components/v2/Sales';
 import { Directions } from '../components/v2/Directions';
 import { CareerLab } from '../components/v2/CareerLab';
 import { Campus } from '../components/v2/Campus';
@@ -27,10 +28,15 @@ export default function Home() {
       {v.about && (
         <>
           <Manifesto />
-          <Numbers />
+          <ProofBento />
         </>
       )}
-      {v.courses && <Directions />}
+      {v.courses && (
+        <>
+          <CourseMarquee />
+          <Directions />
+        </>
+      )}
       {v.careerTest && (
         <>
           <StarSeam />
@@ -53,6 +59,7 @@ export default function Home() {
         </>
       )}
       {v.contact && <ContactV2 />}
+      <MobileCtaBar />
     </div>
   );
 }

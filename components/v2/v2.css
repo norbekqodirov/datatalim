@@ -429,3 +429,66 @@ html .v2 .field[aria-invalid="true"],
 html:not(.dark) .v2 .nf-dark { display: none; }
 .v2 .nf-light { display: none; }
 @media (min-width: 768px) { html:not(.dark) .v2 .nf-light { display: block; } }
+
+/* ---------- sales blocks (Sales.tsx): bento, marquee, start steps, mobile CTA ---------- */
+.v2 .bento-tile {
+  position: relative;
+  padding: clamp(1.25rem, 2.2vw, 2rem);
+  min-height: clamp(11rem, 18vw, 15rem);
+  overflow: hidden;
+  transition: transform .35s cubic-bezier(.22,1,.36,1), border-color .35s;
+}
+.v2 .bento-tile::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(60% 80% at 0% 0%, rgba(0,97,255,.10), transparent 70%);
+  pointer-events: none;
+}
+.v2 .bento-tile:hover { border-color: var(--line-2); transform: translate3d(0,-3px,0); }
+.v2 .bento-icon { filter: drop-shadow(0 18px 28px rgba(0,97,255,.28)); transition: transform .5s cubic-bezier(.22,1,.36,1); }
+.v2 .bento-tile:hover .bento-icon { transform: translate3d(0,-6px,0) rotate(-4deg) scale(1.04); }
+.v2 .bento-title { font-size: clamp(1.15rem, 1.6vw, 1.45rem); font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; color: var(--fg); }
+.v2 .bento-cta { background: linear-gradient(120deg, #0061ff 0%, #0a4fd8 45%, #00a3c4 100%); border-color: transparent; }
+.v2 .bento-cta::before { background: radial-gradient(50% 90% at 100% 100%, rgba(96,239,255,.45), transparent 70%); }
+.v2 .bento-cta-btn { background: #fff; color: #0a1f44; min-height: 52px; }
+.v2 .bento-cta-btn:hover { background: #eaf6ff; }
+
+.v2 .marquee-band { color: var(--fg); border-block: 1px solid var(--line); }
+.v2 .marquee-row { display: flex; width: max-content; }
+.v2 .marquee-row + .marquee-row { margin-top: .4em; }
+.v2 .marquee-track { display: flex; flex-shrink: 0; animation: v2-marquee 60s linear infinite; }
+.v2 .marquee-row.is-rev .marquee-track { animation-direction: reverse; animation-duration: 70s; }
+.v2 .marquee-row.is-still .marquee-track { animation: none; }
+.v2 .marquee-band:hover .marquee-track { animation-play-state: paused; }
+.v2 .marquee-item {
+  display: inline-flex; align-items: center; gap: .45em; padding-right: .6em; white-space: nowrap;
+  font-size: clamp(1.9rem, 4.6vw, 4.4rem); font-weight: 600; letter-spacing: -0.035em; line-height: 1.15;
+}
+.v2 .marquee-item.is-outline { color: transparent; -webkit-text-stroke: 1px var(--fg-3); }
+.v2 .marquee-band:hover .marquee-item.is-outline { -webkit-text-stroke-color: var(--cyan-ink); }
+.v2 .marquee-emoji { font-size: .62em; -webkit-text-stroke: 0; color: initial; }
+.v2 .marquee-star { width: .42em; height: .42em; margin-left: .35em; fill: var(--cyan-ink); }
+@keyframes v2-marquee { from { transform: translate3d(0,0,0); } to { transform: translate3d(-100%,0,0); } }
+
+.v2 .start-step {
+  display: flex; align-items: center; gap: 1rem;
+  padding: .9rem 1.1rem .9rem .8rem;
+  border: 1px solid var(--line); border-radius: 20px; background: var(--bg-2);
+}
+
+.v2 .mobile-cta {
+  position: fixed; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 45; display: flex; gap: 8px; padding: 8px;
+  border-radius: 22px; border: 1px solid var(--line-2);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 20px 50px -20px rgba(0,0,0,.6);
+}
+.v2 .mobile-cta-call {
+  width: 48px; height: 48px; flex-shrink: 0; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line-2); color: var(--fg);
+}
+@media (min-width: 1024px) { .v2 .mobile-cta { display: none; } }
+/* telefonda hero joyi tor: ishonch qatori bentoda baribir bor */
+@media (max-width: 639px) { .v2 .hero-proof { display: none; } }

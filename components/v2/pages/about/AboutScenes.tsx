@@ -6,6 +6,7 @@ import { useStore } from '../../../../store/useStore';
 import { useLanguage } from '../../../../i18n';
 import { uz, useMotionReduced } from '../../utils';
 import { CountUp, Mask, ScrollText, Star3D } from '../../fx';
+import { EnrollModal } from '../../../EnrollModal';
 import './about.css';
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -146,11 +147,11 @@ export const MissionScene: React.FC = () => {
         </Reveal>
 
         <div className="mt-[12vh] grid lg:grid-cols-12 gap-x-12 gap-y-14 [&>*]:min-w-0">
-          <ol className="lg:col-span-7 hairline self-start">
+          <ol className="lg:col-span-7 hairline flex flex-col">
             {GOALS.map((g, i) => (
               <motion.li
                 key={g}
-                className="flex items-baseline gap-6 py-7 border-b"
+                className="flex items-baseline gap-6 py-7 border-b lg:flex-1 lg:items-center"
                 style={{ borderColor: 'var(--line)' }}
                 initial={reduced ? false : { opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -570,8 +571,8 @@ export const PlaceScene: React.FC = () => {
           </a>
         </div>
 
-        <div className="lg:col-span-6">
-          <div className="panel relative aspect-[4/3] lg:aspect-square max-h-[34rem] w-full overflow-hidden grain" aria-hidden="true">
+        <div className="lg:col-span-5 lg:col-start-8">
+          <div className="panel relative aspect-[4/3] lg:aspect-square max-h-[28rem] w-full overflow-hidden grain" aria-hidden="true">
             <div className="absolute inset-0" style={{ background: 'radial-gradient(60% 60% at 50% 50%, rgba(0,97,255,.22), transparent 72%)' }} />
             <div
               className="absolute inset-0 opacity-60"
@@ -613,6 +614,7 @@ export const PlaceScene: React.FC = () => {
 // ------------------------------------------------------------------ 10 closing
 export const AboutClosing: React.FC = () => {
   const ref = useRef<HTMLElement>(null);
+  const [consult, setConsult] = useState(false);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   return (
     <section ref={ref} className="relative py-[16vh] overflow-hidden" aria-labelledby="about-cta-title">
@@ -629,9 +631,11 @@ export const AboutClosing: React.FC = () => {
           <Link to="/karyera-testi" className="btn btn-primary">
             Karyera testini boshlash <ArrowRight size={18} aria-hidden="true" />
           </Link>
-          <Link to="/kurslar" className="btn btn-ghost">Kurslarni koʻrish</Link>
+          <button type="button" className="btn btn-ghost" onClick={() => setConsult(true)}>Bepul konsultatsiya</button>
         </div>
+        <p className="mt-6 text-sm ink-3">Test bepul va majburiyatsiz. Natijadan keyin ustozlarimiz kurs tanlashda yordam beradi.</p>
       </div>
+      <EnrollModal isOpen={consult} onClose={() => setConsult(false)} courseName="Bepul konsultatsiya" type="consult" />
     </section>
   );
 };

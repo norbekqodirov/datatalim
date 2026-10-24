@@ -1,7 +1,8 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useSpring, MotionValue } from 'framer-motion';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import { openConsult } from './consult';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import type { Course } from '../../data/courses';
@@ -188,7 +189,7 @@ const CategoryPanel: React.FC<{ cat: (typeof CATS)[number]; index: number; x: Mo
       </motion.span>
       {/* category glow */}
       <motion.div
-        className="absolute -right-40 -bottom-40 w-[44rem] h-[44rem] rounded-full pointer-events-none"
+        className="absolute -left-40 -bottom-48 w-[44rem] h-[44rem] rounded-full pointer-events-none"
         style={{ x: glowX, background: `radial-gradient(circle, ${cat.color}3a 0%, transparent 65%)` }}
         aria-hidden="true"
       />
@@ -200,7 +201,7 @@ const CategoryPanel: React.FC<{ cat: (typeof CATS)[number]; index: number; x: Mo
         <h3 id={`cat-${cat.id}`} className="dir-title">{cat.title}</h3>
         <p className="dir-blurb">{cat.blurb}</p>
 
-        <ul className="dir-list mt-auto min-h-0 overflow-hidden">
+        <ul className="dir-list mt-8 min-h-0 overflow-hidden">
           {list.map((c) => (
             <li key={c.id} className="hairline">
               <Link to={`/kurslar/${c.id}`} className="group flex items-center gap-4">
@@ -213,6 +214,14 @@ const CategoryPanel: React.FC<{ cat: (typeof CATS)[number]; index: number; x: Mo
             </li>
           ))}
         </ul>
+
+        {/* kartaning chap-pastki burchagi: oʻng tomondagi yorqin muqovaga qarshi vazn va keyingi qadam */}
+        <div className="mt-auto pt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <button type="button" onClick={() => openConsult(cat.title)} className="btn btn-ghost !min-h-[48px]">
+            Mos kursni tanlashda yordam <ArrowRight size={18} aria-hidden="true" />
+          </button>
+          <span className="mono ink-3 text-[0.8rem]">{list.length} ta kurs · bepul konsultatsiya</span>
+        </div>
       </div>
 
       {/* 3D cover stack */}
@@ -279,6 +288,9 @@ const StackedList: React.FC = () => {
                       </li>
                     ))}
                   </ul>
+                  <button type="button" onClick={() => openConsult(cat.title)} className="btn btn-ghost w-full mt-5">
+                    Mos kursni tanlashda yordam <ArrowRight size={18} aria-hidden="true" />
+                  </button>
                 </div>
               </motion.article>
             );

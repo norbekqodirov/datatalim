@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Users, Award, Star, ArrowRight, type LucideIcon } from 'lucide-react';
 import { SEO } from '../components/SEO';
+import { EnrollModal } from '../components/EnrollModal';
 import { useStore } from '../store/useStore';
 import { Mask, Star3D, StarSeam } from '../components/v2/fx';
 import { uz, useMotionReduced } from '../components/v2/utils';
@@ -22,6 +23,7 @@ export default function Team() {
   const { team } = useStore();
   const navigate = useNavigate();
   const reduced = useMotionReduced();
+  const [consult, setConsult] = useState(false);
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
   const textY = useTransform(scrollYProgress, [0, 1], [0, -70]);
@@ -118,24 +120,37 @@ export default function Team() {
         </div>
       </section>
 
-      {/* join */}
+      {/* next step for students first, hiring second */}
       <section className="relative py-[14vh] overflow-hidden" aria-labelledby="join-title">
-        <StarGlyph size="min(54vw, 520px)" color="var(--blue)" className="absolute -right-[10vw] -top-[6vw] opacity-[.1] pointer-events-none" />
-        <div className="wrap relative">
-          <p className="t-kicker mb-6">03 — Hamkorlik</p>
-          <Mask>
-            <h2 id="join-title" className="t-display max-w-[14ch]">
-              Bizning jamoaga <span className="ink-grad">qoʻshiling</span>
-            </h2>
-          </Mask>
-          <p className="t-lead mt-6 max-w-xl">{uz("O'z sohangizning yetuk mutaxassisi bo'lsangiz va yoshlarga bilim berishni xohlasangiz, biz sizni kutamiz!")}</p>
-          <div className="mt-10">
-            <button type="button" className="btn btn-primary" onClick={goContact}>
-              Biz bilan bogʻlanish <ArrowRight size={18} aria-hidden="true" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(50% 60% at 50% 100%, rgba(0,97,255,.14), transparent 70%)' }} />
+        <div className="wrap relative grid lg:grid-cols-12 gap-x-14 gap-y-12 items-end [&>*]:min-w-0">
+          <div className="lg:col-span-7">
+            <p className="t-kicker mb-6">03 — Boshlash</p>
+            <Mask>
+              <h2 id="join-title" className="t-display max-w-[14ch]">
+                Ustozlar bilan <span className="ink-grad">tanishing</span>
+              </h2>
+            </Mask>
+            <p className="t-lead mt-6 max-w-xl">{uz("Qaysi yo'nalish sizga mosligini birga aniqlaymiz: bepul konsultatsiyada savollaringizga javob beramiz.")}</p>
+            <div className="mt-10 flex flex-wrap gap-3">
+              <button type="button" className="btn btn-primary" onClick={() => setConsult(true)}>
+                Bepul konsultatsiya <ArrowRight size={18} aria-hidden="true" />
+              </button>
+              <Link to="/kurslar" className="btn btn-ghost">Kurslarni koʻrish</Link>
+            </div>
+          </div>
+          <div className="lg:col-span-4 lg:col-start-9 panel p-7 sm:p-8 relative overflow-hidden">
+            <StarGlyph size="9rem" color="var(--blue)" className="absolute -right-8 -top-8 opacity-[.12] pointer-events-none" />
+            <p className="t-kicker mb-4">Hamkorlik</p>
+            <h3 className="t-h3">Ustoz boʻlmoqchimisiz?</h3>
+            <p className="t-body mt-3">{uz("O'z sohangizning yetuk mutaxassisi bo'lsangiz va yoshlarga bilim berishni xohlasangiz, biz sizni kutamiz!")}</p>
+            <button type="button" className="link-arrow mt-5 min-h-[44px]" onClick={goContact}>
+              Biz bilan bogʻlanish →
             </button>
           </div>
         </div>
       </section>
+      <EnrollModal isOpen={consult} onClose={() => setConsult(false)} courseName="Bepul konsultatsiya" type="consult" />
     </div>
   );
 }

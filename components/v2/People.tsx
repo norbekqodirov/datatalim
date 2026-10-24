@@ -6,6 +6,8 @@ import { useLanguage } from '../../i18n';
 import { YouTubeFacade } from './YouTubeFacade';
 import { uz, youtubeId } from './utils';
 import { Mask, ScrollText } from './fx';
+import { openConsult } from './consult';
+import { ArrowRight } from 'lucide-react';
 
 const initials = (name: string) =>
   name
@@ -28,9 +30,9 @@ export const Voices: React.FC = () => {
   return (
     <section className="relative py-[14vh]" aria-labelledby="voices-title">
       <div className="wrap">
-        <p className="t-kicker mb-10">07 — Ovozlar</p>
+        <p className="t-kicker mb-10 text-center">07 — Ovozlar</p>
         {quote && (
-          <figure className="max-w-5xl">
+          <figure className="max-w-5xl mx-auto text-center">
             <blockquote>
               <p id="voices-title" className="t-h2" style={{ fontWeight: 500 }}>
                 <span className="ink-grad" aria-hidden="true">«</span>
@@ -38,7 +40,7 @@ export const Voices: React.FC = () => {
                 <span className="ink-grad" aria-hidden="true">»</span>
               </p>
             </blockquote>
-            <figcaption className="mt-8 flex items-center gap-4">
+            <figcaption className="mt-8 flex items-center justify-center gap-4 text-left">
               {siteContent.aboutImage ? (
                 <img src={siteContent.aboutImage} alt={founder} className="w-14 h-14 rounded-full object-cover" loading="lazy" width={56} height={56} />
               ) : (
@@ -56,7 +58,7 @@ export const Voices: React.FC = () => {
 
         {videos.length > 0 && (
           <>
-            <h3 className="t-h3 mt-24 mb-8">Oʻquvchilarimiz oʻz tajribasi haqida</h3>
+            <h3 className="t-h3 mt-24 mb-8 text-center">Oʻquvchilarimiz oʻz tajribasi haqida</h3>
             <div className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-4 -mx-[var(--gutter)] px-[var(--gutter)] lg:grid lg:grid-cols-3 lg:overflow-visible lg:mx-0 lg:px-0">
               {videos.map((id, i) => (
                 <motion.div
@@ -73,6 +75,14 @@ export const Voices: React.FC = () => {
             </div>
           </>
         )}
+
+        {/* ijtimoiy isbotdan keyin — keyingi qadam */}
+        <div className="mt-14 flex flex-col items-center text-center gap-4">
+          <p className="t-lead max-w-xl">Siz ham shu yoʻlni boshlashingiz mumkin — bitta qoʻngʻiroqdan.</p>
+          <button type="button" onClick={() => openConsult()} className="btn btn-primary">
+            Konsultatsiyaga yozilish <ArrowRight size={18} aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </section>
   );

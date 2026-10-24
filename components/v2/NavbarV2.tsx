@@ -6,6 +6,7 @@ import { useTheme } from '../../store/ThemeContext';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { Logo } from '../BrandElements';
+import { openConsult } from './consult';
 import './v2.css';
 
 const LANGS = [
@@ -41,7 +42,7 @@ export const NavbarV2: React.FC = () => {
     { name: t('nav.team'), path: '/jamoa' },
     { name: t('nav.languages') || 'Til kurslari', path: '/til-kurslari' },
     { name: t('nav.blog') || 'Blog', path: '/blog' },
-    { name: t('nav.contact'), path: '/#contact' },
+    { name: t('nav.careerTest'), path: '/karyera-testi' },
   ];
 
   // hide on scroll down, reveal on scroll up (rAF-throttled, state only changes on flips)
@@ -276,9 +277,9 @@ export const NavbarV2: React.FC = () => {
               </AnimatePresence>
             </div>
 
-            <Link to="/karyera-testi" className="btn btn-primary nav-cta !min-h-[44px] !px-4 !text-[0.875rem] ml-2">
-              {t('nav.careerTest')}
-            </Link>
+            <button type="button" onClick={() => openConsult()} className="btn btn-primary nav-cta !min-h-[44px] !px-4 !text-[0.875rem] ml-2">
+              {t('test.consult')}
+            </button>
 
             <button
               ref={menuBtnRef}
@@ -366,9 +367,9 @@ export const NavbarV2: React.FC = () => {
                 transition={{ delay: 0.08 + 0.045 * links.length, duration: 0.4, ease: EASE }}
                 className="hairline pt-8"
               >
-                <Link to="/karyera-testi" className="btn btn-primary w-full">
-                  <Sparkles size={18} aria-hidden="true" /> {t('nav.careerTest')}
-                </Link>
+                <button type="button" onClick={() => { setOpen(false); openConsult(); }} className="btn btn-primary w-full">
+                  <Sparkles size={18} aria-hidden="true" /> {t('test.consult')}
+                </button>
                 <div className="mt-6 flex items-center justify-between gap-4">
                   <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} className="mono inline-flex items-center min-h-[44px] text-[1.05rem]" style={{ color: 'var(--fg)' }}>
                     {phone}

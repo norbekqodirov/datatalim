@@ -141,3 +141,16 @@
 @media (max-width: 1023.98px) {
   .v2 .lang-card .big-glyph { top: 0.6rem; bottom: auto; right: 1rem; font-size: 5.5rem; opacity: 0.55; }
 }
+
+/* desktop: the glyph is the right-hand focal point (vertically centred, uncropped) so the card is not left-heavy text + empty right */
+@media (min-width: 1024px) {
+  .v2 .lang-card .big-glyph {
+    right: 7%;
+    top: 50%;
+    bottom: auto;
+    margin-top: -0.48em;
+    font-size: clamp(11rem, 17vw, 17rem);
+    line-height: 1;
+  }
+  .v2 .lang-card .glow { right: 0; top: 50%; margin-top: -13rem; }
+}

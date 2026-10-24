@@ -283,13 +283,8 @@ export default function ApplyForm() {
                                     <p className="text-xs ink-3 text-center">Maʼlumotlaringiz faqat siz bilan bogʻlanish uchun ishlatiladi.</p>
                                 </form>
                             </div>
-                        </motion.div>
-
-                        <div className="lg:col-span-6 lg:row-start-2 lg:self-start">
-                            <img src="/images/v2/apply-steps.webp" alt="" aria-hidden="true" loading="lazy" decoding="async"
-                                className="hidden lg:block w-full max-w-[34rem] aspect-[16/8] object-cover rounded-2xl mb-8"
-                                style={{ border: '1px solid var(--line)' }} />
-                            <ol className="grid gap-4 max-w-[34rem]" style={{ counterReset: 'ap' }}>
+                            <div className="mt-8 px-1">
+                            <ol className="grid gap-4" style={{ counterReset: 'ap' }}>
                                 {STEPS.map((s, i) => (
                                     <motion.li
                                         key={s}
@@ -304,11 +299,18 @@ export default function ApplyForm() {
                                 ))}
                             </ol>
                             {phoneHref && (
-                                <a href={phoneHref} className="mt-6 inline-flex items-center gap-3 min-h-[44px] ink-2 hover:underline underline-offset-4">
+                                <a href={phoneHref} className="mt-4 inline-flex items-center gap-3 min-h-[44px] ink-2 hover:underline underline-offset-4">
                                     <Phone size={18} aria-hidden="true" className="ink-blue" />
                                     <span>Savolingiz bormi? <span className="mono" style={{ color: 'var(--fg)' }}>{siteContent.contactPhone}</span></span>
                                 </a>
                             )}
+                            </div>
+                        </motion.div>
+
+                        <div className="hidden lg:block lg:col-span-6 lg:row-start-2 lg:self-start">
+                            <img src="/images/v2/apply-steps.webp" alt="" aria-hidden="true" loading="lazy" decoding="async"
+                                className="hidden lg:block w-full max-w-[34rem] aspect-[16/9] object-cover rounded-2xl"
+                                style={{ border: '1px solid var(--line)' }} />
                         </div>
                     </div>
                 )}
