@@ -85,8 +85,8 @@ export interface SiteContent {
 }
 
 export const initialSiteContent: SiteContent = {
-  heroTitle: { uz: "Zamonaviy kasblarni biz bilan", ru: "Zamonaviy kasblarni biz bilan", en: "Zamonaviy kasblarni biz bilan" },
-  heroSubtitle: { uz: "o'rganing.", ru: "o'rganing.", en: "o'rganing." },
+  heroTitle: { uz: "Ma'lumotdan kasbgacha —", ru: "Ma'lumotdan kasbgacha —", en: "Ma'lumotdan kasbgacha —" },
+  heroSubtitle: { uz: "yo'lni biz bilan boshlang.", ru: "yo'lni biz bilan boshlang.", en: "yo'lni biz bilan boshlang." },
   heroDescription: { uz: "DATA Ta'lim Stansiyasi — 7 yoshdan yuqori bo'lgan barcha uchun IT va zamonaviy kasblarni o'rgatuvchi innovatsion markaz.", ru: "DATA Ta'lim Stansiyasi — 7 yoshdan yuqori bo'lgan barcha uchun IT va zamonaviy kasblarni o'rgatuvchi innovatsion markaz.", en: "DATA Ta'lim Stansiyasi — 7 yoshdan yuqori bo'lgan barcha uchun IT va zamonaviy kasblarni o'rgatuvchi innovatsion markaz." },
   tourVideoUrl: "https://www.youtube.com/embed/pGHOIuzeVlI?si=ZT4PSM1PZsLywt6-&rel=0",
   testimonialVideos: [
