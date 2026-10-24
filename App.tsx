@@ -15,6 +15,7 @@ const ApplyForm = lazy(() => import('./pages/ApplyForm'));
 const Languages = lazy(() => import('./pages/Languages'));
 const Blog = lazy(() => import('./pages/Blog'));
 const BlogPost = lazy(() => import('./pages/BlogPost'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 // Layout
 // v2 chrome (previous versions remain in components/layout/ for rollback)
@@ -66,6 +67,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 // Public Layout — Navbar va Footer faqat 1 marta mount bo'ladi
 const PublicLayout = () => {
   const { isDark } = useTheme();
+  const location = useLocation();
   const { isChecking } = useTracking(); // Initialize marketing link tracking
 
   if (isChecking) {
@@ -87,7 +89,7 @@ const PublicLayout = () => {
     >
       <Navbar />
       <main id="main" className="flex-1">
-        <ErrorBoundary>
+        <ErrorBoundary resetKey={location.pathname}>
           <Outlet />
         </ErrorBoundary>
       </main>
@@ -126,6 +128,8 @@ function App() {
 
   return (
     <HelmetProvider>
+      {/* Ilova darajasidagi himoya: navbar, admin yoki /ariza xatosi oq ekran qoldirmaydi */}
+      <ErrorBoundary fullScreen>
       <Router>
         <PixelTracker />
         <ScrollProgress />
@@ -147,6 +151,7 @@ function App() {
               <Route path="/til-kurslari" element={<Languages />} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogPost />} />
+              <Route path="*" element={<NotFound />} />
             </Route>
 
             {/* Standalone Landing Page for Marketing Links */}
@@ -178,6 +183,7 @@ function App() {
           </Routes>
         </Suspense>
       </Router>
+      </ErrorBoundary>
     </HelmetProvider>
   );
 }

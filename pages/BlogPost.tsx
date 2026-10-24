@@ -59,9 +59,11 @@ const BlogPost: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/posts/${slug}`)
-      .then(res => res.json())
-      .then(data => setPost(data))
+    setLoading(true);
+    fetch(`/api/posts/${encodeURIComponent(slug ?? '')}`)
+      .then(res => (res.ok ? res.json() : null))
+      // 404 javobi ({ error }) post sifatida qabul qilinmasligi kerak
+      .then(data => setPost(data && data.id && data.slug ? data : null))
       .catch(() => setPost(null))
       .finally(() => setLoading(false));
   }, [slug]);

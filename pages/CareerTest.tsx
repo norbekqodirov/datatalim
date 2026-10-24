@@ -1087,6 +1087,9 @@ export default function CareerTest() {
   const transitionLockRef = useRef(false);
   // Har bir test topshirilishida faqat bir marta avtomatik yuborilishi uchun
   const autoSubmittedRef = useRef(saved?.submitted ?? false);
+  // Qaysi so'rov muvaffaqiyatli yetib borgani — qayta urinishda faqat yetmaganini yuboramiz
+  const sentPartsRef = useRef({ lead: saved?.submitted ?? false, result: saved?.submitted ?? false });
+  const [sendFailures, setSendFailures] = useState(0);
   // Kutilayotgan animatsiya taymerlari. Ular bekor qilinmasa, "Qayta"/"Orqaga"
   // bosilganda eski taymer allaqachon almashgan ekranning holatini o'zgartirib
   // yuboradi va AnimatePresence chiqish animatsiyasida qotib qoladi.
@@ -1145,7 +1148,7 @@ export default function CareerTest() {
       name: userName, phone: userPhone, age: userAge, gender: userGender,
       submitted: autoSubmittedRef.current,
     });
-  }, [view, stage, currentQ, s2Page, s1Answers, s2Answers, s3Answers, fcSwap, mcOrder, userName, userPhone, userAge, userGender]);
+  }, [view, stage, currentQ, s2Page, s1Answers, s2Answers, s3Answers, fcSwap, mcOrder, userName, userPhone, userAge, userGender, sendFailures]);
 
   // Tiklanganda: foydalanuvchiga xabar va (agar yetib bormagan bo'lsa) natijani yuborish
   useEffect(() => {
@@ -1179,6 +1182,7 @@ export default function CareerTest() {
     }
     clearPending();
     autoSubmittedRef.current = false;
+    sentPartsRef.current = { lead: false, result: false };
     setTried(false);
     setDir(1);
     setOutcome(null);
@@ -1192,6 +1196,7 @@ export default function CareerTest() {
   function restartTest() {
     clearPending();
     autoSubmittedRef.current = false;
+    sentPartsRef.current = { lead: false, result: false };
     setConfirmRestart(false);
     setOutcome(null);
     setView('intro'); setStage(1); setCurrentQ(0); setS2Page(0);
@@ -1210,7 +1215,8 @@ export default function CareerTest() {
   const atStart = stage === 1 && currentQ === 0;
 
   function goBack() {
-    if (atStart) return;
+    // o'tish animatsiyasi (yoki yakuniy hisoblash) paytida orqaga qaytish natijani buzmasin
+    if (atStart || transitionLockRef.current) return;
     clearPending();
     setDir(-1);
     if (stage === 1) { if (currentQ > 0) setCurrentQ(q => q - 1); }
@@ -1246,7 +1252,7 @@ export default function CareerTest() {
 
   function handleS2Answer(qid: number, val: number) {
     const next = { ...s2Answers, [qid]: val };
-    setS2Answers(next);
+    setS2Answers(prev => ({ ...prev, [qid]: val }));
     // keyingi javobsiz fikrni (yoki "Keyingisi" tugmasini) ko'rinadigan joyga olib keladi
     const i = likertPageQs.findIndex(q => q.id === qid);
     const nextIdx = likertPageQs.findIndex((q, j) => j > i && next[q.id] === undefined);
@@ -1309,7 +1315,7 @@ export default function CareerTest() {
    * "Karyera Testi" Sheet tabiga yuboradi. Fon jarayoni — natijalar sahifasini
    * bloklamaydi, xatolik bo'lsa ham foydalanuvchi natijasini ko'raveradi.
    */
-  function submitCareerTestAuto(pcts: Record<RiasecType, number>, finalResults: CourseResult[]) {
+  function submitCareerTestAuto(pcts: Record<RiasecType, number>, finalResults: CourseResult[], attempt = 0) {
     if (autoSubmittedRef.current) return;
     if (!nameValid || !phoneValid) return; // himoya: intro validatsiyasiz bu yergacha yetib kelmasligi kerak
     autoSubmittedRef.current = true;
@@ -1317,22 +1323,38 @@ export default function CareerTest() {
     const fullPhone = '+998' + rawPhone;
     const topCourseNames = finalResults.slice(0, 3).map(r => r.course.name);
     const code = getHollandCode(pcts).join('');
+    const sent = sentPartsRef.current;
+    const jobs: Promise<unknown>[] = [];
 
-    submitLeadToAPI({
-      name: userName.trim(),
-      phone: fullPhone,
-      courseId: topCourseNames.join(', ') || 'Karyera testi',
-      sourceRef: 'Karyera_Testi',
-    }).catch(err => console.error('Karyera testi CRM lead xatosi:', err));
+    if (!sent.lead) {
+      jobs.push(submitLeadToAPI({
+        name: userName.trim(),
+        phone: fullPhone,
+        courseId: topCourseNames.join(', ') || 'Karyera testi',
+        sourceRef: 'Karyera_Testi',
+      }).then(() => { sent.lead = true; }));
+    }
+    if (!sent.result) {
+      jobs.push(submitCareerTestResult({
+        name: userName.trim(),
+        phone: fullPhone,
+        gender: userGender,
+        age: userAge,
+        hollandCode: code,
+        courses: topCourseNames,
+      }).then(() => { sent.result = true; }));
+    }
 
-    submitCareerTestResult({
-      name: userName.trim(),
-      phone: fullPhone,
-      gender: userGender,
-      age: userAge,
-      hollandCode: code,
-      courses: topCourseNames,
-    }).catch(err => console.error('Karyera testi Sheets xatosi:', err));
+    // Tarmoq xatosida lead yo'qolmasin: 2 marta qayta urinadi, baribir bo'lmasa
+    // "yuborilmagan" holati saqlanadi va sahifa qayta ochilganda yana yuboriladi.
+    Promise.allSettled(jobs).then(rs => {
+      const failed = rs.filter(r => r.status === 'rejected');
+      if (failed.length === 0) return;
+      console.error('Karyera testi natijasini yuborib boʻlmadi:', failed);
+      autoSubmittedRef.current = false;
+      setSendFailures(n => n + 1);
+      if (attempt < 2) schedule(() => submitCareerTestAuto(pcts, finalResults, attempt + 1), 5000 * (attempt + 1));
+    });
   }
 
   const displayStrengths = topStrengthsOf(s2Answers);
@@ -1388,6 +1410,7 @@ export default function CareerTest() {
     const el = e.target as HTMLElement | null;
     const tag = el?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+    if (e.repeat) return; // tugmani bosib turish bir nechta javobni to'ldirib yubormasin
     const k = e.key.toLowerCase();
     if (stage === 1) {
       const i = k === '1' || k === 'a' ? 0 : k === '2' || k === 'b' ? 1 : -1;

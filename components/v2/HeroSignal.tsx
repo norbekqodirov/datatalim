@@ -66,9 +66,15 @@ export const HeroSignal: React.FC = () => {
     }
 
     // only animate while the hero is on screen
-    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? field.start() : field.stop()), { threshold: 0 });
+    let onScreen = false;
+    const io = new IntersectionObserver(([e]) => {
+      onScreen = e.isIntersecting;
+      if (onScreen && !document.hidden) field.start();
+      else field.stop();
+    }, { threshold: 0 });
     io.observe(canvas);
-    const onVis = () => (document.hidden ? field.stop() : field.start());
+    // tabga qaytilganda faqat hero ekranda bo'lsa davom etadi
+    const onVis = () => (!document.hidden && onScreen ? field.start() : field.stop());
     document.addEventListener('visibilitychange', onVis);
 
     const onMove = (e: PointerEvent) => {

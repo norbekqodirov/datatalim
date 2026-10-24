@@ -4,7 +4,7 @@
    Scoped under .v2 so legacy pages and html.dark overrides stay untouched.
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&display=swap');
+/* JetBrains Mono index.html'da bloklamasdan (preload + onload) yuklanadi */
 
 .v2 {
   /* dark is the default (cinematic) */
