@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 
 // Asosiy domen (datatalim_nginx.conf server_name bilan bir xil)
@@ -13,7 +13,9 @@ interface SEOProps {
     image?: string;
     url?: string;
     type?: 'website' | 'article' | 'course';
-    jsonLd?: Record<string, unknown>;
+    jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+    /** true bo'lsa sahifa qidiruv indeksidan chiqariladi (dublikat / texnik sahifalar uchun) */
+    noindex?: boolean;
 }
 
 export const SEO: React.FC<SEOProps> = ({
@@ -24,10 +26,35 @@ export const SEO: React.FC<SEOProps> = ({
     url,
     type = 'website',
     jsonLd,
+    noindex = false,
 }) => {
-    const fullTitle = `${title} | DATA Ta'lim Stansiyasi`;
-    // url berilmasa joriy sahifaning kanonik manzili (query va hash'siz) ishlatiladi
-    const canonicalUrl = url || (typeof window !== 'undefined' ? `${SITE_URL}${window.location.pathname}` : SITE_URL);
+    // index.html'dagi statik (data-seo-static) meta teglar bosh sahifa uchun yozilgan; <SEO> o'z teglarini
+    // bergach ular DOM'da ikkilanib qolmasligi uchun olib tashlanadi (Helmet ularni o'zi o'chira olmaydi).
+    useEffect(() => {
+        document.querySelectorAll('[data-seo-static]').forEach((el) => el.remove());
+    }, []);
+
+    // JSON-LD'ni Helmet orqali emas, to'g'ridan-to'g'ri <head>'ga yozamiz: react-helmet-async
+    // <script> tegini (ayniqsa kurs ma'lumoti keyin kelganda) ikki marta qo'shib yuborar edi.
+    const jsonLdText = jsonLd ? JSON.stringify(jsonLd) : '';
+    useEffect(() => {
+        if (!jsonLdText) return;
+        const el = document.createElement('script');
+        el.type = 'application/ld+json';
+        el.setAttribute('data-seo-jsonld', '');
+        el.text = jsonLdText;
+        document.head.appendChild(el);
+        return () => el.remove();
+    }, [jsonLdText]);
+
+    // Sarlavhada brend allaqachon bo'lsa, "… | DATA | DATA Ta'lim Stansiyasi" kabi ikkilanish bo'lmasin
+    const fullTitle = /DATA\s+Ta['ʼ’]lim/i.test(title) ? title : `${title} | DATA Ta'lim Stansiyasi`;
+    // url berilmasa joriy sahifaning kanonik manzili (query, hash va oxirgi "/" siz) ishlatiladi
+    const canonicalUrl =
+        url ||
+        (typeof window !== 'undefined'
+            ? `${SITE_URL}${window.location.pathname.replace(/\/+$/, '') || '/'}`
+            : SITE_URL);
     // 'course' Open Graph'da mavjud tur emas, 'website' sifatida beriladi
     const ogType = type === 'course' ? 'website' : type;
 
@@ -39,27 +66,24 @@ export const SEO: React.FC<SEOProps> = ({
             <meta name="description" content={description} />
             <meta name="keywords" content={keywords} />
             <link rel="canonical" href={canonicalUrl} />
+            <meta name="robots" content={noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large'} />
 
             {/* Open Graph / Facebook */}
             <meta property="og:type" content={ogType} />
             <meta property="og:url" content={canonicalUrl} />
+            <meta property="og:site_name" content="DATA Ta'lim Stansiyasi" />
+            <meta property="og:locale" content="uz_UZ" />
             <meta property="og:title" content={fullTitle} />
             <meta property="og:description" content={description} />
             {image && <meta property="og:image" content={image} />}
 
             {/* Twitter */}
-            <meta property="twitter:card" content="summary_large_image" />
-            <meta property="twitter:url" content={canonicalUrl} />
-            <meta property="twitter:title" content={fullTitle} />
-            <meta property="twitter:description" content={description} />
-            {image && <meta property="twitter:image" content={image} />}
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:url" content={canonicalUrl} />
+            <meta name="twitter:title" content={fullTitle} />
+            <meta name="twitter:description" content={description} />
+            {image && <meta name="twitter:image" content={image} />}
 
-            {/* JSON-LD Structured Data */}
-            {jsonLd && (
-                <script type="application/ld+json">
-                    {JSON.stringify(jsonLd)}
-                </script>
-            )}
         </Helmet>
     );
 };

@@ -19,7 +19,9 @@ export default function HomeClassic() {
   return (
     <>
       <SEO
-        title="Bosh Sahifa"
+        title="Bosh Sahifa (eski dizayn)"
+        url="https://datatalim.uz/"
+        noindex
         description="DATA Ta'lim Stansiyasi - zamonaviy kasblarni biz bilan o'rganing. Dasturlash, dizayn, va moliya bepul ta'lim grantlari mavjud."
       />
       {visibility.hero && <Hero />}

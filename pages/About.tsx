@@ -5,6 +5,7 @@ import { useTheme } from '../store/ThemeContext';
 import { useStore } from '../store/useStore';
 import { useLanguage } from '../i18n';
 import { PatternBg, FloatingStars, Star1, Star2 } from '../components/BrandElements';
+import { SEO } from '../components/SEO';
 
 const stats = [
   { icon: Users, value: "1600+", label: "O'quvchi sig'imi", desc: "Zamonaviy o'quv xonalari" },
@@ -57,6 +58,7 @@ export default function About() {
 
   return (
     <div className="min-h-screen relative overflow-hidden pb-16" style={{ background: isDark ? '#000' : '#f8fafc' }}>
+      <SEO title="Biz haqimizda" description="DATA Ta'lim Stansiyasi — Urganchdagi zamonaviy o'quv markazi: 250+ kompyuter, 1600+ o'quvchi sig'imi, amaliy darslar va ish bilan ta'minlash." />
       <PatternBg color={isDark ? '#fc466b' : '#3f5efb'} opacity={isDark ? 0.02 : 0.03} />
       <FloatingStars color1="#3f5efb" color2="#fc466b" className="opacity-40" />
 

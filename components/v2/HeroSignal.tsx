@@ -50,8 +50,12 @@ export const HeroSignal: React.FC = () => {
       return;
     }
     fieldRef.current = field;
+    const portrait = () => window.innerHeight > window.innerWidth * 1.1;
     field.anchorX = desktop ? 0.73 : 0.5;
-    field.dim = desktop ? 1 : 0.3;
+    // phones: the world floats above the headline instead of hiding behind it
+    field.anchorY = !desktop && portrait() ? 0.21 : 0.5;
+    field.sizeMul = desktop ? 1 : 0.7;
+    field.dim = desktop || portrait() ? 1 : 0.3;
 
     const onResize = () => {
       field.resize();
@@ -104,8 +108,10 @@ export const HeroSignal: React.FC = () => {
     if (!f || reduced) return;
     f.progress = formationAt(v);
     f.anchorX = desktop && v < 0.14 ? 0.73 : 0.5;
-    // on narrow screens the cloud sits behind the headline: keep it quiet until the text leaves
-    f.dim = !desktop && v < 0.14 ? 0.3 : 1;
+    const phone = !desktop && window.innerHeight > window.innerWidth * 1.1;
+    f.anchorY = phone && v < 0.14 ? 0.21 : 0.5;
+    // short landscape screens: the cloud sits behind the headline, keep it quiet until the text leaves
+    f.dim = !desktop && !phone && v < 0.14 ? 0.3 : 1;
   });
 
   const hintOpacity = useTransform(scrollYProgress, [0, 0.06], [1, 0]);
@@ -136,30 +142,32 @@ export const HeroSignal: React.FC = () => {
         <div className="absolute inset-0 pointer-events-none" style={{ background: vignette }} />
 
         {/* Stage A — headline + CTAs (left), chaos cloud (right) */}
-        <Stage p={scrollYProgress} range={[-1, 0, 0.08, 0.16]} className="absolute inset-0 flex items-center">
+        <Stage p={scrollYProgress} range={[-1, 0, 0.08, 0.16]} className="absolute inset-0 flex items-end pb-[13svh] lg:items-center lg:pb-0">
           <div className="wrap pt-24">
             <HeroCopy title={title} subtitle={subtitle} description={description} />
           </div>
         </Stage>
 
         {/* Stage B — the globe */}
-        <Stage p={scrollYProgress} range={[0.2, 0.3, 0.42, 0.5]} className="absolute inset-x-0 bottom-[9vh] text-center">
+        <Stage p={scrollYProgress} range={[0.2, 0.3, 0.42, 0.5]} className="absolute inset-x-0 bottom-[11vh] text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">01 — Maʼlumot</p>
-            <h2 className="t-display max-w-4xl mx-auto">Dunyo maʼlumotdan iborat.</h2>
+            <h2 className="t-caption max-w-5xl mx-auto">Dunyo maʼlumotdan iborat.</h2>
           </div>
         </Stage>
 
         {/* Stage C — the brand star */}
-        <Stage p={scrollYProgress} range={[0.62, 0.72, 0.9, 1.05]} className="absolute inset-x-0 bottom-[8vh] text-center">
+        <Stage p={scrollYProgress} range={[0.62, 0.72, 0.9, 1.05]} className="absolute inset-x-0 bottom-[11vh] text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">02 — Bilim</p>
-            <h2 className="t-display max-w-5xl mx-auto">
+            <h2 className="t-caption max-w-5xl mx-auto">
               Biz uni <span className="ink-grad">kasbga</span> aylantirishni oʻrgatamiz.
             </h2>
             <p className="t-lead mt-5 max-w-2xl mx-auto">Dasturlash · Sunʼiy intellekt · Media · Dizayn · Moliya</p>
           </div>
         </Stage>
+
+        <StoryRail p={scrollYProgress} />
 
         {/* scroll hint */}
         <motion.div style={{ opacity: hintOpacity }} className="scroll-hint absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 pointer-events-none">
@@ -175,6 +183,40 @@ export const HeroSignal: React.FC = () => {
         </motion.div>
       </div>
     </section>
+  );
+};
+
+// three-step progress rail: makes the scroll story legible (world → data → profession)
+const STEPS: { label: string; at: [number, number, number, number] }[] = [
+  { label: 'Dunyo', at: [-1, 0, 0.16, 0.24] },
+  { label: 'Maʼlumot', at: [0.16, 0.26, 0.5, 0.6] },
+  { label: 'Kasb', at: [0.5, 0.68, 1.1, 1.2] },
+];
+
+const RailStep: React.FC<{ p: MotionValue<number>; label: string; at: [number, number, number, number]; i: number }> = ({ p, label, at, i }) => {
+  const opacity = useTransform(p, at, [0.35, 1, 1, 0.35]);
+  return (
+    <motion.span style={{ opacity }} className="t-kicker !text-[0.7rem] sm:!text-[0.75rem] flex items-center gap-2" >
+      <span style={{ color: 'var(--cyan-ink)' }}>{String(i + 1).padStart(2, '0')}</span>
+      {label}
+    </motion.span>
+  );
+};
+
+const StoryRail: React.FC<{ p: MotionValue<number> }> = ({ p }) => {
+  const show = useTransform(p, [0.03, 0.1, 0.94, 1], [0, 1, 1, 0]);
+  const fill = useTransform(p, [0.02, 0.9], [0, 1]);
+  return (
+    <motion.div style={{ opacity: show }} className="absolute left-[var(--gutter)] right-[var(--gutter)] bottom-5 pointer-events-none" aria-hidden="true">
+      <div className="flex justify-between mb-3">
+        {STEPS.map((s, i) => (
+          <RailStep key={s.label} p={p} label={s.label} at={s.at} i={i} />
+        ))}
+      </div>
+      <div className="h-px w-full" style={{ background: 'var(--line-2)' }}>
+        <motion.div className="h-px origin-left" style={{ scaleX: fill, background: 'var(--grad)' }} />
+      </div>
+    </motion.div>
   );
 };
 

@@ -7,6 +7,7 @@ import { useStore } from '../store/useStore';
 import { motion } from 'framer-motion';
 import { useTheme } from '../store/ThemeContext';
 import { useLanguage } from '../i18n';
+import { SEO, SITE_URL, courseSchema, breadcrumbSchema } from '../components/SEO';
 import { PatternBg, FloatingStars, Star1, Star2, BRAND_COLORS } from '../components/BrandElements';
 
 export default function CourseDetail() {
@@ -27,6 +28,7 @@ export default function CourseDetail() {
   if (!course) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <SEO title="Kurs topilmadi" noindex />
         <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-4">Kurs topilmadi</h1>
         <Button onClick={() => navigate('/kurslar')}>Kurslar ro'yxatiga qaytish</Button>
       </div>
@@ -35,8 +37,33 @@ export default function CourseDetail() {
 
   const brandColors = BRAND_COLORS[course.category as keyof typeof BRAND_COLORS] || { primary: '#0061ff', secondary: '#60efff' };
 
+  // SEO: kurs sahifasi uchun o'z sarlavha/tavsif/kanonik manzil va Course + BreadcrumbList JSON-LD
+  const courseTitle = tField(course.title);
+  const courseDesc = String(tField(course.description) || '').replace(/\s+/g, ' ').trim();
+  const seoDesc = courseDesc.length > 158 ? `${courseDesc.slice(0, 155).trimEnd()}...` : courseDesc;
+  const courseUrl = `${SITE_URL}/kurslar/${course.id}`;
+  const courseCover = course.coverImage ? (course.coverImage.startsWith('http') ? course.coverImage : `${SITE_URL}${course.coverImage}`) : undefined;
+
   return (
     <div className="min-h-screen relative overflow-hidden pb-16" style={{ background: isDark ? '#000' : '#f8fafc' }}>
+      <SEO
+        title={`${courseTitle} kursi — Urganch`}
+        description={seoDesc || undefined}
+        url={courseUrl}
+        image={courseCover}
+        type="course"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@graph': [
+            courseSchema({ name: courseTitle, description: seoDesc || courseTitle, url: courseUrl, image: courseCover }),
+            breadcrumbSchema([
+              { name: 'Bosh sahifa', url: `${SITE_URL}/` },
+              { name: 'Kurslar', url: `${SITE_URL}/kurslar` },
+              { name: courseTitle, url: courseUrl },
+            ]),
+          ],
+        }}
+      />
       <PatternBg color={brandColors.primary} opacity={isDark ? 0.03 : 0.02} />
       <FloatingStars color1={brandColors.primary} color2={brandColors.secondary} className="opacity-40" />
 

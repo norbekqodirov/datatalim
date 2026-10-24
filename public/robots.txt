@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /paneladmindata
+# /api/ ataylab yopilmagan: Googlebot sahifani JS bilan chizganda kurslar/jamoa ma'lumotini /api'dan oladi.
 
 Sitemap: https://datatalim.uz/sitemap.xml

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useId } from 'react';
+import { useState, useRef, useEffect, useId, useMemo } from 'react';
 import type { ComponentType, CSSProperties, ChangeEvent, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -92,7 +92,7 @@ const FORCED_CHOICE: ForcedChoiceQ[] = [
   { id:4,  text:"Qaysi rolni tanlagan bo'lardingiz?",                optionA:{icon:Trees,       text:"Mahsulotni o'z qo'lim bilan tayyorlash",         type:'R'}, optionB:{icon:Handshake,   text:"Mahsulotni sotish va biznesni yuritish",               type:'E'} },
   { id:5,  text:"Qaysi vazifa sizga qulayroq?",                      optionA:{icon:Cpu,         text:"Qurilma yoki mexanizmni sozlash",                type:'R'}, optionB:{icon:FileText,    text:"Hujjat va ma'lumotlarni tartibga solish",              type:'C'} },
   { id:6,  text:"Qaysi jarayon sizni ko'proq jalb qiladi?",          optionA:{icon:Telescope,   text:"Ma'lumotlarni chuqur tahlil qilib qonuniyat topish", type:'I'}, optionB:{icon:Sparkles,   text:"Butunlay yangi, original g'oya o'ylab topish",         type:'A'} },
-  { id:7,  text:"Qaysi muammo sizga yaqinroq?",                      optionA:{icon:FlaskConical,text:"Ilmiy gipotezani tekshirish",                    type:'I'}, optionB:{icon:HeartHandshake,text:"Insonning shaxsiy muammosini tinglab yordam berish",type:'S'} },
+  { id:7,  text:"Qaysi ish sizga yaqinroq?",                      optionA:{icon:FlaskConical,text:"Ilmiy gipotezani tekshirish",                    type:'I'}, optionB:{icon:HeartHandshake,text:"Insonning shaxsiy muammosini tinglab yordam berish",type:'S'} },
   { id:8,  text:"Qaysi loyiha sizni ko'proq hayajonlantiradi?",      optionA:{icon:Library,     text:"Uzoq muddatli tadqiqot olib borish",             type:'I'}, optionB:{icon:Building2,   text:"Yangi biznes yoki startap boshlash",                   type:'E'} },
   { id:9,  text:"Qaysi ish uslubi sizga mos?",                       optionA:{icon:Atom,        text:"Sabab-oqibatni izlab, mustaqil xulosa chiqarish", type:'I'}, optionB:{icon:Receipt,     text:"Aniq shakl bo'yicha hisobot va hujjat yuritish",       type:'C'} },
   { id:10, text:"Qaysi muhitda ishlashni xohlaysiz?",                optionA:{icon:Palette,     text:"Ijodiy studiya yoki dizayn bo'limida",           type:'A'}, optionB:{icon:Users,       text:"Odamlar bilan bevosita muloqotda",                    type:'S'} },
@@ -106,7 +106,7 @@ const FORCED_CHOICE: ForcedChoiceQ[] = [
 // ─── Bosqich 2 — Baholash (24 ta: har bir tip uchun 4 tadan mustaqil savol) ──
 // 2 tadan 4 taga oshirildi — bu ichki ishonchlilikni (reliability) sezilarli oshiradi.
 const LIKERT: LikertQ[] = [
-  { id:16, text:"Qo'limda biror narsani yig'ish, ta'mirlash yoki qurish menga yoqadi.",              type:'R' },
+  { id:16, text:"Qo'lim bilan biror narsani yig'ish, ta'mirlash yoki qurish menga yoqadi.",              type:'R' },
   { id:17, text:"Texnik asboblar yoki mexanizmlar bilan ishlashda o'zimni erkin his qilaman.",       type:'R' },
   { id:18, text:"Nazariyani o'qishdan ko'ra, amalda sinab ko'rishni afzal ko'raman.",                type:'R' },
   { id:19, text:"Ko'zga ko'rinadigan, aniq natija beruvchi ish menga ko'proq qoniqish beradi.",      type:'R' },
@@ -119,7 +119,7 @@ const LIKERT: LikertQ[] = [
   { id:26, text:"Rang, shakl va kompozitsiyaga nisbatan tabiiy sezgirligim bor.",                    type:'A' },
   { id:27, text:"Odatiy yechim o'rniga yangi va kutilmagan g'oyalar taklif qilaman.",                type:'A' },
   { id:28, text:"Boshqalarga yordam berish yoki ularni o'qitish menga zavq bag'ishlaydi.",           type:'S' },
-  { id:29, text:"Odamning muammosini tinglab, unga qo'llab-quvvatlash ko'rsatishni yaxshi ko'raman.",type:'S' },
+  { id:29, text:"Odamning muammosini tinglab, uni qo'llab-quvvatlashni yaxshi ko'raman.",type:'S' },
   { id:30, text:"Jamoa bilan birga ishlaganda o'zimni yaxshi his qilaman.",                          type:'S' },
   { id:31, text:"Atrofimdagilarning kayfiyati va ehtiyojini tez sezaman.",                           type:'S' },
   { id:32, text:"Jamoani boshqarish yoki loyihani yetaklashdan qochmayman.",                         type:'E' },
@@ -146,12 +146,12 @@ const MULTI_CHOICE: MultiChoiceQ[] = [
   },
   {
     id:41,
-    text:"Maktabda \"Kasblar kuni\" tashkil etilmoqda va sizga vazifa berishdi:",
+    text:"Maktabda \"Kasblar kuni\" tashkil etilmoqda. Qaysi vazifani o'z zimmangizga olasiz?",
     options:[
       {label:'A',text:"Stend va jihozlarni o'z qo'lim bilan yig'aman",type:'R',icon:Hammer},
       {label:'B',text:"O'quvchilar bilan suhbat qurib, savollariga javob beraman",type:'S',icon:MessageCircle},
       {label:'C',text:"Tadbirni boshqarib, dasturni e'lon qilaman",type:'E',icon:Megaphone},
-      {label:'D',text:"Ishtirokchilar ro'yxati va vaqt jadvalini yurataman",type:'C',icon:FileText},
+      {label:'D',text:"Ishtirokchilar ro'yxati va vaqt jadvalini yuritaman",type:'C',icon:FileText},
     ]
   },
   {
@@ -166,7 +166,7 @@ const MULTI_CHOICE: MultiChoiceQ[] = [
   },
   {
     id:43,
-    text:"Do'stingiz sizdan uyi uchun kitob javoni loyihalashni so'radi:",
+    text:"Do'stingiz sizdan uyi uchun kitob javoni loyihalashni so'radi. Nima qilasiz?",
     options:[
       {label:'A',text:"Yog'och va asboblar bilan o'zim yasab beraman",type:'R',icon:Cog},
       {label:'B',text:"Eng mustahkam va tejamli konstruksiyani hisoblab chiqaman",type:'I',icon:Calculator},
@@ -201,10 +201,10 @@ const S2_PAGES = Math.ceil(LIKERT.length / S2_PER_PAGE);
 const TOTAL_Q = FORCED_CHOICE.length + LIKERT.length + MULTI_CHOICE.length;
 
 const COURSES: Course[] = [
-  { id:'foundation',         name:'Foundation',                   url:'/kurslar/foundation',         riasec:{R:20,I:40,A:5, S:5, E:10,C:20}, desc:"Python, algoritm va dasturlash asoslari. IT ga birinchi qadam.", minAge:15, maxAge:99 },
+  { id:'foundation',         name:'Foundation',                   url:'/kurslar/foundation',         riasec:{R:20,I:40,A:5, S:5, E:10,C:20}, desc:"Kompyuter savodxonligi, Python va mantiqiy fikrlash asoslari. IT'ga birinchi qadam.", minAge:15, maxAge:99 },
   { id:'python-bi',          name:'Web dasturlash: Python BI',     url:'/kurslar/python-bi',          riasec:{R:15,I:45,A:5, S:5, E:10,C:20}, desc:"Python yordamida web va biznes tahlil (BI) dasturlash.", minAge:15, maxAge:99 },
   { id:'frontend',           name:'Frontend Web Dasturlash',       url:'/kurslar/frontend',           riasec:{R:10,I:35,A:25,S:5, E:10,C:15}, desc:"HTML, CSS, JavaScript va React bilan zamonaviy saytlar yaratish.", minAge:15, maxAge:99 },
-  { id:'robototexnika',      name:'Robototexnika',                 url:'/kurslar/robototexnika',      riasec:{R:35,I:30,A:5, S:5, E:10,C:15}, desc:"Robot qurish, dasturlash va muhandislik asoslari.", minAge:7, maxAge:15 },
+  { id:'robototexnika',      name:'Robototexnika',                 url:'/kurslar/robototexnika',      riasec:{R:35,I:30,A:5, S:5, E:10,C:15}, desc:"Robot qurish, dasturlash va muhandislik asoslari. 8–14 yosh uchun.", minAge:8, maxAge:14 },
   { id:'grafik-dizayn',      name:'Grafik Dizayn',                 url:'/kurslar/grafik-dizayn',      riasec:{R:5, I:10,A:55,S:5, E:10,C:15}, desc:"Logo, brend va vizual materiallar yaratish. Photoshop, Illustrator.", minAge:15, maxAge:99 },
   { id:'arxitektura-dizayn', name:'Arxitektura va Dizayn',         url:'/kurslar/arxitektura-dizayn', riasec:{R:15,I:20,A:45,S:5, E:10,C:5},  desc:"Arxitektura loyihalash va interyer dizayn asoslari.", minAge:15, maxAge:99 },
   { id:'videografiya',       name:'Videografiya',                  url:'/kurslar/videografiya',       riasec:{R:10,I:10,A:50,S:10,E:15,C:5},  desc:"Video suratga olish, montaj va professional kontent yaratish.", minAge:15, maxAge:99 },
@@ -212,10 +212,10 @@ const COURSES: Course[] = [
   { id:'ai-media',           name:'AI MEDIA',                      url:'/kurslar/ai-media',           riasec:{R:5, I:20,A:40,S:10,E:15,C:10}, desc:"Sun'iy intellekt vositalari bilan media kontent yaratish.", minAge:15, maxAge:99 },
   { id:'smm',                name:'SMM',                           url:'/kurslar/smm',                riasec:{R:5, I:15,A:30,S:25,E:20,C:5},  desc:"Ijtimoiy tarmoqlarni boshqarish, kontent strategiyasi.", minAge:15, maxAge:99 },
   { id:'buxgalteriya',       name:'Zamonaviy Buxgalteriya (1C)',   url:'/kurslar/buxgalteriya',       riasec:{R:10,I:20,A:5, S:10,E:15,C:40}, desc:"Buxgalteriya asoslari va 1C dasturida ishlash.", minAge:15, maxAge:99 },
-  { id:'excel-pro',          name:'Excel Pro',                     url:'/kurslar/excel-pro',          riasec:{R:5, I:25,A:5, S:10,E:15,C:40}, desc:"Microsoft Excel da professional darajada ishlash.", minAge:15, maxAge:99 },
+  { id:'excel-pro',          name:'Excel Pro',                     url:'/kurslar/excel-pro',          riasec:{R:5, I:25,A:5, S:10,E:15,C:40}, desc:"Microsoft Excelda professional darajada ishlash.", minAge:15, maxAge:99 },
   { id:'hr-menejer',         name:'HR Menejerligi',                url:'/kurslar/hr-menejer',         riasec:{R:5, I:20,A:10,S:30,E:25,C:10}, desc:"Kadrlar boshqaruvi, suhbat o'tkazish va HR strategiyasi.", minAge:15, maxAge:99 },
   { id:'ofis-dasturlari',    name:'Ofis Dasturlarida Ishlash',     url:'/kurslar/ofis-dasturlari',    riasec:{R:10,I:20,A:5, S:10,E:15,C:40}, desc:"Word, Excel, PowerPoint va ofis vositalari bilan ishlash.", minAge:15, maxAge:99 },
-  { id:'kids-web',           name:'Web Dasturlash (Kids)',         url:'/kurslar/kids-web',           riasec:{R:15,I:30,A:25,S:15,E:5, C:10}, desc:"Bolalar uchun qiziqarli dasturlash kursi — o'yin orqali o'rganish.", minAge:7, maxAge:13 },
+  { id:'kids-web',           name:'Web Dasturlash (Kids)',         url:'/kurslar/kids-web',           riasec:{R:15,I:30,A:25,S:15,E:5, C:10}, desc:"Bolalar uchun qiziqarli dasturlash kursi — o'yin orqali o'rganish. 11–15 yosh uchun.", minAge:11, maxAge:15 },
 ];
 
 const RIASEC_INFO: Record<RiasecType, { name: string; short: string; desc: string; careers: string; color: string; icon: LucideIcon }> = {
@@ -282,6 +282,11 @@ function shuffledIndices(n: number): number[] {
   return arr;
 }
 
+// Yaxlitlangan foizlar teng chiqqanda (masalan 22% va 22%) haqiqiy tartibni aniqlash uchun
+// yaxlitlanmagan qiymatlar shu yerda saqlanadi. Aks holda teng natijada doim olti burchakdagi
+// oldingi tip (R, I, A...) yutib, Holland kodi bir tomonga og'ib ketardi.
+const EXACT_PCTS = new WeakMap<object, Record<RiasecType, number>>();
+
 // ─── Ballash: har bir bosqich normallashtiriladi va teng hissa qo'shadi ──────
 // Bu — avvalgi versiyadagi 37.5% / 25% / 37.5% nomutanosibligini bartaraf etadi.
 function computePercentages(
@@ -329,6 +334,7 @@ function computePercentages(
 
   // Yig'indi aynan 100% bo'lishi uchun eng katta qoldiqqa yaxlitlash
   const exact = TYPES.map(t => ({ t, v: combined[t] / total * 100 }));
+  EXACT_PCTS.set(result, Object.fromEntries(exact.map(e => [e.t, e.v])) as Record<RiasecType, number>);
   exact.forEach(e => result[e.t] = Math.floor(e.v));
   let remainder = 100 - TYPES.reduce((s, t) => s + result[t], 0);
   exact.sort((a, b) => (b.v - Math.floor(b.v)) - (a.v - Math.floor(a.v)));
@@ -336,9 +342,11 @@ function computePercentages(
   return result;
 }
 
-/** Tiplarni foiz bo'yicha tartiblash (teng bo'lsa olti burchak tartibi bilan barqaror ajratish) */
+/** Tiplarni foiz bo'yicha tartiblash (teng bo'lsa — yaxlitlanmagan qiymat, so'ng olti burchak tartibi) */
 function sortedTypes(pcts: Record<RiasecType, number>): RiasecType[] {
-  return [...TYPES].sort((a, b) => (pcts[b] - pcts[a]) || (HEX_ORDER.indexOf(a) - HEX_ORDER.indexOf(b)));
+  const ex = EXACT_PCTS.get(pcts);
+  return [...TYPES].sort((a, b) =>
+    (pcts[b] - pcts[a]) || (ex ? ex[b] - ex[a] : 0) || (HEX_ORDER.indexOf(a) - HEX_ORDER.indexOf(b)));
 }
 
 /** Holland Kodi — eng yuqori 3 ta tip (masalan "SEC") */
@@ -376,10 +384,12 @@ function iachanAgreement(personCode: RiasecType[], courseCode: RiasecType[]): nu
   return sum / 28; // 0..1
 }
 
-function matchCourses(pcts: Record<RiasecType, number>, age: number | null): CourseResult[] {
+function matchCourses(pcts: Record<RiasecType, number>, age: number | null, availableIds?: ReadonlySet<string> | null): CourseResult[] {
   const personCode = getHollandCode(pcts);
+  // Saytda (admin/API orqali) mavjud bo'lmagan kurs tavsiya qilinmaydi — aks holda havola "topilmadi" sahifasiga olib boradi
+  const pool0 = availableIds && availableIds.size > 0 ? COURSES.filter(c => availableIds.has(c.id)) : COURSES;
 
-  const scored = COURSES.map(course => {
+  const scored = pool0.map(course => {
     const courseTotal = TYPES.reduce((s, t) => s + course.riasec[t], 0);
 
     // 1) Kosinus o'xshashligi — to'liq 6 o'lchovli profil shakli
@@ -413,20 +423,26 @@ function matchCourses(pcts: Record<RiasecType, number>, age: number | null): Cou
     .map(({ course, matchScore }, i) => ({ course, matchScore, rank: i + 1 }));
 }
 
-function topStrengthsOf(s2Answers: Record<number, number>) {
-  const entries = Object.entries(s2Answers) as unknown as [string, number][];
-  const strong = entries
-    .filter(([, v]) => v >= 4)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 6)
-    .map(([id]) => STRENGTHS[Number(id)])
-    .filter(Boolean);
-  if (strong.length > 0) return strong;
-  return entries
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 6)
-    .map(([id]) => STRENGTHS[Number(id)])
-    .filter(Boolean);
+/**
+ * Kuchli tomonlar: faqat 4–5 baho berilgan fikrlar (past baho "kuchli tomon" bo'la olmaydi).
+ * Teng bahoda foydalanuvchining o'z profilida yuqori turgan tip oldinga chiqadi — aks holda
+ * ro'yxat doim R/I savollaridan (id tartibi bo'yicha) boshlanib qolardi.
+ */
+function topStrengthsOf(s2Answers: Record<number, number>, pcts: Record<RiasecType, number>) {
+  const typeOf = new Map(LIKERT.map(q => [q.id, q.type] as const));
+  const rank = sortedTypes(pcts);
+  const entries = (Object.entries(s2Answers) as unknown as [string, number][])
+    .map(([id, v]) => ({ id: Number(id), v, r: rank.indexOf(typeOf.get(Number(id)) ?? 'R') }))
+    .filter(e => e.v >= 4 && STRENGTHS[e.id])
+    .sort((a, b) => (b.v - a.v) || (a.r - b.r) || (a.id - b.id));
+  // bir tipdan ko'pi bilan 3 ta — ro'yxat xilma-xil bo'lsin
+  const perType: Partial<Record<RiasecType, number>> = {};
+  const picked: number[] = [];
+  entries.forEach(e => {
+    const t = typeOf.get(e.id) ?? 'R';
+    if (picked.length < 6 && (perType[t] ?? 0) < 3) { picked.push(e.id); perType[t] = (perType[t] ?? 0) + 1; }
+  });
+  return picked.map(id => STRENGTHS[id]);
 }
 
 const diffLabel = (d: number) => d >= 25 ? 'Yuqori' : d >= 15 ? "O'rtacha" : 'Past';
@@ -458,9 +474,11 @@ function parseAge(age: string): number | null {
   return age.trim() !== '' && Number.isFinite(n) && n >= 10 && n <= 90 ? n : null;
 }
 
-function buildOutcome(s1: S1Answers, s2: Record<number, number>, s3: S3Answers, age: string): Outcome {
+const idsOf = (list: { id: string }[]): ReadonlySet<string> => new Set(list.map(c => c.id));
+
+function buildOutcome(s1: S1Answers, s2: Record<number, number>, s3: S3Answers, age: string, availableIds?: ReadonlySet<string>): Outcome {
   const pcts = computePercentages(s1, s2, s3);
-  return { pcts, results: matchCourses(pcts, parseAge(age)), quality: computeQuality(pcts, s2) };
+  return { pcts, results: matchCourses(pcts, parseAge(age), availableIds), quality: computeQuality(pcts, s2) };
 }
 
 // ─── Jarayonni saqlash: sahifa yangilansa ham javoblar yo'qolmaydi ───────────
@@ -725,6 +743,25 @@ async function generateCareerTestPdf(params: {
     doc.text(tx(s), x, y, { align: opts?.align, charSpace: opts?.charSpace });
   };
   const wrap = (s: string, width: number) => doc.splitTextToSize(tx(s), width) as string[];
+  /** wrap + bo'sh joysiz juda uzun so'zni belgilar bo'yicha sindirish (joriy shrift o'lchamida) */
+  const wrapHard = (s: string, width: number) => wrap(s, width).flatMap(l => {
+    if (doc.getTextWidth(l) <= width) return [l];
+    const out: string[] = [];
+    let cur = '';
+    for (const ch of l) {
+      if (cur && doc.getTextWidth(cur + ch) > width) { out.push(cur); cur = ch; } else cur += ch;
+    }
+    if (cur) out.push(cur);
+    return out;
+  });
+  /** bir qatorga sig'maydigan matnni "…" bilan qisqartirish (joriy shrift o'lchamida) */
+  const fitText = (s: string, width: number) => {
+    let t = tx(s);
+    if (doc.getTextWidth(t) <= width) return t;
+    const ell = brandFont ? '…' : '...';
+    while (t.length > 1 && doc.getTextWidth(t + ell) > width) t = t.slice(0, -1);
+    return t.trimEnd() + ell;
+  };
   const kicker = (s: string, x: number, y: number, color: RGB = PDF_C.ink3) => {
     font('medium', 7, color);
     text(s.toUpperCase(), x, y, { charSpace: 0.6 });
@@ -771,7 +808,7 @@ async function generateCareerTestPdf(params: {
     font('bold', 9.5, PDF_C.ink);
     text('DATA', M + 6.5, 16.6);
     font('normal', 7.5, PDF_C.ink3);
-    text(title, W - M, 16.6, { align: 'right' });
+    text(fitText(title, CW - 40), W - M, 16.6, { align: 'right' });
     doc.setDrawColor(...PDF_C.line); doc.setLineWidth(0.25);
     doc.line(M, 21, W - M, 21);
   };
@@ -790,7 +827,22 @@ async function generateCareerTestPdf(params: {
   const reportTitle = `Karyera testi hisoboti${name ? ` — ${name}` : ''}`;
 
   // ═══ 1-SAHIFA: muqova + asosiy xulosa ═══
-  const bandH = 104;
+  // uzun ism: shrift kichraytirib 2 qatorga sig'diriladi, sig'masa oxirgi qator "…" bilan qisqartiriladi
+  const nameW = 100;
+  const nameStr = name || 'Sizning natijangiz';
+  let nameSize = 22;
+  let nameLines: string[] = [];
+  for (const sz of [22, 19, 16, 14]) {
+    nameSize = sz;
+    font('semibold', sz, PDF_C.white);
+    nameLines = wrapHard(nameStr, nameW);
+    if (nameLines.length <= 2) break;
+  }
+  if (nameLines.length > 2) nameLines = [nameLines[0], fitText(nameLines.slice(1).join(' '), nameW)];
+  const nameLH = nameSize * 0.41;
+  const afterName = 51 + (nameLines.length - 1) * nameLH;
+  // ism 2 qatorga o'tsa, muqova bandi shunga qarab kengayadi (matn o'zaro ustma-ust tushmasligi uchun)
+  const bandH = 104 + (afterName - 51);
   doc.setFillColor(...PDF_C.night);
   doc.rect(0, 0, W, bandH, 'F');
 
@@ -825,10 +877,8 @@ async function generateCareerTestPdf(params: {
   text('TA’LIM STANSIYASI', M + 8.8, 22.6, { charSpace: 0.5 });
 
   kicker('Karyera testi hisoboti · Holland RIASEC', M, 40, PDF_C.cyan);
-  font('semibold', 22, PDF_C.white);
-  const nameLines = wrap(name || 'Sizning natijangiz', 108).slice(0, 2);
-  nameLines.forEach((l, i) => doc.text(l, M, 51 + i * 9));
-  const afterName = 51 + (nameLines.length - 1) * 9;
+  font('semibold', nameSize, PDF_C.white);
+  nameLines.forEach((l, i) => doc.text(l, M, 51 + i * nameLH));
 
   kicker('Holland kodingiz', M, afterName + 13, [150, 158, 172]);
   font('bold', 42, PDF_C.cyan);
@@ -998,6 +1048,12 @@ async function generateCareerTestPdf(params: {
     doc.roundedRect(W - M - 32, y + 13.5, Math.max(1.4, 26 * r.matchScore / 100), 1.4, 0.7, 0.7, 'F');
     y += rowH + 4;
   });
+  const ageN = parseAge(age);
+  if (results.length < 3 && ageN !== null) {
+    font('normal', 7.6, PDF_C.ink3);
+    wrap(`${ageN} yosh uchun ayni paytda ${results.length} ta kurs mavjud — qolgan yo'nalishlarimiz 15 yoshdan boshlanadi.`, CW)
+      .forEach(l => { doc.text(l, M, y + 1); y += 3.9; });
+  }
 
   y += 6;
   y = sectionTitle('05', 'Metodologiya', y);
@@ -1026,7 +1082,7 @@ async function generateCareerTestPdf(params: {
   font('semibold', 14, PDF_C.white);
   text('Keyingi qadam: bepul maslahat', M + 7, cy0 + 16);
   font('normal', 8, [190, 197, 208]);
-  wrap('Mutaxassisimiz natijangizni siz bilan birga koʻrib chiqadi va mos kursni tanlashda yordam beradi.', CW - 80)
+  wrap('Mutaxassisimiz natijangizni siz bilan birga koʻrib chiqadi va mos kursni tanlashda yordam beradi.', 78)
     .forEach((l, i) => doc.text(l, M + 7, cy0 + 22 + i * 4));
   font('semibold', 9.5, PDF_C.white);
   const rx = W - M - 7;
@@ -1035,7 +1091,8 @@ async function generateCareerTestPdf(params: {
   text('datatalim.uz', rx, cy0 + 22, { align: 'right' });
   text('t.me/data_talim_stansiyasi', rx, cy0 + 26.5, { align: 'right' });
   if (contact?.address) {
-    wrap(contact.address, 70).slice(0, 2).forEach((l, i) => doc.text(l, rx, cy0 + 31 + i * 3.8, { align: 'right' }));
+    font('normal', 7.2, [190, 197, 208]);
+    wrap(contact.address, 76).slice(0, 2).forEach((l, i) => doc.text(l, rx, cy0 + 31 + i * 3.6, { align: 'right' }));
   }
 
   // sahifa raqamlari va pastki qism
@@ -1057,6 +1114,8 @@ async function generateCareerTestPdf(params: {
 export default function CareerTest() {
   const reduced = useMotionReduced();
   const siteContent = useStore(s => s.siteContent);
+  const storeCourses = useStore(s => s.courses);
+  const availableIds = useMemo(() => idsOf(storeCourses), [storeCourses]);
   const [saved] = useState(loadProgress);
   const [view, setView] = useState<View>(saved?.view ?? 'intro');
   const [userName, setUserName] = useState(saved?.name ?? '');
@@ -1074,9 +1133,11 @@ export default function CareerTest() {
   const [mcOrder, setMcOrder] = useState<number[][]>(() => saved?.mcOrder ?? MULTI_CHOICE.map(() => shuffledIndices(4)));
   // Tiklangan natija javoblardan qayta hisoblanadi (hisob deterministik)
   const [outcome, setOutcome] = useState<Outcome | null>(() =>
-    saved?.view === 'result' ? buildOutcome(saved.s1, saved.s2, saved.s3, saved.age) : null,
+    saved?.view === 'result' ? buildOutcome(saved.s1, saved.s2, saved.s3, saved.age, idsOf(useStore.getState().courses)) : null,
   );
-  const [enrollCourse, setEnrollCourse] = useState<{ name: string; id: string } | null>(null);
+  const [enrollCourse, setEnrollCourse] = useState<{ name: string; id: string; type: 'enroll' | 'consult' } | null>(null);
+  // Natija CRM'ga yetib borganini foydalanuvchiga ko'rsatish uchun (ishonch va ravshanlik)
+  const [delivered, setDelivered] = useState(saved?.submitted ?? false);
   const [calcStep, setCalcStep] = useState(0);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [tried, setTried] = useState(false);
@@ -1288,7 +1349,7 @@ export default function CareerTest() {
     }
     // Oxirgi savol: natija darhol hisoblanadi va yuboriladi (sahifa yangilansa ham yo'qolmaydi),
     // "hisoblanmoqda" ekrani esa faqat tahlil bosqichlarini ko'rsatadi.
-    const o = buildOutcome(s1Answers, s2Answers, newS3, userAge);
+    const o = buildOutcome(s1Answers, s2Answers, newS3, userAge, availableIds);
     setOutcome(o);
     trackSiteEvent('career_test_complete');
     submitCareerTestAuto(o.pcts, o.results);
@@ -1349,7 +1410,7 @@ export default function CareerTest() {
     // "yuborilmagan" holati saqlanadi va sahifa qayta ochilganda yana yuboriladi.
     Promise.allSettled(jobs).then(rs => {
       const failed = rs.filter(r => r.status === 'rejected');
-      if (failed.length === 0) return;
+      if (failed.length === 0) { setDelivered(true); return; }
       console.error('Karyera testi natijasini yuborib boʻlmadi:', failed);
       autoSubmittedRef.current = false;
       setSendFailures(n => n + 1);
@@ -1357,12 +1418,21 @@ export default function CareerTest() {
     });
   }
 
-  const displayStrengths = topStrengthsOf(s2Answers);
   const pcts = outcome?.pcts ?? { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
-  const results = outcome?.results ?? [];
+  const displayStrengths = topStrengthsOf(s2Answers, pcts);
+  // kurslar ro'yxati (API) keyin yuklansa ham tavsiya to'g'ri bo'lishi uchun renderda qayta saralanadi
+  const results = useMemo(
+    () => (outcome ? matchCourses(outcome.pcts, ageNum, availableIds) : []),
+    [outcome, ageNum, availableIds],
+  );
   const quality = outcome?.quality ?? { differentiation: 0, consistencyDistance: 1, distinctRatings: 0, confidence: 0 };
   const hollandCode = getHollandCode(pcts);
   const ordered = sortedTypes(pcts);
+  // 15 yoshgacha bo'lgan foydalanuvchiga kelajakdagi eng mos kattalar kursi ko'rsatiladi
+  const futureCourse = useMemo(
+    () => (outcome && ageNum !== null && ageNum < 15 ? matchCourses(outcome.pcts, 16, availableIds)[0] ?? null : null),
+    [outcome, ageNum, availableIds],
+  );
 
   async function handleDownloadPdf() {
     if (generatingPdf || !outcome) return;
@@ -1380,6 +1450,11 @@ export default function CareerTest() {
     } finally {
       setGeneratingPdf(false);
     }
+  }
+
+  function openConsult() {
+    const top = results[0]?.course;
+    setEnrollCourse({ name: top ? top.name : 'Karyera testi', id: top?.id ?? 'consult', type: 'consult' });
   }
 
   async function handleShare() {
@@ -1833,11 +1908,14 @@ export default function CareerTest() {
                   </p>
 
                   <div className="mt-8 flex flex-wrap gap-3">
-                    <button type="button" onClick={handleDownloadPdf} disabled={generatingPdf} aria-busy={generatingPdf} className="btn btn-primary">
+                    <button type="button" onClick={openConsult} className="btn btn-primary">
+                      <MessageCircle size={18} aria-hidden="true" /> Bepul maslahat
+                    </button>
+                    <button type="button" onClick={handleDownloadPdf} disabled={generatingPdf} aria-busy={generatingPdf} className="btn btn-ghost !px-5">
                       {generatingPdf ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <Download size={18} aria-hidden="true" />}
                       {generatingPdf ? 'Tayyorlanmoqda…' : 'PDF hisobot'}
                     </button>
-                    <button type="button" onClick={handleShare} className="btn btn-ghost">
+                    <button type="button" onClick={handleShare} className="btn btn-ghost !px-5">
                       <Share2 size={18} aria-hidden="true" /> Ulashish
                     </button>
                   </div>
@@ -1865,12 +1943,17 @@ export default function CareerTest() {
                 {results.length < 3 && ageValid && (
                   <p className="mt-8 text-sm ink-2 panel !rounded-2xl px-5 py-4">
                     {ageNum} yosh uchun ayni paytda {results.length} ta kurs mavjud — qolgan yoʻnalishlarimiz 15 yoshdan boshlanadi.
+                    {futureCourse && (
+                      <> Profilingizga koʻra 15 yoshdan keyin sizga <strong style={{ color: 'var(--fg)' }}>{uz(futureCourse.course.name)}</strong> ({futureCourse.matchScore}% moslik) mos tushadi.</>
+                    )}
                   </p>
                 )}
 
                 {results[0] && (() => {
                   const r = results[0];
                   const topTypes = [...TYPES].sort((a, b) => r.course.riasec[b] - r.course.riasec[a]).slice(0, 3);
+                  // "Nima uchun" — kurs talab qiladigan tiplardan foydalanuvchida eng kuchli ikkitasi
+                  const whyTypes = sortedTypes(pcts).filter(t => topTypes.includes(t)).slice(0, 2);
                   return (
                     <motion.article
                       initial={{ opacity: 0, y: reduced ? 0 : 24 }}
@@ -1893,10 +1976,10 @@ export default function CareerTest() {
                           ))}
                         </ul>
                         <p className="mt-5 text-sm ink-2">
-                          Nima uchun: sizning {topTypes.slice(0, 2).map(t => RIASEC_INFO[t].short.toLowerCase()).join(' va ')} qiziqishlaringiz bu kurs talablariga eng yaqin.
+                          Nima uchun: sizda {whyTypes.map(t => `${RIASEC_INFO[t].short.toLowerCase()} (${pcts[t]}%)`).join(' va ')} tiplar kuchli — bu kurs aynan shularga tayanadi.
                         </p>
                         <div className="mt-8 flex flex-wrap gap-3">
-                          <button type="button" className="btn btn-primary" onClick={() => setEnrollCourse({ name: r.course.name, id: r.course.id })}>
+                          <button type="button" className="btn btn-primary" onClick={() => setEnrollCourse({ name: r.course.name, id: r.course.id, type: 'enroll' })}>
                             Kursga yozilish <ArrowRight size={18} aria-hidden="true" />
                           </button>
                           <Link to={r.course.url} className="btn btn-ghost">Kurs haqida</Link>
@@ -1939,7 +2022,7 @@ export default function CareerTest() {
                           <Link to={r.course.url} className="btn btn-ghost !min-h-[44px] !px-4 !text-[0.9rem]" aria-label={`${uz(r.course.name)} — kurs haqida`}>
                             Batafsil
                           </Link>
-                          <button type="button" className="btn btn-ghost !min-h-[44px] !px-4 !text-[0.9rem]" onClick={() => setEnrollCourse({ name: r.course.name, id: r.course.id })} aria-label={`${uz(r.course.name)} kursiga yozilish`}>
+                          <button type="button" className="btn btn-ghost !min-h-[44px] !px-4 !text-[0.9rem]" onClick={() => setEnrollCourse({ name: r.course.name, id: r.course.id, type: 'enroll' })} aria-label={`${uz(r.course.name)} kursiga yozilish`}>
                             Yozilish
                           </button>
                         </div>
@@ -2025,9 +2108,23 @@ export default function CareerTest() {
                   <p className="t-kicker">Keyingi qadam</p>
                   <p className="t-h2 mt-5 max-w-[18ch]">Bepul maslahat uchun biz bilan bogʻlaning.</p>
                   <p className="t-body mt-4 max-w-[36rem]">Natijangiz asosida mutaxassisimiz siz bilan bogʻlanib, kurs tanlashda yordam beradi.</p>
+                  {delivered && (
+                    <p className="mt-4 flex items-start gap-2 text-sm ink-2 max-w-[36rem]" role="status">
+                      <CheckCircle size={18} className="shrink-0 mt-px" style={{ color: "var(--green-ink)" }} aria-hidden="true" />
+                      <span>Natijangiz +998 {userPhone} raqami bilan qabul qilindi — mutaxassisimiz tez orada qoʻngʻiroq qiladi.</span>
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <Link to="/kurslar" className="btn btn-primary">Barcha kurslar <ArrowRight size={18} aria-hidden="true" /></Link>
+                  <button type="button" onClick={openConsult} className="btn btn-primary">
+                    <MessageCircle size={18} aria-hidden="true" /> Bepul maslahat olish
+                  </button>
+                  {siteContent?.contactPhone && (
+                    <a href={`tel:${siteContent.contactPhone.replace(/[^\d+]/g, '')}`} className="btn btn-ghost">
+                      <Phone size={16} aria-hidden="true" /> {siteContent.contactPhone}
+                    </a>
+                  )}
+                  <Link to="/kurslar" className="btn btn-ghost">Barcha kurslar</Link>
                   <button type="button" onClick={restartTest} className="btn btn-ghost">
                     <RotateCcw size={16} aria-hidden="true" /> Qayta topshirish
                   </button>
@@ -2044,7 +2141,8 @@ export default function CareerTest() {
           isOpen={!!enrollCourse}
           onClose={() => setEnrollCourse(null)}
           courseName={enrollCourse.name}
-          extraInfo="Karyera testi natijasi asosida tavsiya etildi"
+          type={enrollCourse.type}
+          extraInfo={`Karyera testi natijasi asosida tavsiya etildi. Holland kodi: ${hollandCode.join('')}`}
           initialName={userName.trim()}
           initialPhone={userPhone}
         />

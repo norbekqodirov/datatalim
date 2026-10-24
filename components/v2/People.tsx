@@ -5,6 +5,7 @@ import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { YouTubeFacade } from './YouTubeFacade';
 import { uz, youtubeId } from './utils';
+import { Mask, ScrollText } from './fx';
 
 const initials = (name: string) =>
   name
@@ -33,7 +34,7 @@ export const Voices: React.FC = () => {
             <blockquote>
               <p id="voices-title" className="t-h2" style={{ fontWeight: 500 }}>
                 <span className="ink-grad" aria-hidden="true">«</span>
-                {quote}
+                <ScrollText text={quote} />
                 <span className="ink-grad" aria-hidden="true">»</span>
               </p>
             </blockquote>
@@ -87,7 +88,7 @@ export const TeamStrip: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
           <div>
             <p className="t-kicker mb-6">08 — Jamoa</p>
-            <h2 id="team-title" className="t-h2 max-w-[18ch]">Sizni kasbga olib chiqadigan odamlar.</h2>
+            <Mask><h2 id="team-title" className="t-h2 max-w-[18ch]">Sizni kasbga olib chiqadigan odamlar.</h2></Mask>
           </div>
           <Link to="/jamoa" className="link-arrow min-h-[44px]">Butun jamoa →</Link>
         </div>

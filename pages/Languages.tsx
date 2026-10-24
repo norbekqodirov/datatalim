@@ -131,7 +131,7 @@ export default function Languages() {
 
     return (
         <div className={`min-h-screen ${isDark ? 'bg-[#000000]' : 'bg-slate-50'}`}>
-            <SEO title="Til Kurslari | DATA" description="DATA Ta'lim Stansiyasida Ingliz, Rus, Koreys va Nemis tillari. IELTS, TOPIK va CEFR ga tayyorgarlik." />
+            <SEO title="Til Kurslari" description="DATA Ta'lim Stansiyasida Ingliz, Rus, Koreys va Nemis tillari. IELTS, TOPIK va CEFR ga tayyorgarlik." />
 
             {/* --- HERO SECTION --- */}
             <section className="relative pt-32 pb-20 overflow-hidden">

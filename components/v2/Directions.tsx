@@ -93,10 +93,10 @@ const PinnedTrack: React.FC = () => {
       aria-label="Taʼlim yoʻnalishlari"
     >
       <div className="sticky top-0 h-screen overflow-hidden flex items-center" onFocus={onFocusIn}>
-        <motion.div ref={trackRef} style={{ x }} className="flex items-stretch gap-6 pl-[var(--gutter)] pr-[12vw] will-change-transform">
+        <motion.div ref={trackRef} style={{ x }} className="relative flex items-stretch gap-6 pl-[var(--gutter)] pr-[12vw] will-change-transform">
           <IntroPanel />
           {CATS.map((c, i) => (
-            <CategoryPanel key={c.id} cat={c} index={i} progress={smooth} total={CATS.length} />
+            <CategoryPanel key={c.id} cat={c} index={i} x={x} total={CATS.length} />
           ))}
         </motion.div>
         <ProgressRail p={smooth} />
@@ -120,26 +120,76 @@ const IntroPanel: React.FC = () => {
   );
 };
 
-const CategoryPanel: React.FC<{ cat: (typeof CATS)[number]; index: number; progress: MotionValue<number>; total: number }> = ({ cat, index, progress, total }) => {
+// one cover of the 3D stack: deeper layers drift more than the front one (parallax in depth)
+const CoverLayer: React.FC<{ src: string; i: number; dist: MotionValue<number> }> = ({ src, i, dist }) => {
+  const dx = useTransform(dist, [-1, 0, 1], [-i * 70, 0, i * 70]);
+  return (
+    <motion.div
+      className="absolute inset-0 rounded-[22px] overflow-hidden"
+      style={{
+        x: dx,
+        translateZ: -i * 120,
+        top: `${-i * 7}%`,
+        bottom: `${i * 7}%`,
+        left: `${i * 9}%`,
+        right: `${-i * 9}%`,
+        boxShadow: '0 40px 80px -30px rgba(0,0,0,.6)',
+        border: '1px solid var(--line-2)',
+        zIndex: 3 - i,
+        filter: i ? `brightness(${1 - i * 0.22})` : undefined,
+      }}
+    >
+      <img src={src} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" width={800} height={800} />
+    </motion.div>
+  );
+};
+
+const CategoryPanel: React.FC<{ cat: (typeof CATS)[number]; index: number; x: MotionValue<number>; total: number }> = ({ cat, index, x, total }) => {
   const { courses } = useStore();
   const { tField } = useLanguage();
   const list = courses.filter((c) => c.category === cat.id);
   const covers = list.filter((c) => c.coverImage).slice(0, 3);
+  const ref = useRef<HTMLElement>(null);
+  const geo = useRef({ left: 0, w: 1 });
 
-  // local progress around the moment this panel is centred
-  const center = (index + 1) / (total + 0.6);
-  const rot = useTransform(progress, [center - 0.35, center, center + 0.35], [28, 0, -18]);
-  const lift = useTransform(progress, [center - 0.35, center, center + 0.35], [60, 0, -30]);
+  useLayoutEffect(() => {
+    const m = () => {
+      const el = ref.current;
+      if (el) geo.current = { left: el.offsetLeft, w: el.offsetWidth };
+    };
+    m();
+    window.addEventListener('resize', m);
+    return () => window.removeEventListener('resize', m);
+  }, []);
+
+  // signed distance of this panel's centre from the viewport centre, in viewport widths
+  const dist = useTransform(x, (xv) => (geo.current.left + xv + geo.current.w / 2 - window.innerWidth / 2) / window.innerWidth);
+  const rot = useTransform(dist, [-0.9, 0, 0.9], [-24, 0, 30]);
+  const lift = useTransform(dist, [-0.9, 0, 0.9], [-30, 0, 60]);
+  const panelOpacity = useTransform(dist, [-0.95, -0.35, 0, 0.35, 0.95], [0.3, 0.85, 1, 0.85, 0.3]);
+  const panelScale = useTransform(dist, [-0.95, 0, 0.95], [0.92, 1, 0.92]);
+  const ghostX = useTransform(dist, [-1, 1], [160, -160]);
+  const glowX = useTransform(dist, [-1, 1], [-120, 120]);
 
   return (
-    <article
+    <motion.article
+      ref={ref}
+      style={{ opacity: panelOpacity, scale: panelScale }}
       className="dir-panel shrink-0 w-[min(76rem,82vw)] h-[78vh] panel relative overflow-hidden grid grid-cols-12"
       aria-labelledby={`cat-${cat.id}`}
     >
+      {/* oversized outlined numeral drifting against the scroll */}
+      <motion.span
+        className="mono absolute right-[2%] top-[-4%] select-none pointer-events-none leading-none"
+        style={{ x: ghostX, fontSize: 'clamp(9rem, 24vw, 22rem)', color: 'transparent', WebkitTextStroke: '1px var(--line-2)', fontWeight: 500 }}
+        aria-hidden="true"
+      >
+        {String(index + 1).padStart(2, '0')}
+      </motion.span>
       {/* category glow */}
-      <div
+      <motion.div
         className="absolute -right-40 -bottom-40 w-[44rem] h-[44rem] rounded-full pointer-events-none"
-        style={{ background: `radial-gradient(circle, ${cat.color}2e 0%, transparent 65%)` }}
+        style={{ x: glowX, background: `radial-gradient(circle, ${cat.color}3a 0%, transparent 65%)` }}
         aria-hidden="true"
       />
 
@@ -169,23 +219,11 @@ const CategoryPanel: React.FC<{ cat: (typeof CATS)[number]; index: number; progr
       <div className="col-span-6 relative z-10 flex items-center justify-center" style={{ perspective: '1400px' }} aria-hidden="true">
         <motion.div style={{ rotateY: rot, y: lift, transformStyle: 'preserve-3d' }} className="relative w-[78%] aspect-square">
           {covers.map((c, i) => (
-            <div
-              key={c.id}
-              className="absolute inset-0 rounded-[22px] overflow-hidden"
-              style={{
-                transform: `translate3d(${i * 9}%, ${-i * 7}%, ${-i * 120}px)`,
-                boxShadow: '0 40px 80px -30px rgba(0,0,0,.6)',
-                border: '1px solid var(--line-2)',
-                zIndex: 3 - i,
-                filter: i ? `brightness(${1 - i * 0.22})` : undefined,
-              }}
-            >
-              <img src={optimizedCover(c.coverImage)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" width={800} height={800} />
-            </div>
+            <CoverLayer key={c.id} src={optimizedCover(c.coverImage)} i={i} dist={dist} />
           ))}
         </motion.div>
       </div>
-    </article>
+    </motion.article>
   );
 };
 

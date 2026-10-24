@@ -25,6 +25,12 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
     const dialogRef = useRef<HTMLDivElement>(null);
     const nameRef = useRef<HTMLInputElement>(null);
     const phoneRef = useRef<HTMLInputElement>(null);
+    const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Telegram parse_mode=HTML: foydalanuvchi kiritgan matn xabarni buzmasligi uchun
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // 'Arizangiz qabul qilindi' dan keyingi avtomatik yopilish taymeri — komponent o'chsa ham qolib ketmasin
+    useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
 
     // dialog behaviour: lock page scroll, focus the first empty field, Esc closes,
     // Tab stays inside, focus returns to the trigger on close
@@ -72,10 +78,12 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (loading || sent) return;
         const rawPhone = formData.phone.replace(/\D/g, '');
 
-        if (!formData.name.trim()) {
-            toast.error('Ismingizni kiriting!', v2Toast());
+        const cleanName = formData.name.trim();
+        if (cleanName.length < 2) {
+            toast.error('Ismingizni kiriting (kamida 2 harf).', v2Toast());
             return;
         }
 
@@ -99,7 +107,7 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
                 : (courseName || 'consult');
 
             crmData = await submitLeadToAPI({
-                name: formData.name,
+                name: cleanName,
                 phone: fullPhone,
                 courseId: crmCourseData,
                 sourceRef,
@@ -113,11 +121,11 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         const displayRef = crmData?.resolvedSourceRef || sourceRef || 'Organik';
 
         let text = `${emoji} <b>${label} — DATA Ta'lim Stansiyasi</b>\n\n`;
-        text += `👤 <b>Ism:</b> ${formData.name}\n`;
+        text += `👤 <b>Ism:</b> ${esc(cleanName)}\n`;
         text += `📞 <b>Telefon:</b> ${fullPhone}\n`;
-        text += `📚 <b>Kurs:</b> ${courseName}\n`;
+        text += `📚 <b>Kurs:</b> ${esc(courseName)}\n`;
         if (extraInfo) {
-            text += `\n📊 <b>Qo'shimcha:</b>\n${extraInfo}\n`;
+            text += `\n📊 <b>Qo'shimcha:</b>\n${esc(extraInfo)}\n`;
         }
         text += `🔗 <b>Manba (ref):</b> ${displayRef}\n`;
         text += `\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
@@ -132,11 +140,13 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
 
         setLoading(false);
 
-        if (crmData) {
+        // Ariza CRM'ga yoki (CRM ishlamasa) menejerlar Telegram'iga yetib borgan bo'lsa — qabul qilingan.
+        // Aks holda foydalanuvchiga xato ko'rsatib qayta yuborishga majburlash dublikat yaratardi.
+        if (crmData || result.success) {
             trackEvent('Lead', { source: type, course: courseName });
             toast.success('Arizangiz qabul qilindi! Tez orada siz bilan bog\'lanamiz.', v2Toast());
             setSent(true);
-            setTimeout(() => {
+            closeTimerRef.current = setTimeout(() => {
                 setSent(false);
                 setFormData({ name: '', phone: '' });
                 onClose();

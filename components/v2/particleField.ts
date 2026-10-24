@@ -104,7 +104,7 @@ function build(count: number): P[] {
       gy,
       s: [sx, sy, sz],
       hue: hueBias >= 0 ? hueBias : hr < 0.6 ? 0 : hr < 0.92 ? 1 : 2,
-      size: 1.1 + rnd() * 1.6,
+      size: 1.5 + rnd() * 2.0,
       phase: rnd() * TAU,
     });
   }
@@ -139,6 +139,13 @@ export class ParticleField {
   /** horizontal anchor of the formation (0..1 of width) */
   anchorX = 0.5;
   private sax = 0.5;
+  /** vertical anchor (0..1 of height); phones park the world above the headline */
+  anchorY = 0.5;
+  /** particle size multiplier (phones use finer dust) */
+  sizeMul = 1;
+  private say = 0.5;
+  private spinAcc = 0;
+  private lastT = 0;
   /** overall brightness (0..1), e.g. lowered behind text on small screens */
   dim = 1;
   private sdim = 1;
@@ -196,10 +203,13 @@ export class ParticleField {
   private frame(still = false) {
     const { ctx, w, h, dpr } = this;
     const time = still ? 0 : (performance.now() - this.t0) / 1000;
+    const dt = still ? 0 : Math.min(0.05, time - this.lastT);
+    this.lastT = time;
     this.sp += (this.progress - this.sp) * (still ? 1 : 0.085);
     this.mx += (this.tmx - this.mx) * 0.05;
     this.my += (this.tmy - this.my) * 0.05;
     this.sax += (this.anchorX - this.sax) * (still ? 1 : 0.06);
+    this.say += (this.anchorY - this.say) * (still ? 1 : 0.06);
     this.sdim += (this.dim - this.sdim) * (still ? 1 : 0.06);
 
     const p = clamp01(this.sp);
@@ -207,17 +217,22 @@ export class ParticleField {
     const m1 = ease(clamp01(p / 0.5));
     const m2 = ease(clamp01((p - 0.5) / 0.5));
 
+    // "burst": peaks mid-transition (planet->galaxy, galaxy->star): the camera flies in, the field
+    // spins up and glows, then everything settles into the next shape
+    const burst = Math.sin(Math.PI * m1) * (1 - m2) + Math.sin(Math.PI * m2);
+    this.spinAcc += dt * (0.25 + 1.5 * burst);
+
     // camera: planet spins on its axis; galaxy is seen from above at an angle; star faces viewer
-    const spin = time * 0.25;
+    const spin = still ? 0 : this.spinAcc;
     const rotY = spin * (1 - m2) + Math.sin(time * 0.6) * 0.3 * m2 + this.mx * 0.45;
     const rotX = -0.22 * (1 - m1) + 0.95 * m1 * (1 - m2) + this.my * 0.3 + Math.sin(time * 0.4) * 0.05;
     const cy = Math.cos(rotY), sy = Math.sin(rotY);
     const cx = Math.cos(rotX), sx = Math.sin(rotX);
 
     const minDim = Math.min(w, h);
-    const scale = minDim * (0.27 + 0.06 * m1 - 0.02 * m2);
+    const scale = minDim * (0.3 + 0.05 * m1 - 0.07 * m2) * (1 + 0.08 * burst);
     const ox = w * this.sax;
-    const oy = h * (0.5 - 0.09 * clamp01(p * 4)); // lift the shape once captions appear below
+    const oy = h * (this.say - 0.14 * clamp01(p * 4)); // lift the shape once captions appear below
     const focal = 3.4;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -226,7 +241,7 @@ export class ParticleField {
     // soft core glow behind the formation
     const glowR = scale * (1.7 - 0.2 * m2);
     const glow = ctx.createRadialGradient(ox, oy, 0, ox, oy, glowR);
-    const ga = (this.dark ? 0.2 : 0.1) * this.sdim * (1 + 0.4 * m1 * (1 - m2));
+    const ga = (this.dark ? 0.24 : 0.11) * this.sdim * (1 + 0.4 * m1 * (1 - m2) + 0.9 * burst);
     glow.addColorStop(0, `rgba(0,97,255,${ga.toFixed(3)})`);
     glow.addColorStop(0.5, `rgba(96,239,255,${(ga * 0.22).toFixed(3)})`);
     glow.addColorStop(1, 'rgba(0,0,0,0)');
@@ -267,7 +282,7 @@ export class ParticleField {
       const depth = clamp01((z2 + 1.8) / 3.6); // 0 near → 1 far
       const twinkle = 0.78 + 0.22 * Math.sin(time * 2.2 + pt.phase);
       const alpha = Math.min(1, (this.dark ? 1 : 0.85) * (1 - depth * 0.65) * twinkle * this.sdim);
-      const size = pt.size * persp;
+      const size = pt.size * persp * this.sizeMul * (1 + 0.45 * burst);
 
       ctx.fillStyle = styles[pt.hue][Math.round(alpha * 20)];
       ctx.fillRect(px - size / 2, py - size / 2, size, size);

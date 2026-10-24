@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { Mask } from './fx';
 import { useMotionReduced } from './utils';
 import { ArrowRight } from 'lucide-react';
 
@@ -45,14 +46,24 @@ export const CareerLab: React.FC = () => {
 
   const prof = PROFILES[idx];
 
+  // the radar rises out of the page: tilted flat at first, standing up as it reaches the centre
+  const stageRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: stageRef, offset: ['start end', 'center 0.55'] });
+  const tilt = useTransform(scrollYProgress, [0, 1], [62, 0]);
+  const rise = useTransform(scrollYProgress, [0, 1], [0.78, 1]);
+  const fade = useTransform(scrollYProgress, [0, 0.5], [0.15, 1]);
+  const spin = useTransform(scrollYProgress, [0, 1], [-14, 0]);
+
   return (
-    <section className="relative py-[16vh] overflow-hidden" aria-labelledby="lab-title">
+    <section className="relative py-[12vh] overflow-hidden" aria-labelledby="lab-title">
       <div className="wrap grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
         <div className="lg:col-span-5 relative z-10">
           <p className="t-kicker mb-6">05 — Karyera laboratoriyasi</p>
-          <h2 id="lab-title" className="t-h2">
-            Qaysi kasb sizga mos — <span className="ink-grad">maʼlumot</span> aytib beradi.
-          </h2>
+          <Mask>
+            <h2 id="lab-title" className="t-h2">
+              Qaysi kasb sizga mos — <span className="ink-grad">maʼlumot</span> aytib beradi.
+            </h2>
+          </Mask>
           <p className="t-lead mt-6 max-w-md">
             Holland RIASEC metodikasi asosidagi test qiziqishlaringizni olti oʻlchovda baholaydi va sizga mos yoʻnalishni koʻrsatadi.
           </p>
@@ -78,8 +89,19 @@ export const CareerLab: React.FC = () => {
           onViewportEnter={() => setInView(true)}
           onViewportLeave={() => setInView(false)}
         >
-          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="w-full max-w-[34rem] h-auto overflow-visible" role="img" aria-label={`Namuna natija: ${prof.label}`}>
+          <div ref={stageRef} className="w-full max-w-[34rem]" style={{ perspective: '1100px' }}>
+          <motion.svg
+            viewBox={`0 0 ${SIZE} ${SIZE}`}
+            className="w-full h-auto overflow-visible"
+            style={reduced ? undefined : { rotateX: tilt, rotateZ: spin, scale: rise, opacity: fade, transformOrigin: '50% 60%' }}
+            role="img"
+            aria-label={`Namuna natija: ${prof.label}`}
+          >
             <defs>
+              <linearGradient id="lab-sweep" x1="1" y1="0" x2="0" y2="0">
+                <stop offset="0%" stopColor="#60efff" stopOpacity="0.38" />
+                <stop offset="100%" stopColor="#60efff" stopOpacity="0" />
+              </linearGradient>
               <linearGradient id="lab-fill" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stopColor="#0061ff" stopOpacity="0.55" />
                 <stop offset="100%" stopColor="#60efff" stopOpacity="0.25" />
@@ -105,6 +127,13 @@ export const CareerLab: React.FC = () => {
                 </g>
               );
             })}
+            {/* scanner sweep */}
+            {!reduced && (
+              <g className="radar-sweep" style={{ animationPlayState: inView ? 'running' : 'paused' }}>
+                <path d={`M ${C} ${C} L ${C + R} ${C} A ${R} ${R} 0 0 0 ${C + R * Math.cos(-0.9)} ${C + R * Math.sin(-0.9)} Z`} fill="url(#lab-sweep)" />
+                <line x1={C} y1={C} x2={C + R} y2={C} stroke="var(--cyan-ink)" strokeWidth={1.5} opacity={0.8} />
+              </g>
+            )}
             {/* the profile */}
             <motion.polygon
               initial={false}
@@ -130,7 +159,8 @@ export const CareerLab: React.FC = () => {
                 />
               );
             })}
-          </svg>
+          </motion.svg>
+          </div>
           <div className="mt-6 text-center">
             <span className="t-kicker">Namuna natija</span>
             <motion.p

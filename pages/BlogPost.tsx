@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Tag, Link2, Check } from 'lucide-react';
-import { Helmet } from 'react-helmet-async';
+import { SEO, articleSchema, SITE_URL } from '../components/SEO';
 import { useTheme } from '../store/ThemeContext';
 import { useLanguage } from '../i18n';
 import DOMPurify from 'dompurify';
@@ -48,6 +48,8 @@ interface Post {
   category: string;
   is_published: boolean;
   created_at: string;
+  published_at?: string | null;
+  updated_at?: string | null;
 }
 
 const BlogPost: React.FC = () => {
@@ -97,6 +99,7 @@ const BlogPost: React.FC = () => {
   if (!post) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center pt-32 gap-4">
+        <SEO title="Maqola topilmadi" noindex />
         <p className={`text-lg ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
           {lang === 'ru' ? 'Статья не найдена' : lang === 'en' ? 'Post not found' : 'Maqola topilmadi'}
         </p>
@@ -112,11 +115,21 @@ const BlogPost: React.FC = () => {
 
   return (
     <>
-      <Helmet>
-        <title>{title} | DATA Ta'lim</title>
-        <meta name="description" content={(lang === 'ru' ? post.excerpt_ru : lang === 'en' ? post.excerpt_en : post.excerpt_uz) || ''} />
-        <meta property="og:type" content="article" />
-      </Helmet>
+      <SEO
+        title={title}
+        description={(lang === 'ru' ? post.excerpt_ru : lang === 'en' ? post.excerpt_en : post.excerpt_uz) || post.excerpt_uz || undefined}
+        type="article"
+        url={`${SITE_URL}/blog/${post.slug}`}
+        image={post.cover_image ? (post.cover_image.startsWith('http') ? post.cover_image : `${SITE_URL}${post.cover_image}`) : undefined}
+        jsonLd={articleSchema({
+          title,
+          description: post.excerpt_uz || title,
+          url: `${SITE_URL}/blog/${post.slug}`,
+          image: post.cover_image ? (post.cover_image.startsWith('http') ? post.cover_image : `${SITE_URL}${post.cover_image}`) : undefined,
+          datePublished: post.published_at || post.created_at || new Date().toISOString(),
+          dateModified: post.updated_at || undefined,
+        })}
+      />
 
       <article className="pt-32 pb-20 px-4">
         <div className="max-w-3xl mx-auto">

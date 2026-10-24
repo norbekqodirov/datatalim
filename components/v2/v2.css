@@ -69,6 +69,14 @@ html:not(.dark) .v2 {
   letter-spacing: -0.045em;
   font-weight: 700;
 }
+.v2 .t-caption {
+  font-size: clamp(2.1rem, 5.4vw, 4.9rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-weight: 700;
+  text-wrap: balance;
+  text-shadow: 0 2px 40px var(--bg);
+}
 .v2 .t-h2 {
   font-size: clamp(2.1rem, 4.6vw, 4.25rem);
   line-height: 1.02;
@@ -204,6 +212,10 @@ html:not(.dark) .v2 .ink-grad {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   mix-blend-mode: overlay;
 }
+
+/* ---------- radar scanner (CareerLab) ---------- */
+@keyframes v2-sweep { to { transform: rotate(360deg); } }
+.v2 .radar-sweep { transform-origin: 210px 210px; animation: v2-sweep 6s linear infinite; }
 
 /* ---------- marquee ---------- */
 @keyframes v2-marquee { to { transform: translateX(-50%); } }

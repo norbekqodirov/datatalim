@@ -8,8 +8,53 @@ declare global {
     }
 }
 
+const FB_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
+// Skript yuklanishining eng kech vaqti (load'dan keyin), agar foydalanuvchi hech narsa bosmasa
+const FB_LOAD_FALLBACK_MS = 3500;
+
+let scriptRequested = false;
+
+/** fbevents.js (~425 kB) ni yuklaydi. Navbatdagi (queue) hodisalarni skript o'zi yuboradi. */
+const loadPixelScript = () => {
+    if (scriptRequested) return;
+    scriptRequested = true;
+    const fbScript = document.createElement('script');
+    fbScript.async = true;
+    fbScript.src = FB_SCRIPT_SRC;
+    const firstScript = document.getElementsByTagName('script')[0];
+    if (firstScript && firstScript.parentNode) {
+        firstScript.parentNode.insertBefore(fbScript, firstScript);
+    } else {
+        document.head.appendChild(fbScript);
+    }
+};
+
 /**
- * Inits the Facebook Pixel script manually (if not hardcoded in index.html)
+ * Skript yuklashni kechiktiradi: birinchi o'zaro ta'sir (scroll/click/key/touch) YOKI
+ * sahifa 'load' + bo'sh vaqt (idle) — qaysi biri oldin bo'lsa. Shu paytgacha fbq() chaqiruvlari
+ * (init, PageView, Lead ...) stub'ning navbatida (queue) saqlanadi, hech narsa yo'qolmaydi.
+ */
+const scheduleLoad = () => {
+    const events = ['pointerdown', 'keydown', 'scroll', 'touchstart'] as const;
+    let fallbackTimer: number | undefined;
+
+    const go = () => {
+        events.forEach((e) => window.removeEventListener(e, go));
+        if (fallbackTimer) window.clearTimeout(fallbackTimer);
+        loadPixelScript();
+    };
+    events.forEach((e) => window.addEventListener(e, go, { once: true, passive: true }));
+
+    const afterLoad = () => {
+        // Asosiy kontent chizilgandan keyin, bo'sh vaqtda; kafolat sifatida taymer
+        fallbackTimer = window.setTimeout(go, FB_LOAD_FALLBACK_MS);
+    };
+    if (document.readyState === 'complete') afterLoad();
+    else window.addEventListener('load', afterLoad, { once: true });
+};
+
+/**
+ * Inits the Facebook Pixel: fbq stub + 'init' darhol, fbevents.js esa kechiktirib yuklanadi.
  */
 export const initPixel = () => {
     if (typeof window === 'undefined') return;
@@ -17,7 +62,6 @@ export const initPixel = () => {
     if (window.fbq) return;
 
     const f = window as any;
-    if (f.fbq) return;
     const n: any = f.fbq = function () {
         n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
     };
@@ -27,27 +71,20 @@ export const initPixel = () => {
     n.version = '2.0';
     n.queue = [];
 
-    const fbScript = document.createElement('script');
-    fbScript.async = true;
-    fbScript.src = 'https://connect.facebook.net/en_US/fbevents.js';
-    const firstScript = document.getElementsByTagName('script')[0];
-    if (firstScript && firstScript.parentNode) {
-        firstScript.parentNode.insertBefore(fbScript, firstScript);
-    }
-
-    // Init the pixel with the ID
+    // Init the pixel with the ID (navbatga tushadi, skript yuklangach bajariladi)
     window.fbq('init', FB_PIXEL_ID);
+
+    scheduleLoad();
 };
 
 /**
- * Tracks a standard or custom event
+ * Tracks a standard or custom event. Skript hali yuklanmagan bo'lsa ham hodisa navbatda
+ * saqlanadi va yuklangach yuboriladi.
  * @param eventName E.g., 'PageView', 'Lead', 'Contact'
  * @param data Optional data payload
  */
 export const trackEvent = (eventName: string, data?: any) => {
-    if (typeof window !== 'undefined' && window.fbq) {
-        window.fbq('track', eventName, data);
-    } else {
-        console.warn(`Facebook Pixel not loaded yet. Missed event: ${eventName}`);
-    }
+    if (typeof window === 'undefined') return;
+    if (!window.fbq) initPixel();
+    window.fbq('track', eventName, data);
 };

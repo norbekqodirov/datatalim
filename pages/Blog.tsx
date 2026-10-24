@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Calendar, Tag } from 'lucide-react';
-import { Helmet } from 'react-helmet-async';
+import { SEO } from '../components/SEO';
 import { useTheme } from '../store/ThemeContext';
 import { useLanguage } from '../i18n';
 
@@ -63,9 +63,7 @@ const Blog: React.FC = () => {
 
   return (
     <>
-      <Helmet>
-        <title>{t('nav.blog') || 'Blog'} | DATA Ta'lim</title>
-      </Helmet>
+      <SEO title="Blog" description="IT, dizayn va zamonaviy kasblar haqida foydali maqolalar — DATA Ta'lim Stansiyasi blogi." />
 
       <section className="pt-32 pb-20 px-4">
         <div className="max-w-7xl mx-auto">

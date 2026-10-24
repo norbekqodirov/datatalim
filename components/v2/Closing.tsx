@@ -1,5 +1,5 @@
-import React, { useEffect, useId, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { motion, AnimatePresence, useScroll } from 'framer-motion';
 import { Plus, MapPin, Phone, Mail, Clock, Loader2, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store/useStore';
@@ -8,6 +8,7 @@ import { submitLeadToAPI } from '../../utils/api';
 import { sendToTelegram } from '../../utils/telegram';
 import { trackEvent } from '../../utils/pixel';
 import { uz, v2Toast } from './utils';
+import { Mask, Star3D } from './fx';
 
 // ------------------------------------------------------------------ FAQ
 interface FAQItem {
@@ -55,7 +56,7 @@ export const FaqV2: React.FC = () => {
       <div className="wrap grid lg:grid-cols-12 gap-10">
         <div className="lg:col-span-4">
           <p className="t-kicker mb-6">09 — Savollar</p>
-          <h2 id="faq-title" className="t-h2">Koʻp beriladigan savollar</h2>
+          <Mask><h2 id="faq-title" className="t-h2">Koʻp beriladigan savollar</h2></Mask>
         </div>
         <div className="lg:col-span-8">
           {faqs.map((f, i) => {
@@ -123,6 +124,8 @@ export const ContactV2: React.FC = () => {
   const [course, setCourse] = useState('');
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [state, setState] = useState<'idle' | 'loading' | 'sent'>('idle');
+  const closeRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: closeP } = useScroll({ target: closeRef, offset: ['start end', 'end start'] });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,20 +171,18 @@ export const ContactV2: React.FC = () => {
 
 
   return (
-    <section id="contact" className="relative py-[14vh] overflow-hidden" aria-labelledby="contact-title">
+    <section ref={closeRef} id="contact" className="relative py-[14vh] overflow-hidden" aria-labelledby="contact-title">
       {/* closing star */}
-      <div className="absolute -right-[10vw] top-1/2 -translate-y-1/2 w-[46vw] max-w-[620px] aspect-square pointer-events-none opacity-[.16] hidden lg:block" aria-hidden="true">
-        <div className="star3d w-full h-full" style={{ color: 'var(--blue)' }}>
-          <i />
-        </div>
-      </div>
+      <Star3D progress={closeP} spin={55} className="absolute -right-[10vw] top-[8%] w-[46vw] max-w-[620px] aspect-square pointer-events-none opacity-[.4] hidden lg:block" />
 
       <div className="wrap grid lg:grid-cols-12 gap-12 relative z-10">
         <div className="lg:col-span-6">
           <p className="t-kicker mb-6">10 — Boshlash</p>
-          <h2 id="contact-title" className="t-display">
-            Birinchi qadam — <span className="ink-grad">bepul</span> konsultatsiya.
-          </h2>
+          <Mask>
+            <h2 id="contact-title" className="t-display">
+              Birinchi qadam — <span className="ink-grad">bepul</span> konsultatsiya.
+            </h2>
+          </Mask>
           <p className="t-lead mt-6 max-w-lg">Raqamingizni qoldiring: menejer 1 ish kuni ichida qoʻngʻiroq qilib, sizga mos kurs va jadvalni tanlab beradi.</p>
 
           <dl className="mt-12 grid sm:grid-cols-2 gap-x-8 gap-y-6">
