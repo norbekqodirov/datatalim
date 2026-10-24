@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { submitLeadToAPI } from '../../utils/api';
-import { sendToTelegram } from '../../utils/telegram';
 import { trackEvent } from '../../utils/pixel';
 import { uz, v2Toast } from './utils';
 import { Mask, Star3D } from './fx';
@@ -109,7 +108,6 @@ export const FaqV2: React.FC = () => {
 };
 
 // ------------------------------------------------------------------ Contact / final CTA
-const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const formatPhone = (raw: string) => {
   const v = raw.replace(/\D/g, '').slice(0, 9);
@@ -146,7 +144,7 @@ export const ContactV2: React.FC = () => {
     const courseTitle = course ? tField(courses.find((c) => c.id === course)?.title) : '';
     let crm: any = null;
     try {
-      crm = await submitLeadToAPI({ name: name.trim(), phone: fullPhone, courseId: course || 'Contact Form', sourceRef: 'Aloqa' });
+      crm = await submitLeadToAPI({ name: name.trim(), phone: fullPhone, courseId: courseTitle || course || 'Contact Form', sourceRef: 'Aloqa' });
     } catch (err) {
       console.error('Lead save failed', err);
     }
@@ -157,13 +155,7 @@ export const ContactV2: React.FC = () => {
       return;
     }
 
-    const ref = crm?.resolvedSourceRef || 'Aloqa';
-    const text =
-      `📩 <b>Yangi ariza — DATA Ta'lim Stansiyasi</b>\n\n👤 <b>Ism:</b> ${escapeHtml(name.trim())}\n📞 <b>Telefon:</b> ${fullPhone}` +
-      `\n📚 <b>Kurs:</b> ${escapeHtml(courseTitle || '—')}\n🔗 <b>Manba (ref):</b> ${escapeHtml(ref)}\n\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
-    // Telegram is only a manager notification; the lead is already saved.
-    sendToTelegram(text).then((r) => !r.success && console.error('Telegram notify failed:', r.error));
-
+    // Menejerlarga Telegram xabarini server /api/leads ichida o'zi yuboradi
     trackEvent('Lead', { source: 'Contact' });
     setState('sent');
     setName('');

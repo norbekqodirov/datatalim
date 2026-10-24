@@ -1,0 +1,215 @@
+/* ==========================================================================
+   /kurslar va /kurslar/:id — v2 sahifalari uchun uslublar (faqat .v2 ichida)
+   ========================================================================== */
+
+/* kategoriya rangi: to'ldirish uchun --cat, kichik matn uchun --cat-ink (ikkala temada kontrast >= 4.5) */
+.v2 [data-cat="all"] { --cat: var(--blue); --cat-ink: var(--blue-ink); }
+.v2 [data-cat="programming"] { --cat: #00b26b; --cat-ink: var(--green-ink); }
+.v2 [data-cat="media"] { --cat: #60efff; --cat-ink: var(--cyan-ink); }
+.v2 [data-cat="finance"] { --cat: #0061ff; --cat-ink: var(--blue-ink); }
+.v2 [data-cat="kids"] {
+  --cat: color-mix(in srgb, #00b26b 45%, #60efff);
+  --cat-ink: color-mix(in srgb, var(--green-ink) 50%, var(--cyan-ink));
+}
+.v2 .cat-ink { color: var(--cat-ink); }
+
+.v2 .cover-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cat);
+  background:
+    radial-gradient(60% 60% at 50% 45%, color-mix(in srgb, var(--cat) 28%, transparent), transparent 70%),
+    var(--bg-3);
+}
+
+/* ---------- katalog: sarlavha ---------- */
+.v2 .cx-ghost {
+  font-size: clamp(11rem, 30vw, 27rem);
+  color: transparent;
+  -webkit-text-stroke: 1px var(--line-2);
+  font-weight: 500;
+  line-height: 0.8;
+}
+.v2 .cx-title {
+  font-size: clamp(3rem, 9vw, 8.25rem);
+  line-height: 0.94;
+  letter-spacing: -0.055em;
+  font-weight: 700;
+  overflow-wrap: break-word;
+}
+
+/* ---------- filtr ---------- */
+.v2 .chip {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--fg-2);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+.v2 .chip:hover { color: var(--fg); border-color: var(--fg-3); }
+.v2 .chip[aria-pressed="true"] { color: var(--bg); border-color: var(--fg); }
+.v2 .chip .chip-dot { width: 8px; height: 8px; border-radius: 99px; background: var(--cat); flex: none; }
+.v2 .chip .chip-n { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.75rem; opacity: 0.8; }
+.v2 .chip-bg { position: absolute; inset: -1px; z-index: -1; border-radius: 999px; background: var(--fg); }
+
+/* ---------- kurs kartasi ---------- */
+.v2 .cc {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  transition: transform 0.5s var(--ease), border-color 0.25s var(--ease), box-shadow 0.5s var(--ease);
+}
+.v2 .cc:hover,
+.v2 .cc:focus-within {
+  transform: translate3d(0, -6px, 0);
+  border-color: color-mix(in srgb, var(--cat) 60%, var(--line-2));
+  box-shadow: 0 34px 70px -38px color-mix(in srgb, var(--cat) 75%, transparent);
+}
+.v2 .cc:has(.cc-link:focus-visible) { outline: 2px solid var(--cyan-ink); outline-offset: 3px; }
+.v2 .cc-link { outline: none !important; }
+.v2 .cc-link::after { content: ""; position: absolute; inset: 0; z-index: 3; }
+.v2 .cc-media { position: relative; aspect-ratio: 1 / 1; overflow: hidden; background: var(--bg-3); }
+.v2 .cc-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; will-change: transform; }
+.v2 .cc-media::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 40%;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.5), transparent);
+}
+.v2 .cc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 28px;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.74);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.v2 .cc-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  color: var(--fg);
+  transition: transform 0.4s var(--ease), background-color 0.25s var(--ease), color 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+.v2 .cc:hover .cc-arrow,
+.v2 .cc:focus-within .cc-arrow { background: var(--fg); color: var(--bg); border-color: var(--fg); transform: rotate(-45deg); }
+
+/* ---------- kurs sahifasi: sarlavha ---------- */
+.v2 .cd-title {
+  font-size: clamp(2.5rem, 5.6vw, 5.25rem);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+.v2 .cd-cover {
+  position: relative;
+  border-radius: 32px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  background: var(--bg-3);
+  aspect-ratio: 1 / 1;
+  box-shadow: 0 50px 100px -50px color-mix(in srgb, var(--cat) 80%, transparent), 0 0 0 1px var(--line) inset;
+}
+.v2 .cd-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+.v2 .fact { background: var(--bg); padding: 1.25rem 1.25rem 1.4rem; min-width: 0; }
+@media (min-width: 768px) { .v2 .fact { padding: 1.6rem 1.75rem 1.75rem; } }
+.v2 .fact-v { font-size: clamp(1.4rem, 2.5vw, 2.1rem); line-height: 1.1; letter-spacing: -0.03em; font-weight: 500; overflow-wrap: anywhere; }
+/* narx birligi (so'm) raqamdan ajralib, 'so' / 'm' bo'lib qolmasin; tor ekranda raqam sig'ishi uchun biroz kichik */
+.v2 .fact-v > span { white-space: nowrap; }
+@media (max-width: 479px) { .v2 .fact-v { font-size: 1.2rem; } }
+
+/* ---------- texnologiya belgilari ---------- */
+.v2 .tech {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0 1.15rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  font-weight: 500;
+  transition: border-color 0.25s var(--ease), transform 0.35s var(--ease);
+}
+.v2 .tech:hover { border-color: var(--cat); transform: translate3d(0, -3px, 0); }
+
+/* ---------- dars rejasi (timeline) ---------- */
+.v2 .tl-node {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  display: grid;
+  place-items: center;
+  font-size: 0.8125rem;
+  color: var(--fg-2);
+}
+.v2 .tl-node .tl-fill { position: absolute; inset: -1px; border-radius: 999px; background: var(--blue); display: grid; place-items: center; color: #fff; box-shadow: 0 0 0 6px color-mix(in srgb, var(--blue) 22%, transparent); }
+.v2 .tl-lesson { display: flex; gap: 1rem; padding-block: 0.8rem; border-top: 1px solid var(--line); }
+.v2 .tl-lesson:first-child { border-top: 0; }
+
+/* ---------- yon panel + pastki panel ---------- */
+.v2 .enroll-bar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 40;
+  padding: 0.7rem var(--gutter) calc(0.7rem + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--line-2);
+}
+
+.v2 .mentor-av {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex: none;
+  background: var(--bg-3);
+  border: 1px solid var(--line-2);
+  display: grid;
+  place-items: center;
+}
+.v2 .mentor-av img { width: 100%; height: 100%; object-fit: cover; }
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .cc, .v2 .cc-arrow, .v2 .tech { transition: none; }
+}

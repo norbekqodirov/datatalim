@@ -44,8 +44,8 @@ html:not(.dark) .v2 {
   --line: rgba(5, 7, 13, 0.09);
   --line-2: rgba(5, 7, 13, 0.16);
   --blue-ink: #0052d9;
-  --cyan-ink: #007a8a;
-  --green-ink: #00804d;
+  --cyan-ink: #006f7e;
+  --green-ink: #007545;
 }
 
 
@@ -424,3 +424,8 @@ html .v2 .field[aria-invalid="true"],
 /* "konsultatsiya." must fit the half-width column at every size (≈7.7em wide) */
 .v2 #contact-title { font-size: clamp(1.75rem, 4.9vw, 4.4rem); overflow-wrap: break-word; }
 @media (max-width: 380px) { .v2 #faq-title { font-size: 1.9rem; } }
+
+/* 404: qorong'i rejimda to'liq sahna, yorug' rejimda ramkali kartochka (faqat md+) */
+html:not(.dark) .v2 .nf-dark { display: none; }
+.v2 .nf-light { display: none; }
+@media (min-width: 768px) { html:not(.dark) .v2 .nf-light { display: block; } }

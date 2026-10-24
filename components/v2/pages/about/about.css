@@ -1,0 +1,106 @@
+/* About / Team / Apply pages — extras on top of components/v2/v2.css (scoped under .v2) */
+
+/* statement type used by the scroll-lit paragraphs */
+.v2 .ab-statement {
+  font-size: clamp(1.7rem, 3.7vw, 3.25rem);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+  max-width: 30ch;
+  overflow-wrap: break-word;
+}
+.v2 .ab-year {
+  font-size: clamp(4.5rem, 15vw, 13rem);
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+  font-weight: 500;
+}
+.v2 .ab-ring { transform-origin: 50% 50%; }
+@keyframes ab-ping {
+  0% { transform: scale(0.35); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 0; }
+}
+.v2 .ab-ping { animation: ab-ping 4.2s cubic-bezier(0.22, 1, 0.36, 1) infinite; transform-origin: 50% 50%; }
+@keyframes ab-drip {
+  0% { transform: scaleY(0); transform-origin: top; opacity: 1; }
+  60% { transform: scaleY(1); transform-origin: top; opacity: 1; }
+  100% { transform: scaleY(1); transform-origin: top; opacity: 0; }
+}
+.v2 .ab-drip { animation: ab-drip 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+
+/* rows that light up while they cross the middle of the screen */
+.v2 .ab-row {
+  transition: opacity 0.55s var(--ease), transform 0.55s var(--ease);
+}
+.v2 .ab-cell {
+  background: var(--bg);
+  transition: background-color 0.3s var(--ease);
+}
+.v2 .ab-cell:hover { background: var(--bg-2); }
+.v2 .ab-cell .ico { transition: transform 0.5s var(--ease), color 0.3s var(--ease); }
+.v2 .ab-cell:hover .ico { transform: translate3d(0, -4px, 0) rotate(-6deg); color: var(--cyan-ink); }
+
+.v2 .dir-card { transition: transform 0.4s var(--ease), border-color 0.25s var(--ease); }
+.v2 .dir-card:hover { transform: translate3d(0, -6px, 0); border-color: var(--line-2); }
+.v2 .dir-card .arr { transition: transform 0.35s var(--ease); }
+.v2 .dir-card:hover .arr { transform: translate3d(4px, -4px, 0); }
+
+/* ------------------------------------------------------------------ team cards */
+.v2 .tm-card { transition: transform 0.5s var(--ease), border-color 0.3s var(--ease); }
+.v2 .tm-card:hover,
+.v2 .tm-card:focus-within { transform: translate3d(0, -8px, 0); border-color: var(--line-2); }
+.v2 .tm-visual { position: relative; overflow: hidden; isolation: isolate; }
+.v2 .tm-glow { position: absolute; inset: 0; z-index: 0; }
+.v2 .tm-grid {
+  position: absolute; inset: 0; z-index: 0; opacity: 0.55;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(75% 75% at 50% 45%, #000 20%, transparent 100%);
+          mask-image: radial-gradient(75% 75% at 50% 45%, #000 20%, transparent 100%);
+}
+.v2 .tm-star {
+  position: absolute; z-index: 0; width: 78%; aspect-ratio: 1;
+  right: -22%; top: -14%;
+  transition: transform 1.1s var(--ease), opacity 0.5s var(--ease);
+  transform: rotate(0deg) scale(1);
+}
+.v2 .tm-card:hover .tm-star,
+.v2 .tm-card:focus-within .tm-star { transform: rotate(90deg) scale(1.08); }
+.v2 .tm-initials {
+  position: relative; z-index: 1;
+  font-weight: 700; letter-spacing: -0.06em; line-height: 0.8;
+  font-size: clamp(5.5rem, 14vw, 9rem);
+  transition: transform 0.7s var(--ease);
+}
+.v2 .tm-card:hover .tm-initials,
+.v2 .tm-card:focus-within .tm-initials { transform: translate3d(0, -6px, 0) scale(1.04); }
+.v2 .tm-chip {
+  display: inline-flex; align-items: center; min-height: 28px; padding: 0 0.75rem;
+  border-radius: 999px; border: 1px solid var(--line-2); color: var(--fg-2);
+  font-size: 0.8125rem; transition: border-color 0.25s var(--ease), color 0.25s var(--ease);
+}
+.v2 .tm-card:hover .tm-chip { border-color: var(--fg-3); color: var(--fg); }
+
+/* ------------------------------------------------------------------ apply landing */
+.v2 .ap-select {
+  appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 3rem;
+}
+.v2 .ap-select:invalid, .v2 .ap-select[data-empty] { color: var(--fg-3); }
+.v2 .ap-select option { color: var(--fg); background: var(--bg-2); }
+.v2 .ap-step { counter-increment: ap; }
+.v2 .ap-step::before {
+  content: counter(ap, decimal-leading-zero);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.8125rem; color: var(--cyan-ink); letter-spacing: 0.1em;
+}
+
+@media (max-width: 380px) {
+  .v2 .ab-statement { font-size: 1.55rem; }
+}
+
+/* dark mode forces select text colour with !important: keep the placeholder state dim */
+html.dark .v2 .ap-select[data-empty] { color: var(--fg-3) !important; }
+/* the brand star is a light-mode glow, not a solid object */
+html:not(.dark) .v2 .ab-star { opacity: 0.2 !important; }

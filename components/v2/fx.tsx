@@ -128,3 +128,35 @@ export const CountUp: React.FC<{ to: number; from?: number; suffix?: string; cla
     </span>
   );
 };
+
+/**
+ * Cinema band: a wide decorative image that opens up as it scrolls into view
+ * (scale + corner radius + slow inner drift), Apple product-page style. Purely decorative.
+ */
+export const CinemaBand: React.FC<{ src: string; className?: string; ratio?: string }> = ({ src, className, ratio = '16 / 7' }) => {
+  const reduced = useMotionReduced();
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
+  const scale = useTransform(scrollYProgress, [0, 0.45], [0.86, 1]);
+  const radius = useTransform(scrollYProgress, [0, 0.45], [40, 14]);
+  const imgY = useTransform(scrollYProgress, [0, 1], ['-7%', '7%']);
+  const imgScale = useTransform(scrollYProgress, [0, 0.5, 1], [1.18, 1.08, 1.14]);
+  return (
+    <div ref={ref} className={`wrap ${className ?? ''}`} aria-hidden="true">
+      <motion.div
+        className="relative overflow-hidden"
+        style={reduced ? { aspectRatio: ratio, borderRadius: 14 } : { aspectRatio: ratio, scale, borderRadius: radius }}
+      >
+        <motion.img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover"
+          style={reduced ? undefined : { y: imgY, scale: imgScale }}
+        />
+        <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: 'inset 0 0 0 1px var(--line)', borderRadius: 'inherit' }} />
+      </motion.div>
+    </div>
+  );
+};

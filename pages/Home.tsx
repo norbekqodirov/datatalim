@@ -9,6 +9,7 @@ import { Campus } from '../components/v2/Campus';
 import { Voices, TeamStrip } from '../components/v2/People';
 import { FaqV2, ContactV2 } from '../components/v2/Closing';
 import { StarSeam } from '../components/v2/fx';
+import { Gallery } from '../components/v2/Gallery';
 import '../components/v2/v2.css';
 
 // v2 landing ("DATA · Signal"). The previous homepage lives on in pages/HomeClassic.tsx
@@ -42,6 +43,7 @@ export default function Home() {
           <Campus />
         </>
       )}
+      {v.gallery && <Gallery />}
       {v.testimonials && <Voices />}
       {v.team && <TeamStrip />}
       {v.faq && (

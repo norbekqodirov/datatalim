@@ -16,6 +16,22 @@ export default function NotFound() {
         className="pointer-events-none absolute inset-0"
         style={{ background: 'radial-gradient(50% 45% at 70% 30%, rgba(0,97,255,.16), transparent 70%)' }}
       />
+      {/* qorong'i rejim: ekran chetigacha yoyilgan sahna */}
+      <img
+        src="/images/v2/lost-star.webp"
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-0 nf-dark h-full w-full object-cover opacity-40 md:w-[62%] md:opacity-90"
+        style={{ maskImage: 'linear-gradient(90deg, transparent, #000 35%)', WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 35%)' }}
+      />
+      {/* yorug' rejim: qora tasvir navbar ostiga yoyilib ketmasin — ramkali kartochka */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute right-[5vw] top-1/2 h-[min(56vh,460px)] w-[min(38vw,520px)] -translate-y-1/2 nf-light overflow-hidden"
+        style={{ borderRadius: 'var(--radius)', border: '1px solid var(--line)' }}
+      >
+        <img src="/images/v2/lost-star.webp" alt="" className="h-full w-full object-cover" style={{ objectPosition: '100% 70%' }} />
+      </div>
       <div className="wrap relative pt-28 pb-20">
         <p className="t-kicker">Xato 404</p>
         <h1 className="t-display mt-6 max-w-[14ch]">

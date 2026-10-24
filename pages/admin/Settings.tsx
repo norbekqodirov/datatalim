@@ -27,6 +27,9 @@ const Settings: React.FC = () => {
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       if (res.ok) {
+        // server yangi token beradi (eski tokenlar parol bilan birga bekor bo'ladi)
+        const data = await res.json().catch(() => ({}));
+        if (data?.token) localStorage.setItem('adminToken', data.token);
         toast.success('Parol o\'zgartirildi');
         setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       } else {

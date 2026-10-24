@@ -1,31 +1,49 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Calendar, Tag } from 'lucide-react';
+import { ArrowUpRight, ArrowRight, Search, X } from 'lucide-react';
+import { useScroll } from 'framer-motion';
 import { SEO } from '../components/SEO';
-import { useTheme } from '../store/ThemeContext';
 import { useLanguage } from '../i18n';
+import { uz, useMotionReduced } from '../components/v2/utils';
+import { Mask, Star3D } from '../components/v2/fx';
+import { PostCover } from '../components/v2/pages/blog/PostCover';
+import { Reveal } from '../components/v2/pages/blog/Reveal';
+import { Star4 } from '../components/v2/pages/blog/Star';
+import {
+  BlogPostData as Post,
+  postTitle,
+  postExcerpt,
+  postDate,
+  formatDate,
+  readingMinutes,
+  postContent,
+} from '../components/v2/pages/blog/blogUtils';
+import '../components/v2/v2.css';
+import '../components/v2/pages/blog/blog.css';
 
-interface Post {
-  id: number;
-  slug: string;
-  title_uz: string;
-  title_ru: string;
-  title_en: string;
-  excerpt_uz: string;
-  excerpt_ru: string;
-  excerpt_en: string;
-  cover_image: string;
-  category: string;
-  created_at: string;
-}
+const Meta: React.FC<{ post: Post; lang: string }> = ({ post, lang }) => {
+  const d = postDate(post);
+  const mins = readingMinutes(postContent(post, lang));
+  return (
+    <p className="mono flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] ink-3">
+      {post.category && <span className="ink-cyan uppercase tracking-[0.12em]">{uz(post.category)}</span>}
+      {post.category && d && <span className="meta-dot" aria-hidden="true" />}
+      {d && <time dateTime={d.toISOString()}>{formatDate(d, lang)}</time>}
+      <span className="meta-dot" aria-hidden="true" />
+      <span>{mins} daqiqa</span>
+    </p>
+  );
+};
 
 const Blog: React.FC = () => {
-  const { isDark } = useTheme();
   const { lang, t } = useLanguage();
+  const reduced = useMotionReduced();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const heroRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
 
   useEffect(() => {
     fetch('/api/posts?published=1')
@@ -35,154 +53,200 @@ const Blog: React.FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const getTitle = (post: Post) => {
-    if (lang === 'ru' && post.title_ru) return post.title_ru;
-    if (lang === 'en' && post.title_en) return post.title_en;
-    return post.title_uz;
-  };
-
-  const getExcerpt = (post: Post) => {
-    if (lang === 'ru' && post.excerpt_ru) return post.excerpt_ru;
-    if (lang === 'en' && post.excerpt_en) return post.excerpt_en;
-    return post.excerpt_uz;
-  };
-
   const categories = useMemo(() => {
-    const cats = new Set(posts.map(p => p.category).filter(Boolean));
+    const cats = new Set(posts.map(p => p.category).filter(Boolean) as string[]);
     return Array.from(cats);
   }, [posts]);
 
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return posts.filter(p => {
-      const title = getTitle(p).toLowerCase();
-      const matchSearch = !search || title.includes(search.toLowerCase());
+      const matchSearch = !q || postTitle(p, lang).toLowerCase().includes(q);
       const matchCat = !selectedCategory || p.category === selectedCategory;
       return matchSearch && matchCat;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posts, search, selectedCategory, lang]);
 
+  const featured = filtered[0];
+  const rest = filtered.slice(1);
+  const filtering = !!search.trim() || !!selectedCategory;
+  const clear = () => {
+    setSearch('');
+    setSelectedCategory('');
+  };
+
   return (
-    <>
+    <div className="v2">
       <SEO title="Blog" description="IT, dizayn va zamonaviy kasblar haqida foydali maqolalar — DATA Ta'lim Stansiyasi blogi." />
 
-      <section className="pt-32 pb-20 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h1 className={`text-4xl md:text-5xl font-black mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            {t('nav.blog') || 'Blog'}
-          </h1>
-          <p className={`text-lg mb-10 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-            {lang === 'ru' ? 'Последние статьи и новости' : lang === 'en' ? 'Latest articles and news' : 'Eng so\'nggi maqolalar va yangiliklar'}
+      {/* ---------------------------------------------------------------- masthead */}
+      <header ref={heroRef} className="relative overflow-hidden pt-32 sm:pt-40 pb-10">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'radial-gradient(50% 55% at 80% 20%, rgba(0,97,255,.16), transparent 70%)' }}
+        />
+        {!reduced && (
+          <Star3D
+            progress={scrollYProgress}
+            layers={7}
+            spin={60}
+            className="pointer-events-none absolute -right-16 sm:right-[6%] top-20 w-56 h-56 sm:w-80 sm:h-80 lg:w-[26rem] lg:h-[26rem] opacity-40 sm:opacity-80"
+          />
+        )}
+        <div className="wrap relative">
+          <p className="t-kicker mb-6 flex items-center gap-3">
+            <Star4 className="w-3.5 h-3.5 ink-cyan" />
+            DATA · Jurnal
           </p>
+          <Mask>
+            <h1 className="t-display">
+              <span className="ink-grad">{t('nav.blog') || 'Blog'}</span>
+            </h1>
+          </Mask>
+          <p className="t-lead mt-6 max-w-[34rem]">{uz("Eng so'nggi maqolalar va yangiliklar")}</p>
+        </div>
+      </header>
 
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-10">
-            <div className="relative flex-1 max-w-md">
-              <Search size={18} className={`absolute left-4 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-              <input
-                type="text"
-                placeholder={lang === 'ru' ? 'Поиск...' : lang === 'en' ? 'Search...' : 'Qidirish...'}
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className={`w-full pl-11 pr-4 py-3 rounded-2xl text-sm font-medium outline-none transition-all ${
-                  isDark
-                    ? 'bg-slate-800/60 text-white border border-white/10 focus:border-blue-500/50 placeholder-slate-500'
-                    : 'bg-white text-slate-900 border border-slate-200 focus:border-blue-400 placeholder-slate-400 shadow-sm'
-                }`}
-              />
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => setSelectedCategory('')}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                  !selectedCategory
-                    ? 'bg-[#0061ff] text-white'
-                    : isDark ? 'bg-slate-800/60 text-slate-400 hover:bg-slate-700/60' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                }`}
-              >
-                {lang === 'ru' ? 'Все' : lang === 'en' ? 'All' : 'Barchasi'}
-              </button>
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                    selectedCategory === cat
-                      ? 'bg-[#0061ff] text-white'
-                      : isDark ? 'bg-slate-800/60 text-slate-400 hover:bg-slate-700/60' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+      {/* ---------------------------------------------------------------- filters */}
+      <section aria-label="Qidiruv va toifalar" className="wrap pb-10">
+        <div className="hairline pt-8 flex flex-col lg:flex-row lg:items-center gap-5">
+          <div className="search-wrap w-full lg:max-w-md">
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Maqolalarni qidirish"
+              placeholder="Qidirish..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="field"
+            />
           </div>
-
-          {/* Loading */}
-          {loading && (
-            <div className="flex justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0061ff]" />
-            </div>
-          )}
-
-          {/* Posts Grid */}
-          {!loading && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filtered.map(post => (
-                <Link
-                  key={post.id}
-                  to={`/blog/${post.slug}`}
-                  className={`group rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                    isDark
-                      ? 'bg-slate-800/60 backdrop-blur-xl border border-white/10 hover:border-white/20'
-                      : 'bg-white shadow-sm hover:shadow-lg'
-                  }`}
-                >
-                  {post.cover_image && (
-                    <div className="aspect-video overflow-hidden">
-                      <img
-                        src={post.cover_image}
-                        alt={getTitle(post)}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                    </div>
-                  )}
-                  <div className="p-6">
-                    {post.category && (
-                      <span className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full mb-3 ${
-                        isDark ? 'bg-blue-500/15 text-[#60efff]' : 'bg-blue-50 text-[#0061ff]'
-                      }`}>
-                        <Tag size={12} />
-                        {post.category}
-                      </span>
-                    )}
-                    <h3 className={`text-lg font-bold mb-2 line-clamp-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      {getTitle(post)}
-                    </h3>
-                    {getExcerpt(post) && (
-                      <p className={`text-sm line-clamp-3 mb-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {getExcerpt(post)}
-                      </p>
-                    )}
-                    <div className={`flex items-center gap-2 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      <Calendar size={14} />
-                      {new Date(post.created_at).toLocaleDateString(lang === 'ru' ? 'ru-RU' : lang === 'en' ? 'en-US' : 'uz-UZ')}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {!loading && filtered.length === 0 && (
-            <div className={`text-center py-20 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              <p className="text-lg font-medium">
-                {lang === 'ru' ? 'Статьи не найдены' : lang === 'en' ? 'No posts found' : 'Maqolalar topilmadi'}
-              </p>
-            </div>
+          <div className="flex gap-2 flex-wrap" role="group" aria-label="Toifalar">
+            <button type="button" className="chip" aria-pressed={!selectedCategory} onClick={() => setSelectedCategory('')}>
+              Barchasi
+            </button>
+            {categories.map(cat => (
+              <button key={cat} type="button" className="chip" aria-pressed={selectedCategory === cat} onClick={() => setSelectedCategory(cat)}>
+                {uz(cat)}
+              </button>
+            ))}
+          </div>
+          {!loading && posts.length > 0 && (
+            <p className="mono text-[0.8125rem] ink-3 lg:ml-auto" aria-live="polite">
+              {filtered.length} / {posts.length}
+            </p>
           )}
         </div>
       </section>
-    </>
+
+      <section aria-label="Maqolalar" className="wrap pb-[12vh]" aria-busy={loading}>
+        {/* ---------------------------------------------------------------- loading */}
+        {loading && (
+          <div aria-label="Yuklanmoqda" role="status">
+            <div className="panel grid lg:grid-cols-12 gap-0 overflow-hidden">
+              <div className="lg:col-span-7 skeleton aspect-[16/10] !rounded-none" />
+              <div className="lg:col-span-5 p-8 lg:p-12 space-y-4">
+                <div className="skeleton h-4 w-1/3" />
+                <div className="skeleton h-10 w-full" />
+                <div className="skeleton h-10 w-4/5" />
+                <div className="skeleton h-4 w-3/4" />
+              </div>
+            </div>
+            <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="space-y-4">
+                  <div className="skeleton aspect-[16/10]" />
+                  <div className="skeleton h-4 w-1/3" />
+                  <div className="skeleton h-7 w-5/6" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ---------------------------------------------------------------- featured */}
+        {!loading && featured && (
+          <Reveal>
+            <article className="panel post-card overflow-hidden relative">
+              <Link to={`/blog/${featured.slug}`} className="post-link grid lg:grid-cols-12 items-stretch !rounded-[var(--radius)]">
+                <div className="lg:col-span-7 p-3 sm:p-4">
+                  <PostCover
+                    src={featured.cover_image}
+                    title={postTitle(featured, lang)}
+                    category={featured.category}
+                    seed={featured.id}
+                    big
+                    className="!aspect-[16/10] lg:!aspect-auto lg:h-full lg:min-h-[26rem]"
+                  />
+                </div>
+                <div className="lg:col-span-5 p-6 sm:p-8 lg:p-12 flex flex-col justify-center gap-6">
+                  <p className="t-kicker flex items-center gap-2">
+                    <Star4 className="w-3 h-3 ink-cyan" />
+                    {filtering ? 'Natija' : 'Eng soʻnggi maqola'}
+                  </p>
+                  <h2 className="feature-title post-title-link">{uz(postTitle(featured, lang))}</h2>
+                  {postExcerpt(featured, lang) && <p className="t-lead clamp-3">{uz(postExcerpt(featured, lang))}</p>}
+                  <Meta post={featured} lang={lang} />
+                  <span className="link-arrow">
+                    Oʻqish <ArrowUpRight size={18} aria-hidden="true" />
+                  </span>
+                </div>
+              </Link>
+            </article>
+          </Reveal>
+        )}
+
+        {/* ---------------------------------------------------------------- grid */}
+        {!loading && rest.length > 0 && (
+          <>
+            <div className="mt-16 mb-8 flex items-center gap-4">
+              <h2 className="t-kicker">Barcha maqolalar</h2>
+              <span className="h-px flex-1" style={{ background: 'var(--line)' }} aria-hidden="true" />
+            </div>
+            <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
+              {rest.map((post, i) => (
+                <Reveal as="li" key={post.id} delay={(i % 3) * 0.08}>
+                  <article className="post-card h-full">
+                    <Link to={`/blog/${post.slug}`} className="post-link">
+                      <PostCover src={post.cover_image} title={postTitle(post, lang)} category={post.category} seed={post.id} />
+                      <div className="pt-5 flex flex-col gap-3">
+                        <Meta post={post} lang={lang} />
+                        <h3 className="t-h3 clamp-2 post-title-link">{uz(postTitle(post, lang))}</h3>
+                        {postExcerpt(post, lang) && <p className="t-body clamp-3">{uz(postExcerpt(post, lang))}</p>}
+                      </div>
+                    </Link>
+                  </article>
+                </Reveal>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {/* ---------------------------------------------------------------- empty */}
+        {!loading && filtered.length === 0 && (
+          <Reveal>
+            <div className="panel relative overflow-hidden px-6 py-16 sm:py-24 text-center">
+              <Star4 className="absolute -right-10 -top-10 w-56 h-56 opacity-[0.07] ink-cyan" />
+              <Star4 className="mx-auto w-8 h-8 ink-cyan" />
+              <p className="t-h3 mt-6">Maqolalar topilmadi</p>
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                {filtering ? (
+                  <button type="button" onClick={clear} className="btn btn-ghost">
+                    <X size={18} aria-hidden="true" /> Filtrni tozalash
+                  </button>
+                ) : (
+                  <Link to="/karyera-testi" className="btn btn-primary">
+                    Karyera testi <ArrowRight size={18} aria-hidden="true" />
+                  </Link>
+                )}
+              </div>
+            </div>
+          </Reveal>
+        )}
+      </section>
+    </div>
   );
 };
 

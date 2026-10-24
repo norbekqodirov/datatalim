@@ -1,6 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { X, Loader2, CheckCircle2, Phone } from 'lucide-react';
-import { sendToTelegram } from '../utils/telegram';
 import toast from 'react-hot-toast';
 import { submitLeadToAPI } from '../utils/api';
 import { trackEvent } from '../utils/pixel';
@@ -27,8 +26,6 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
     const nameRef = useRef<HTMLInputElement>(null);
     const phoneRef = useRef<HTMLInputElement>(null);
     const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Telegram parse_mode=HTML: foydalanuvchi kiritgan matn xabarni buzmasligi uchun
-    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     // 'Arizangiz qabul qilindi' dan keyingi avtomatik yopilish taymeri — komponent o'chsa ham qolib ketmasin
     useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
@@ -126,33 +123,11 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
             console.error("Failed to save lead to CRM", e);
         }
 
-        const emoji = type === 'enroll' ? '📝' : '💡';
-        const label = type === 'enroll' ? 'Kursga yozilish' : 'Bepul konsultatsiya';
-        const displayRef = crmData?.resolvedSourceRef || sourceRef || 'Organik';
-
-        let text = `${emoji} <b>${label} — DATA Ta'lim Stansiyasi</b>\n\n`;
-        text += `👤 <b>Ism:</b> ${esc(cleanName)}\n`;
-        text += `📞 <b>Telefon:</b> ${fullPhone}\n`;
-        text += `📚 <b>Kurs:</b> ${esc(courseName)}\n`;
-        if (extraInfo) {
-            text += `\n📊 <b>Qo'shimcha:</b>\n${esc(extraInfo)}\n`;
-        }
-        text += `🔗 <b>Manba (ref):</b> ${displayRef}\n`;
-        text += `\n🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ')}`;
-
-        const result = await sendToTelegram(text);
-        if (!result.success) {
-            // Telegram — faqat menejerlarga tezkor bildirishnoma kanali; lead CRM/Sheetsga
-            // allaqachon tushgan bo'lsa (crmData bor), bu yerda muvaffaqiyatsizlik ariza
-            // qabul qilinmagan degani emas, shuning uchun foydalanuvchiga xatolik ko'rsatmaymiz.
-            console.error('Telegram notification failed (lead is still saved to CRM):', result.error);
-        }
+        // Menejerlarga Telegram xabarini server /api/leads ichida o'zi yuboradi
 
         setLoading(false);
 
-        // Ariza CRM'ga yoki (CRM ishlamasa) menejerlar Telegram'iga yetib borgan bo'lsa — qabul qilingan.
-        // Aks holda foydalanuvchiga xato ko'rsatib qayta yuborishga majburlash dublikat yaratardi.
-        if (crmData || result.success) {
+        if (crmData) {
             trackEvent('Lead', { source: type, course: courseName });
             toast.success('Arizangiz qabul qilindi! Tez orada siz bilan bog\'lanamiz.', v2Toast());
             setSent(true);

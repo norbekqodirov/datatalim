@@ -279,14 +279,26 @@ app.post('/api/admin/login', loginLimiter, async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Generate JWT token valid for 8 hours
-        const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: '8h' });
+        // Generate JWT token valid for 8 hours (pv — parol izi: parol o'zgarsa eski tokenlar bekor bo'ladi)
+        const token = signAdminToken(user);
 
         res.json({ success: true, token });
     } catch (err) {
         serverError(res, err, 'login');
     }
 });
+
+// Parol xeshidan qisqa iz: tokenga yoziladi va har so'rovda bazadagi joriy parol bilan solishtiriladi
+const passwordVersion = (hash) => crypto.createHash('sha256').update(String(hash)).digest('hex').slice(0, 16);
+const signAdminToken = (user) => jwt.sign(
+    { id: user.id, username: user.username, pv: passwordVersion(user.password_hash) },
+    JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: '8h' }
+);
+// Token hali ham amaldagi admin va amaldagi parolga tegishlimi (o'chirilgan admin / almashtirilgan parol -> yo'q)
+const isTokenCurrent = (payload) => {
+    const row = payload && db.prepare('SELECT password_hash FROM admin_users WHERE id = ?').get(payload.id);
+    return !!row && payload.pv === passwordVersion(row.password_hash);
+};
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
@@ -299,7 +311,7 @@ const authenticateToken = (req, res, next) => {
     }
 
     jwt.verify(token, JWT_SECRET, { algorithms: [JWT_ALGORITHM] }, (err, user) => {
-        if (err) {
+        if (err || !isTokenCurrent(user)) {
             return res.status(403).json({ error: 'Invalid or expired token' });
         }
         req.user = user;
@@ -313,8 +325,7 @@ const isAdminRequest = (req) => {
     const token = authHeader && authHeader.split(' ')[1];
     if (!token) return false;
     try {
-        jwt.verify(token, JWT_SECRET, { algorithms: [JWT_ALGORITHM] });
-        return true;
+        return isTokenCurrent(jwt.verify(token, JWT_SECRET, { algorithms: [JWT_ALGORITHM] }));
     } catch {
         return false;
     }
@@ -512,6 +523,8 @@ app.post('/api/leads', leadsLimiter, (req, res) => {
             // Takroriy ariza: Sheets'ga qayta yozilmaydi, faqat muvaffaqiyat javobi qaytadi
             return res.json({ ...publicResult, duplicate: true });
         }
+
+        try { notifyNewLead(finalResult); } catch (e) { console.error('notifyNewLead:', e); } // xabar xatosi arizani buzmasin
 
         // Asynchronously save to Google Sheets; yozilmasa ariza yo'qolmasin — Telegram'ga zaxira xabar
         appendLeadToSheet(finalResult)
@@ -824,7 +837,8 @@ app.post('/api/admin/change-password', authenticateToken, passwordLimiter, async
         if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
         const hash = await bcrypt.hash(newPassword, 10);
         db.prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?').run(hash, user.id);
-        res.json({ success: true });
+        // Boshqa qurilmalardagi eski sessiyalar bekor bo'ladi; joriy sessiya uchun yangi token
+        res.json({ success: true, token: signAdminToken({ ...user, password_hash: hash }) });
     } catch (err) {
         serverError(res, err, 'change-password');
     }
@@ -1007,6 +1021,43 @@ const isSameSiteRequest = (req) => {
     } catch {
         return false;
     }
+};
+
+// Yangi ariza haqida menejerlarga Telegram xabari — brauzer emas, server o'zi yuboradi
+// (ariza bazaga tushgan zahoti; karyera testi arizalari ham shu yerdan xabar beradi)
+const LEAD_KIND = {
+    Kursga_Yozilish: ['📝', 'Kursga yozilish'],
+    Konsultatsiya: ['💡', 'Bepul konsultatsiya'],
+    Aloqa: ['📩', 'Aloqa formasi'],
+    Karyera_Testi: ['🧭', 'Karyera testi'],
+};
+const notifyNewLead = (lead) => {
+    if (!TG_BOT_TOKEN || !TG_CHAT_ID) return;
+    const now = Date.now();
+    if (now - telegramWindowStart > 60 * 60 * 1000) { telegramWindowStart = now; telegramWindowCount = 0; }
+    if (++telegramWindowCount > TELEGRAM_HOURLY_CAP) { console.warn('Telegram soatlik chegarasi oshdi — xabar yuborilmadi.'); return; }
+    lastAssignedManager = lastAssignedManager === 'A' ? 'B' : 'A';
+    const [emoji, label] = LEAD_KIND[lead.source_ref] || ['🎯', 'Yangi ariza (Marketing)'];
+    const ref = lead.resolvedSourceRef || lead.source_ref || 'Organik';
+    const text =
+        `${emoji} <b>${label} — DATA Ta'lim Stansiyasi</b>
+
+` +
+        `👤 <b>Ism:</b> ${escapeHtml(lead.name)}
+` +
+        `📞 <b>Telefon:</b> ${escapeHtml(lead.phone)}
+` +
+        `📚 <b>Kurs:</b> ${escapeHtml(lead.course_id || '—')}
+` +
+        `🔗 <b>Manba (ref):</b> ${escapeHtml(ref)}
+
+` +
+        `🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}
+` +
+        `👥 <b>Biriktirildi:</b> Menejer ${lastAssignedManager}`;
+    sendTelegramMessage(text)
+        .then((r) => { if (!r?.success) console.error('Lead Telegram xabari yuborilmadi:', r?.error); })
+        .catch((e) => console.error('Lead Telegram xatosi:', e?.message || e));
 };
 
 app.post('/api/notify-telegram', leadsLimiter, notifyLimiter, async (req, res) => {

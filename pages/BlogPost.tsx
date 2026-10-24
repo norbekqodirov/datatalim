@@ -1,10 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, Tag, Link2, Check } from 'lucide-react';
-import { SEO, articleSchema, SITE_URL } from '../components/SEO';
-import { useTheme } from '../store/ThemeContext';
-import { useLanguage } from '../i18n';
+import { ArrowLeft, ArrowRight, ArrowUpRight, Check, Link2, Share2 } from 'lucide-react';
+import { motion, useScroll, useSpring } from 'framer-motion';
+import toast from 'react-hot-toast';
 import DOMPurify from 'dompurify';
+import { SEO, articleSchema, SITE_URL } from '../components/SEO';
+import { useLanguage } from '../i18n';
+import { uz, useMotionReduced, v2Toast } from '../components/v2/utils';
+import { Mask } from '../components/v2/fx';
+import { PostCover } from '../components/v2/pages/blog/PostCover';
+import { Reveal } from '../components/v2/pages/blog/Reveal';
+import { Star4 } from '../components/v2/pages/blog/Star';
+import { renderPostMarkdown } from '../components/v2/pages/blog/markdown';
+import {
+  BlogPostData as Post,
+  postTitle,
+  postExcerpt,
+  postContent,
+  postDate,
+  formatDate,
+  readingMinutes,
+} from '../components/v2/pages/blog/blogUtils';
+import '../components/v2/v2.css';
+import '../components/v2/pages/blog/blog.css';
 
 // --- Blog HTML sanitizer (XSS himoyasi) ---
 // Faqat YouTube embed'lariga ruxsat; qolgan iframe'lar o'chiriladi.
@@ -32,178 +50,307 @@ const sanitizePostHtml = (html: string): string =>
     FORBID_TAGS: ['style', 'form', 'input', 'button', 'textarea', 'select'],
   });
 
-interface Post {
-  id: number;
-  slug: string;
-  title_uz: string;
-  title_ru: string;
-  title_en: string;
-  content_uz: string;
-  content_ru: string;
-  content_en: string;
-  excerpt_uz: string;
-  excerpt_ru: string;
-  excerpt_en: string;
-  cover_image: string;
-  category: string;
-  is_published: boolean;
-  created_at: string;
-  published_at?: string | null;
-  updated_at?: string | null;
-}
+const absUrl = (src?: string) => (src ? (src.startsWith('http') ? src : `${SITE_URL}${src}`) : undefined);
 
+// ---------------------------------------------------------------- reading progress
+const ReadingProgress: React.FC<{ target: React.RefObject<HTMLElement | null> }> = ({ target }) => {
+  const reduced = useMotionReduced();
+  const { scrollYProgress } = useScroll({ target, offset: ['start 0.75', 'end 0.35'] });
+  const smooth = useSpring(scrollYProgress, { stiffness: 140, damping: 30, mass: 0.3 });
+  return (
+    <motion.div
+      className="read-progress"
+      aria-hidden="true"
+      style={{ scaleX: reduced ? scrollYProgress : smooth }}
+    />
+  );
+};
+
+// ---------------------------------------------------------------- share
+const ShareBar: React.FC<{ title: string; className?: string }> = ({ title, className = '' }) => {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setCopied(false), 2200);
+      toast.success('Havola nusxalandi', v2Toast());
+    } catch {
+      toast.error('Nusxalab boʻlmadi. Havolani brauzer satridan oling.', v2Toast());
+    }
+  };
+  const share = async () => {
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title, url: window.location.href });
+      } catch (e) {
+        if ((e as DOMException)?.name !== 'AbortError') void copy();
+      }
+    } else {
+      void copy();
+    }
+  };
+
+  return (
+    <div className={`flex flex-wrap gap-3 ${className}`}>
+      <button type="button" onClick={share} className="btn btn-ghost !min-h-[44px] !px-5 !text-[0.9375rem]">
+        <Share2 size={17} aria-hidden="true" /> Ulashish
+      </button>
+      <button type="button" onClick={copy} className="btn btn-ghost !min-h-[44px] !px-5 !text-[0.9375rem]" aria-live="polite">
+        {copied ? <Check size={17} aria-hidden="true" style={{ color: 'var(--green-ink)' }} /> : <Link2 size={17} aria-hidden="true" />}
+        {copied ? 'Nusxalandi!' : 'Havolani nusxalash'}
+      </button>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------- page
 const BlogPost: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const { isDark } = useTheme();
   const { lang } = useLanguage();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [others, setOthers] = useState<Post[]>([]);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let alive = true; // maqola almashganda eski javob yangisini bosib ketmasin
     setLoading(true);
     fetch(`/api/posts/${encodeURIComponent(slug ?? '')}`)
       .then(res => (res.ok ? res.json() : null))
       // 404 javobi ({ error }) post sifatida qabul qilinmasligi kerak
-      .then(data => setPost(data && data.id && data.slug ? data : null))
-      .catch(() => setPost(null))
-      .finally(() => setLoading(false));
+      .then(data => { if (alive) setPost(data && data.id && data.slug ? data : null); })
+      .catch(() => { if (alive) setPost(null); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
   }, [slug]);
 
-  const getTitle = (p: Post) => {
-    if (lang === 'ru' && p.title_ru) return p.title_ru;
-    if (lang === 'en' && p.title_en) return p.title_en;
-    return p.title_uz;
-  };
+  // related / next: from the public list
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/posts?published=1')
+      .then(r => (r.ok ? r.json() : []))
+      .then(d => alive && setOthers(Array.isArray(d) ? d : []))
+      .catch(() => alive && setOthers([]));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
-  const getContent = (p: Post) => {
-    if (lang === 'ru' && p.content_ru) return p.content_ru;
-    if (lang === 'en' && p.content_en) return p.content_en;
-    return p.content_uz;
-  };
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [slug]);
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const html = useMemo(() => (post ? sanitizePostHtml(renderPostMarkdown(postContent(post, lang))) : ''), [post, lang]);
+  const minutes = useMemo(() => (post ? readingMinutes(postContent(post, lang)) : 1), [post, lang]);
+
+  const related = useMemo(() => {
+    if (!post) return [];
+    const time = (p: Post) => postDate(p)?.getTime() ?? 0;
+    return others
+      .filter(p => p.slug !== post.slug)
+      .sort((a, b) => Number(b.category === post.category) - Number(a.category === post.category) || time(b) - time(a))
+      .slice(0, 3);
+  }, [others, post]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center pt-32">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0061ff]" />
+      <div className="v2">
+        <div className="wrap pt-40 pb-[20vh]" role="status" aria-label="Yuklanmoqda">
+          <div className="skeleton h-4 w-40" />
+          <div className="skeleton h-16 w-full max-w-3xl mt-8" />
+          <div className="skeleton h-16 w-3/4 max-w-2xl mt-4" />
+          <div className="skeleton aspect-[16/8] mt-12" />
+        </div>
       </div>
     );
   }
 
   if (!post) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center pt-32 gap-4">
+      <div className="v2 relative min-h-[80svh] flex items-center overflow-hidden">
         <SEO title="Maqola topilmadi" noindex />
-        <h1 className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-          {lang === 'ru' ? 'Статья не найдена' : lang === 'en' ? 'Post not found' : 'Maqola topilmadi'}
-        </h1>
-        <Link to="/blog" className="text-[#0061ff] font-bold hover:underline">
-          {lang === 'ru' ? 'Назад к блогу' : lang === 'en' ? 'Back to blog' : 'Blogga qaytish'}
-        </Link>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'radial-gradient(50% 45% at 70% 30%, rgba(0,97,255,.16), transparent 70%)' }}
+        />
+        <div className="wrap relative pt-28 pb-20">
+          <p className="t-kicker flex items-center gap-3">
+            <Star4 className="w-3.5 h-3.5 ink-cyan" /> Xato 404
+          </p>
+          <h1 className="t-display mt-6 max-w-[14ch]">
+            Maqola <span className="ink-grad">topilmadi</span>.
+          </h1>
+          <div className="mt-10 flex flex-wrap gap-3">
+            <Link to="/blog" className="btn btn-primary">
+              <ArrowLeft size={18} aria-hidden="true" /> Blogga qaytish
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const title = getTitle(post);
-  const content = sanitizePostHtml(getContent(post));
+  const title = postTitle(post, lang);
+  const excerpt = postExcerpt(post, lang);
+  const d = postDate(post);
+  const image = absUrl(post.cover_image);
 
   return (
-    <>
+    <div className="v2">
       <SEO
         title={title}
-        description={(lang === 'ru' ? post.excerpt_ru : lang === 'en' ? post.excerpt_en : post.excerpt_uz) || post.excerpt_uz || undefined}
+        description={excerpt || post.excerpt_uz || undefined}
         type="article"
         url={`${SITE_URL}/blog/${post.slug}`}
-        image={post.cover_image ? (post.cover_image.startsWith('http') ? post.cover_image : `${SITE_URL}${post.cover_image}`) : undefined}
+        image={image}
         jsonLd={articleSchema({
           title,
           description: post.excerpt_uz || title,
           url: `${SITE_URL}/blog/${post.slug}`,
-          image: post.cover_image ? (post.cover_image.startsWith('http') ? post.cover_image : `${SITE_URL}${post.cover_image}`) : undefined,
+          image,
           datePublished: post.published_at || post.created_at || new Date().toISOString(),
           dateModified: post.updated_at || undefined,
         })}
       />
+      <ReadingProgress target={bodyRef} />
 
-      <article className="pt-32 pb-20 px-4">
-        <div className="max-w-3xl mx-auto">
-          {/* Back link */}
-          <Link
-            to="/blog"
-            className={`inline-flex items-center gap-2 text-sm font-bold mb-8 transition-colors ${
-              isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            <ArrowLeft size={16} />
-            {lang === 'ru' ? 'Назад к блогу' : lang === 'en' ? 'Back to blog' : 'Blogga qaytish'}
-          </Link>
+      <article>
+        {/* ---------------------------------------------------------------- header */}
+        <header className="relative overflow-hidden pt-32 sm:pt-40">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{ background: 'radial-gradient(55% 60% at 85% 10%, rgba(0,97,255,.14), transparent 70%)' }}
+          />
+          <div className="wrap relative">
+            <Link to="/blog" className="inline-flex items-center gap-2 min-h-[44px] -ml-1 pr-3 font-medium ink-2 hover:text-[color:var(--fg)] transition-colors">
+              <ArrowLeft size={18} aria-hidden="true" /> Blogga qaytish
+            </Link>
 
-          {/* Cover image */}
-          {post.cover_image && (
-            <div className="rounded-3xl overflow-hidden mb-8">
-              <img src={post.cover_image} alt={title} className="w-full aspect-video object-cover" />
-            </div>
-          )}
+            <p className="mono mt-8 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] ink-3">
+              {post.category && <span className="ink-cyan uppercase tracking-[0.12em]">{uz(post.category)}</span>}
+              {post.category && <span className="meta-dot" aria-hidden="true" />}
+              {d && <time dateTime={d.toISOString()}>{formatDate(d, lang)}</time>}
+              {d && <span className="meta-dot" aria-hidden="true" />}
+              <span>{minutes} daqiqalik oʻqish</span>
+            </p>
 
-          {/* Header */}
-          <div className={`rounded-3xl p-8 mb-8 ${
-            isDark
-              ? 'bg-slate-800/60 backdrop-blur-xl border border-white/10'
-              : 'bg-white shadow-sm'
-          }`}>
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-              {post.category && (
-                <span className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full ${
-                  isDark ? 'bg-blue-500/15 text-[#60efff]' : 'bg-blue-50 text-[#0061ff]'
-                }`}>
-                  <Tag size={12} />
-                  {post.category}
-                </span>
-              )}
-              <span className={`flex items-center gap-1 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                <Calendar size={14} />
-                {new Date(post.created_at).toLocaleDateString(lang === 'ru' ? 'ru-RU' : lang === 'en' ? 'en-US' : 'uz-UZ')}
-              </span>
-            </div>
-            <h1 className={`text-3xl md:text-4xl font-black mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {title}
-            </h1>
-
-            {/* Share */}
-            <button
-              onClick={copyLink}
-              className={`inline-flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all ${
-                isDark
-                  ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {copied ? <Check size={16} className="text-green-500" /> : <Link2 size={16} />}
-              {copied
-                ? (lang === 'ru' ? 'Скопировано!' : lang === 'en' ? 'Copied!' : 'Nusxalandi!')
-                : (lang === 'ru' ? 'Копировать ссылку' : lang === 'en' ? 'Copy link' : 'Havolani nusxalash')
-              }
-            </button>
+            <Mask className="mt-6">
+              <h1 className="post-h1 max-w-[22ch]">{uz(title)}</h1>
+            </Mask>
+            {excerpt && <p className="t-lead mt-6 max-w-[42rem]">{uz(excerpt)}</p>}
+            <ShareBar title={title} className="mt-8" />
           </div>
 
-          {/* Content */}
-          <div
-            className={`rounded-3xl p-8 prose prose-lg max-w-none ${
-              isDark
-                ? 'bg-slate-800/60 backdrop-blur-xl border border-white/10 prose-invert'
-                : 'bg-white shadow-sm'
-            }`}
-            dangerouslySetInnerHTML={{ __html: content }}
-          />
+          <div className="wrap relative mt-12">
+            <Reveal y={36}>
+              <PostCover
+                src={post.cover_image}
+                title={title}
+                category={post.category}
+                seed={post.id}
+                big
+                className="!aspect-[16/9] sm:!aspect-[21/9] !rounded-[var(--radius)]"
+              />
+            </Reveal>
+          </div>
+        </header>
+
+        {/* ---------------------------------------------------------------- body */}
+        <div className="wrap pt-14 sm:pt-20 pb-16">
+          <div ref={bodyRef} className="prose-v2" dangerouslySetInnerHTML={{ __html: html }} />
+          <Star4 className="prose-end-star" />
+
+          <div className="mx-auto mt-12 max-w-[68ch] hairline pt-8 flex flex-wrap items-center justify-between gap-4">
+            <p className="t-kicker">Maqola yoqdimi?</p>
+            <ShareBar title={title} />
+          </div>
         </div>
       </article>
-    </>
+
+      {/* ---------------------------------------------------------------- related */}
+      {related.length > 0 && (
+        <section aria-labelledby="related-title" className="pb-[10vh]">
+          <div className="wrap">
+            <div className="hairline pt-10 mb-10 flex items-end justify-between gap-6">
+              <div>
+                <p className="t-kicker mb-4">Keyingi maqolalar</p>
+                <h2 id="related-title" className="t-h2">Yana <span className="ink-grad">oʻqing</span></h2>
+              </div>
+              <div className="hidden sm:block">
+                <Link to="/blog" className="link-arrow min-h-[44px]">
+                  Barcha maqolalar <ArrowUpRight size={18} aria-hidden="true" />
+                </Link>
+              </div>
+            </div>
+            <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
+              {related.map((p, i) => (
+                <Reveal as="li" key={p.id} delay={i * 0.08}>
+                  <article className="post-card h-full">
+                    <Link to={`/blog/${p.slug}`} className="post-link">
+                      <PostCover src={p.cover_image} title={postTitle(p, lang)} category={p.category} seed={p.id} />
+                      <div className="pt-5 flex flex-col gap-3">
+                        <p className="mono text-[0.8125rem] ink-3">
+                          {formatDate(postDate(p), lang)} <span className="meta-dot mx-2 align-middle" aria-hidden="true" />
+                          {readingMinutes(postContent(p, lang))} daqiqa
+                        </p>
+                        <h3 className="t-h3 clamp-2 post-title-link">{uz(postTitle(p, lang))}</h3>
+                      </div>
+                    </Link>
+                  </article>
+                </Reveal>
+              ))}
+            </ul>
+            <div className="mt-8 sm:hidden">
+              <Link to="/blog" className="link-arrow min-h-[44px]">
+                Barcha maqolalar <ArrowUpRight size={18} aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ---------------------------------------------------------------- CTA: career test */}
+      <section aria-labelledby="post-cta-title" className="pb-[12vh]">
+        <div className="wrap">
+          <Reveal>
+            <div className="panel relative overflow-hidden p-8 sm:p-12 lg:p-16 grid lg:grid-cols-12 gap-10 items-center">
+              <Star4 className="pointer-events-none absolute -right-16 -bottom-20 w-80 h-80 opacity-[0.08] ink-cyan" />
+              <div className="lg:col-span-7 relative">
+                <p className="t-kicker mb-6">Karyera laboratoriyasi</p>
+                <h2 id="post-cta-title" className="t-h2">
+                  Qaysi kasb sizga mos — <span className="ink-grad">maʼlumot</span> aytib beradi.
+                </h2>
+                <p className="t-lead mt-6 max-w-lg">
+                  {uz("Holland RIASEC metodikasi asosidagi test qiziqishlaringizni olti o'lchovda baholaydi va sizga mos yo'nalishni ko'rsatadi.")}
+                </p>
+                <Link to="/karyera-testi" className="btn btn-primary mt-9">
+                  Testni boshlash <ArrowRight size={18} aria-hidden="true" />
+                </Link>
+              </div>
+              <ul className="lg:col-span-5 relative grid grid-cols-3 gap-px rounded-2xl overflow-hidden" style={{ background: 'var(--line)' }}>
+                {[
+                  ['≈12', 'daqiqa'],
+                  ['6', 'oʻlchov'],
+                  ['0', 'soʻm'],
+                ].map(([n, l]) => (
+                  <li key={l} className="p-4 sm:p-5" style={{ background: 'var(--bg-2)' }}>
+                    <span className="block mono text-2xl" style={{ fontWeight: 500 }}>{n}</span>
+                    <span className="block text-sm ink-3 mt-1">{l}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+    </div>
   );
 };
 

@@ -1,0 +1,143 @@
+/* ==========================================================================
+   v2 Til kurslari. Scoped under .v2, tokens from v2.css. Transform/opacity motion only.
+   ========================================================================== */
+
+.v2 .lang-h1 {
+  font-size: clamp(2.5rem, 7.4vw, 6.4rem);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+/* hero tiles: the four languages as typographic cards */
+.v2 .lang-tile {
+  --acc: var(--blue-ink);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 11.5rem;
+  padding: 1.1rem 1.25rem 1.2rem;
+  border-radius: 26px;
+  background: color-mix(in srgb, var(--bg-2) 82%, transparent);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  color: var(--fg);
+  transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.v2 .lang-tile:hover { border-color: var(--acc); }
+.v2 .lang-tile .glyph {
+  position: absolute;
+  right: 0.9rem;
+  top: -0.05em;
+  font-size: clamp(4.6rem, 8vw, 7rem);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--acc);
+  opacity: 0.9;
+  transition: transform 0.6s var(--ease);
+  pointer-events: none;
+}
+.v2 .lang-tile:hover .glyph { transform: translate3d(0, 6px, 0) scale(1.05); }
+
+/* course cards */
+.v2 .lang-card {
+  --acc: var(--blue-ink);
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  transform-origin: 50% 0;
+}
+.v2 .lang-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--acc);
+  opacity: 0.85;
+}
+.v2 .lang-card .glow {
+  position: absolute;
+  width: 26rem;
+  height: 26rem;
+  right: -9rem;
+  top: -9rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--acc) 34%, transparent), transparent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.v2 .lang-card .big-glyph {
+  position: absolute;
+  right: 1.5rem;
+  bottom: -0.2em;
+  font-size: clamp(9rem, 18vw, 17rem);
+  line-height: 0.9;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  color: transparent;
+  -webkit-text-stroke: 1.5px color-mix(in srgb, var(--acc) 70%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+.v2 .lang-name {
+  font-size: clamp(2.3rem, 5.6vw, 4.75rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-weight: 700;
+  overflow-wrap: break-word;
+}
+.v2 .lang-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--fg);
+}
+.v2 .lang-level i { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--acc); display: inline-block; flex: none; }
+
+@media (min-width: 1024px) and (min-height: 640px) {
+  .v2 .lang-stack > .lang-card {
+    position: sticky;
+    top: calc(92px + var(--i, 0) * 22px);
+    min-height: min(31rem, 68vh);
+  }
+  .v2 .lang-stack > .lang-card + .lang-card { margin-top: 2.5rem; }
+}
+
+/* mock-test / event rows */
+.v2 .icon-tile {
+  width: 4rem;
+  height: 4rem;
+  flex: none;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-3);
+  color: var(--cyan-ink);
+  border: 1px solid var(--line);
+  transition: background-color 0.25s var(--ease), color 0.25s var(--ease), transform 0.4s var(--ease);
+}
+.v2 .row-card { transition: border-color 0.25s var(--ease); }
+.v2 .row-card:hover { border-color: var(--line-2); }
+.v2 .row-card:hover .icon-tile { background: var(--blue); color: #fff; transform: rotate(-6deg); }
+.v2 .event-row:hover .icon-tile { background: var(--blue); color: #fff; transform: rotate(-6deg); }
+
+@media (max-width: 1023.98px) {
+  .v2 .lang-card .big-glyph { top: 0.6rem; bottom: auto; right: 1rem; font-size: 5.5rem; opacity: 0.55; }
+}

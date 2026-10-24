@@ -141,7 +141,7 @@ function App() {
       <Router>
         <PixelTracker />
         <ScrollProgress />
-        <Toaster position="top-right" />
+        <Toaster position="top-right" toastOptions={{ className: 'app-toast' }} />
         <BackToTop />
         <GlobalSearch />
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#000000]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0061ff]"></div></div>}>
