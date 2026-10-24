@@ -198,7 +198,7 @@ app.use(cors((req, callback) => {
 // Ochiq (autentifikatsiyasiz) POST yo'llari uchun kichik limit; katta (5 MB) limit faqat admin kontenti uchun.
 const jsonSmall = express.json({ limit: '32kb' });
 const jsonLarge = express.json({ limit: '5mb' });
-const SMALL_BODY_PATHS = /^\/api\/(leads|career-test-result|notify-telegram|track\/click|analytics\/track|admin\/login|admin\/change-password)\/?$/;
+const SMALL_BODY_PATHS = /^\/api\/(leads|career-test-result|notify-telegram|track\/click|analytics\/track|admin\/login|admin\/change-password)\/?$/i; // Express yo'llari katta-kichik harfni farqlamaydi
 app.use((req, res, next) => (SMALL_BODY_PATHS.test(req.path) ? jsonSmall : jsonLarge)(req, res, next));
 app.use((req, res, next) => { if (req.body === undefined) req.body = {}; next(); }); // Express 5: body yo'q bo'lsa undefined
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
