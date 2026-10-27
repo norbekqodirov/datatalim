@@ -1,6 +1,5 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion, useScroll, useTransform } from 'framer-motion';
 import { Instagram, Send, ArrowUpRight, ArrowRight, Sparkles, MapPin, Mail, Clock } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
@@ -25,12 +24,8 @@ export const FooterV2: React.FC = () => {
   const { t, tField } = useLanguage();
   const year = new Date().getFullYear();
   const reduced = useMotionReduced();
-  const ref = useRef<HTMLElement>(null);
   // bosh sahifada yakuniy CTA — aloqa boʻlimi; footer bandi takrorlanmasin
   const showCta = useLocation().pathname !== '/';
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end end'] });
-  const markY = useTransform(scrollYProgress, [0, 1], ['28%', '0%']);
-  const markOpacity = useTransform(scrollYProgress, [0.35, 1], [0.15, 1]);
 
   const pages = [
     { to: '/kurslar', name: t('nav.courses') },
@@ -40,17 +35,18 @@ export const FooterV2: React.FC = () => {
     { to: '/jamoa', name: t('nav.team') },
     { to: '/blog', name: t('nav.blog') || 'Blog' },
   ];
-  const linkCls = 'foot-link inline-flex items-center min-h-[44px]';
+  // mobilda 44px teginish maydoni; sichqoncha bilan ixchamroq ritm
+  const linkCls = 'foot-link inline-flex items-center min-h-[44px] lg:min-h-[34px]';
 
   return (
-    <footer ref={ref} className="v2 relative overflow-hidden" style={{ position: 'relative', borderTop: '1px solid var(--line)' }}>
+    <footer className="v2 relative overflow-hidden" style={{ position: 'relative', borderTop: '1px solid var(--line)' }}>
       {/* soft brand glow rising from the bottom edge */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[60%]"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[70%]"
         style={{ background: 'radial-gradient(60% 80% at 50% 100%, color-mix(in srgb, var(--blue) 16%, transparent), transparent 70%)' }}
       />
-      <div className="wrap relative pt-16 sm:pt-20 pb-10">
+      <div className="wrap relative pt-14 sm:pt-16 pb-8">
         {/* 1 — the one action that matters */}
         {showCta && (
           <div className="foot-cta grid gap-6 lg:gap-10 lg:grid-cols-12 lg:items-center mb-14 sm:mb-16">
@@ -75,12 +71,12 @@ export const FooterV2: React.FC = () => {
         )}
 
         {/* 2 — directory */}
-        <div className="grid gap-x-10 gap-y-12 grid-cols-2 lg:grid-cols-12">
+        <div className="grid gap-x-10 gap-y-10 grid-cols-2 lg:grid-cols-12">
           <div className="col-span-2 lg:col-span-4">
             <Link to="/" aria-label="DATA Taʼlim Stansiyasi — bosh sahifa" className="inline-flex items-center min-h-[44px]" style={{ color: 'var(--fg)' }}>
               <Logo width={150} />
             </Link>
-            <p className="t-body mt-6 max-w-sm">
+            <p className="t-body mt-5 max-w-sm">
               Dasturlash, sunʼiy intellekt, media, dizayn va moliya boʻyicha zamonaviy oʻquv markazi. Urganch, 2019-yildan beri.
             </p>
             <ul className="mt-6 flex flex-wrap gap-2">
@@ -121,7 +117,7 @@ export const FooterV2: React.FC = () => {
                 </li>
               ))}
               <li>
-                <Link to="/kurslar" className="link-arrow min-h-[44px]">Barcha kurslar <ArrowUpRight size={16} aria-hidden="true" /></Link>
+                <Link to="/kurslar" className="link-arrow min-h-[44px] lg:min-h-[34px] mt-1">Barcha kurslar <ArrowUpRight size={16} aria-hidden="true" /></Link>
               </li>
             </ul>
           </nav>
@@ -152,23 +148,8 @@ export const FooterV2: React.FC = () => {
           </div>
         </div>
 
-        {/* 3 — oversized wordmark: rises into place as the page ends */}
-        <motion.div
-          className="mt-16 sm:mt-20 select-none pointer-events-none"
-          aria-hidden="true"
-          style={{
-            color: 'var(--bg-3)',
-            y: reduced ? 0 : markY,
-            opacity: reduced ? 1 : markOpacity,
-            WebkitMaskImage: 'linear-gradient(180deg, #000 55%, transparent 100%)',
-            maskImage: 'linear-gradient(180deg, #000 55%, transparent 100%)',
-          }}
-        >
-          <Logo width={0} className="w-full h-auto" />
-        </motion.div>
-
-        {/* 4 — fine print */}
-        <div className="mt-6 pt-6 flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-sm ink-3" style={{ borderTop: '1px solid var(--line)' }}>
+        {/* 3 — fine print */}
+        <div className="mt-12 sm:mt-14 pt-5 flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-sm ink-3" style={{ borderTop: '1px solid var(--line)' }}>
           <span>© {year} DATA Taʼlim Stansiyasi. {t('footer.rights')}</span>
           <span className="flex flex-wrap items-center gap-x-5 gap-y-1">
             <button
