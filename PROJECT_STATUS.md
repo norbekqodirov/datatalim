@@ -74,7 +74,7 @@
 - **Arizalar (Leads)** sahifasi: `pages/admin/ManageLeads.tsx`. API: `GET /api/leads` (q, source, status, from, to, limit, offset) va `PATCH /api/leads/:id` (status, notes).
 
 ### Commit holati
-Hammasi `7e4e8f4` da commit qilingan (2026-10-27). Push qilinmagan.
+Hammasi `7e4e8f4` da commit qilingan (2026-10-27) va GitHub `origin/redesign-v2` ga push qilingan. `main` ga hali merge qilinmagan.
 
 ### Keyingi ishlar (backlog)
 - [ ] Egasi landingni ko'rib, fikr bersin. Qaysi bo'lim hali yoqmasa, o'shandan davom etiladi.
