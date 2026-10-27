@@ -3,7 +3,7 @@
 > **AI uchun:** ish boshlashdan oldin shu faylni o'qi, keyin faqat kerakli fayllarni och.
 > Bu fayl **joriy holat** haqida: uni ustidan yangila, tarixni git log saqlaydi.
 > Har ish bosqichi tugagach §6 (Jurnal) ga 1–3 qator qo'sh va §5 (Keyingi ishlar) ni yangila.
-> Oxirgi yangilanish: **2026-10-27** · branch `redesign-v2` · oxirgi commit `c4d7ea7` (undan keyin ko'p o'zgarish commit qilinmagan, §5 ga qara)
+> Oxirgi yangilanish: **2026-10-27** · branch `redesign-v2` · oxirgi commit `7e4e8f4`
 
 ---
 
@@ -73,8 +73,8 @@
 - Barcha Manage* sahifalari, Settings va Login yangilandi.
 - **Arizalar (Leads)** sahifasi: `pages/admin/ManageLeads.tsx`. API: `GET /api/leads` (q, source, status, from, to, limit, offset) va `PATCH /api/leads/:id` (status, notes).
 
-### Commit qilinmagan o'zgarishlar (2026-10-27)
-v2 landing ritm pass, Directions «metro», Campus turi, Voices, admin qayta dizayni, ManageLeads, reset-admin-password skripti, `scripts/qa/`, ushbu fayl. **Commit taklif qilinishi kerak.**
+### Commit holati
+Hammasi `7e4e8f4` da commit qilingan (2026-10-27). Push qilinmagan.
 
 ### Keyingi ishlar (backlog)
 - [ ] Egasi landingni ko'rib, fikr bersin. Qaysi bo'lim hali yoqmasa, o'shandan davom etiladi.
