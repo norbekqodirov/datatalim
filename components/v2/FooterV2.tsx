@@ -13,7 +13,7 @@ const SOCIAL = [
 ];
 
 const Heading: React.FC<{ children: React.ReactNode; id?: string }> = ({ children, id }) => (
-  <p id={id} className="t-kicker pt-4 mb-4 flex items-center gap-2.5" style={{ borderTop: '1px solid var(--line-2)' }}>
+  <p id={id} className="t-kicker mb-4 flex items-center gap-2.5">
     <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rotate-45" style={{ background: 'var(--cyan-ink)' }} />
     {children}
   </p>
@@ -138,7 +138,10 @@ export const FooterV2: React.FC = () => {
               </a>
               <span className="flex items-start gap-2.5 py-2">
                 <MapPin size={16} className="shrink-0 mt-1 ink-3" aria-hidden="true" />
-                {uz(tField(siteContent.contactAddress))}
+                <span>
+                  {uz(tField(siteContent.contactAddress))}
+                  {siteContent.contactLandmark && <span className="block ink-3">{uz(tField(siteContent.contactLandmark))}</span>}
+                </span>
               </span>
               <span className="flex items-start gap-2.5 py-2">
                 <Clock size={16} className="shrink-0 mt-1 ink-3" aria-hidden="true" />

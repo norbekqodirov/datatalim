@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, MapPin, Phone, Mail, Clock, Loader2, Check, Send } from 'lucide-react';
+import { Plus, Loader2, Check, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
@@ -272,22 +272,6 @@ export const ContactV2: React.FC = () => {
         </div>
       </div>
 
-      <dl className="wrap relative z-10 mt-16 pt-10 hairline grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
-        {[
-          { icon: MapPin, k: 'Manzil', v: `${uz(tField(siteContent.contactAddress))}. ${uz(tField(siteContent.contactLandmark))}` },
-          { icon: Clock, k: 'Ish vaqti', v: uz(tField(siteContent.contactSchedule)) },
-          { icon: Phone, k: 'Telefon', v: siteContent.contactPhone, href: `tel:${siteContent.contactPhone.replace(/[^\d+]/g, '')}` },
-          { icon: Mail, k: 'Email', v: siteContent.contactEmail, href: `mailto:${siteContent.contactEmail}` },
-        ].map(({ icon: Icon, k, v, href }) => (
-          <div key={k} className="flex gap-4">
-            <Icon size={20} className="shrink-0 mt-1 ink-blue" aria-hidden="true" />
-            <div>
-              <dt className="t-kicker !text-[0.75rem]">{k}</dt>
-              <dd className="mt-1 leading-relaxed">{href ? <a href={href} className="inline-flex items-center min-h-[44px] -my-2.5 hover:underline underline-offset-4">{v}</a> : v}</dd>
-            </div>
-          </div>
-        ))}
-      </dl>
     </section>
   );
 };
