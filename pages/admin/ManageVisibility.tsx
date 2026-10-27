@@ -1,14 +1,48 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { motion } from 'framer-motion';
-import { Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useTheme } from '../../store/ThemeContext';
-import { useState } from 'react';
+import { PageHeader, Switch, Spinner } from '../../components/admin/ui/kit';
+
+const GROUPS: { title: string; desc: string; items: { key: string; label: string; desc: string }[] }[] = [
+  {
+    title: 'Bosh sahifa',
+    desc: 'Mehmon birinchi ko\'radigan qismlar.',
+    items: [
+      { key: 'hero', label: 'Bosh qism (Hero)', desc: 'Birinchi ekrandagi sarlavha va asosiy tugma' },
+      { key: 'about', label: 'Biz haqimizda', desc: 'Markaz va asoschi haqida qisqa blok' },
+      { key: 'tourVideo', label: 'DATAga sayohat (video)', desc: 'Markaz bo\'ylab tur videosi' },
+    ],
+  },
+  {
+    title: 'Taʼlim',
+    desc: 'Kurslar va ularni tanlashga yordam beruvchi qismlar.',
+    items: [
+      { key: 'courses', label: 'Kurslar', desc: 'Yoʻnalishlar va kurs kartochkalari' },
+      { key: 'careerTest', label: 'Karyera testi', desc: 'Mos kasbni aniqlovchi interaktiv test' },
+      { key: 'testimonials', label: 'Oʻquvchilar fikri', desc: 'Video sharhlar (YouTube Shorts)' },
+    ],
+  },
+  {
+    title: 'Markaz haqida',
+    desc: 'Ishonch uyg\'otuvchi va tanishtiruvchi qismlar.',
+    items: [
+      { key: 'facilities', label: 'Sharoitlar', desc: 'Oʻquv xonalari va qulayliklar' },
+      { key: 'team', label: 'Jamoa', desc: 'Ustozlar va xodimlar' },
+      { key: 'gallery', label: 'Galereya', desc: 'Markazdan olingan rasmlar' },
+    ],
+  },
+  {
+    title: 'Yordam va aloqa',
+    desc: 'Savollarga javob va bogʻlanish.',
+    items: [
+      { key: 'faq', label: 'Koʻp beriladigan savollar (FAQ)', desc: 'Savol-javoblar bloki' },
+      { key: 'contact', label: 'Aloqa', desc: 'Manzil, telefon va xarita' },
+    ],
+  },
+];
 
 export default function ManageVisibility() {
   const { visibility, toggleSectionVisibility } = useStore();
-  const { isDark } = useTheme();
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
   const handleToggle = async (key: string) => {
@@ -23,68 +57,45 @@ export default function ManageVisibility() {
     }
   };
 
-  const sections = [
-    { key: 'hero', label: 'Bosh qism (Hero)' },
-    { key: 'about', label: 'Biz haqimizda' },
-    { key: 'tourVideo', label: 'DATAga Sayohat (Video)' },
-    { key: 'courses', label: 'Kurslar' },
-    { key: 'testimonials', label: "O'quvchilar Fikri" },
-    { key: 'careerTest', label: 'Karyera Testi' },
-    { key: 'facilities', label: 'Sharoitlar' },
-    { key: 'team', label: 'Jamoa' },
-    { key: 'faq', label: "Ko'p beriladigan savollar (FAQ)" },
-    { key: 'gallery', label: 'Galereya' },
-    { key: 'contact', label: 'Aloqa' },
-  ];
+  const all = GROUPS.flatMap(g => g.items);
+  const visibleCount = all.filter(s => visibility[s.key as keyof typeof visibility]).length;
 
   return (
-    <div className="space-y-8">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className={`text-4xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Bo'limlar Ko'rinishi</h1>
-        <p className={`font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Saytning qaysi qismlari ko'rinishini boshqaring.</p>
-      </motion.div>
+    <div>
+      <PageHeader
+        kicker="Tizim"
+        title="Bo'limlar ko'rinishi"
+        sub="Saytning qaysi qismlari mehmonlarga ko'rinishini boshqaring. O'zgarish darhol saqlanadi."
+        actions={<span className="a-badge is-blue">{visibleCount} / {all.length} ko&apos;rinadi</span>}
+      />
 
-      <div className={`rounded-[2.5rem] p-8 border shadow-sm ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-white border-slate-100'}`}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {sections.map(({ key, label }) => {
-            const isVisible = visibility[key as keyof typeof visibility];
-            return (
-              <div
-                key={key}
-                className={`flex items-center justify-between p-6 rounded-3xl border-2 transition-all duration-300 ${isVisible
-                    ? isDark ? 'border-blue-900/50 bg-blue-900/20' : 'border-blue-100 bg-blue-50/50'
-                    : isDark ? 'border-white/5 bg-slate-800' : 'border-slate-100 bg-slate-50'
-                  }`}
-              >
-                <div>
-                  <h3 className={`font-bold text-lg ${isVisible ? (isDark ? 'text-blue-300' : 'text-blue-900') : (isDark ? 'text-slate-400' : 'text-slate-500')}`}>{label}</h3>
-                  <p className={`text-sm font-medium mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {isVisible ? "Saytda ko'rinib turibdi" : 'Yashirilgan'}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleToggle(key)}
-                  disabled={savingKey === key}
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-sm ${savingKey === key ? 'opacity-70 cursor-not-allowed ' : ''
-                    }${isVisible
-                      ? isDark
-                        ? 'bg-[#0061ff] text-white hover:bg-blue-600 shadow-blue-900/50'
-                        : 'bg-[#0061ff] text-white hover:bg-blue-700 shadow-blue-500/30'
-                      : isDark
-                        ? 'bg-slate-700 text-slate-400 border border-slate-600 hover:bg-slate-600'
-                        : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-100'
-                    }`}
-                >
-                  {savingKey === key ? (
-                    <div className={`animate-spin rounded-full h-6 w-6 border-b-2 ${isVisible ? 'border-white' : (isDark ? 'border-slate-400' : 'border-[#0061ff]')}`}></div>
-                  ) : (
-                    isVisible ? <Eye size={24} /> : <EyeOff size={24} />
-                  )}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+      <div className="grid gap-4">
+        {GROUPS.map(group => (
+          <section key={group.title} className="a-card" aria-labelledby={`vis-${group.title}`}>
+            <div className="px-5 pt-4 pb-3" style={{ borderBottom: '1px solid var(--a-line)' }}>
+              <h2 id={`vis-${group.title}`} className="a-h2">{group.title}</h2>
+              <p className="a-sub" style={{ fontSize: '.8rem' }}>{group.desc}</p>
+            </div>
+            <ul>
+              {group.items.map(({ key, label, desc }, i) => {
+                const isVisible = !!visibility[key as keyof typeof visibility];
+                const busy = savingKey === key;
+                return (
+                  <li key={key} className="flex items-center gap-4 px-5 py-2.5" style={i > 0 ? { borderTop: '1px solid var(--a-line)' } : undefined}>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-[.95rem]">{label}</div>
+                      <div className="a-sub" style={{ fontSize: '.78rem' }}>{desc}</div>
+                    </div>
+                    <span className={`a-badge hidden sm:inline-flex ${isVisible ? 'is-green' : ''}`}>{isVisible ? 'Ko\'rinadi' : 'Yashirin'}</span>
+                    {busy ? <span className="a-switch-hit a-muted"><Spinner size={18} /></span> : (
+                      <Switch checked={isVisible} onChange={() => handleToggle(key)} label={`${label}: ${isVisible ? 'yashirish' : 'ko\'rsatish'}`} disabled={savingKey !== null} />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
       </div>
     </div>
   );

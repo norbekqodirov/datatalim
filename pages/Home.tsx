@@ -9,7 +9,6 @@ import { CareerLab } from '../components/v2/CareerLab';
 import { Campus } from '../components/v2/Campus';
 import { Voices, TeamStrip } from '../components/v2/People';
 import { FaqV2, ContactV2 } from '../components/v2/Closing';
-import { StarSeam } from '../components/v2/fx';
 import { Gallery } from '../components/v2/Gallery';
 import '../components/v2/v2.css';
 
@@ -24,40 +23,22 @@ export default function Home() {
         title="IT va zamonaviy kasblar kurslari — Urganch"
         description="DATA Taʼlim Stansiyasi — Urganchdagi dasturlash, sunʼiy intellekt, media, dizayn va moliya boʻyicha zamonaviy oʻquv markazi. Bepul karyera testi va konsultatsiya."
       />
+      {/* hikoya: va'da → isbot → nima o'rganiladi → qanday → qaysi biri menga mos → qayerda → kimlar bilan → savollar → harakat */}
       {v.hero && <HeroSignal />}
-      {v.about && (
-        <>
-          <Manifesto />
-          <ProofBento />
-        </>
-      )}
+      {v.about && <ProofBento />}
       {v.courses && (
         <>
           <CourseMarquee />
           <Directions />
         </>
       )}
-      {v.careerTest && (
-        <>
-          <StarSeam />
-          <CareerLab />
-        </>
-      )}
-      {(v.facilities || v.tourVideo) && (
-        <>
-          <StarSeam />
-          <Campus />
-        </>
-      )}
+      {v.about && <Manifesto />}
+      {v.careerTest && <CareerLab />}
+      {(v.facilities || v.tourVideo) && <Campus />}
       {v.gallery && <Gallery />}
       {v.testimonials && <Voices />}
       {v.team && <TeamStrip />}
-      {v.faq && (
-        <>
-          <StarSeam />
-          <FaqV2 />
-        </>
-      )}
+      {v.faq && <FaqV2 />}
       {v.contact && <ContactV2 />}
       <MobileCtaBar />
     </div>

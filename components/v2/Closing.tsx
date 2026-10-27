@@ -1,6 +1,6 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
-import { motion, AnimatePresence, useScroll } from 'framer-motion';
-import { Plus, MapPin, Phone, Mail, Clock, Loader2, Check } from 'lucide-react';
+import React, { useEffect, useId, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, MapPin, Phone, Mail, Clock, Loader2, Check, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
@@ -8,7 +8,8 @@ import { submitLeadToAPI } from '../../utils/api';
 import { trackEvent } from '../../utils/pixel';
 import { uz, v2Toast } from './utils';
 import { StartSteps } from './Sales';
-import { Mask, Star3D } from './fx';
+import { Mask } from './fx';
+import { openConsult } from './consult';
 
 // ------------------------------------------------------------------ FAQ
 interface FAQItem {
@@ -52,11 +53,25 @@ export const FaqV2: React.FC = () => {
   const a = (f: FAQItem) => uz((f[`answer_${lang}` as keyof FAQItem] as string) || f.answer_uz);
 
   return (
-    <section className="relative py-[12vh]" aria-labelledby="faq-title">
+    <section className="relative sec" aria-labelledby="faq-title">
       <div className="wrap grid lg:grid-cols-12 gap-10">
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-4 lg:sticky lg:top-28 self-start">
           <p className="t-kicker mb-6">09 — Savollar</p>
           <Mask><h2 id="faq-title" className="t-h2">Koʻp beriladigan savollar</h2></Mask>
+          {/* javob topilmasa — keyingi qadam shu yerning oʻzida */}
+          <div className="faq-help panel mt-10">
+            <span className="faq-bubble" aria-hidden="true">💬</span>
+            <p className="font-semibold text-[1.1rem] tracking-[-0.01em]">Javobini topmadingizmi?</p>
+            <p className="t-body mt-2 !text-[0.95rem]">Savolingizni yozing — maslahatchimiz tushuntirib beradi.</p>
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <button type="button" className="btn btn-primary" onClick={() => openConsult()}>
+                Bepul konsultatsiya
+              </button>
+              <a href="https://t.me/data_talim_stansiyasi" target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+                <Send size={16} aria-hidden="true" /> Telegram
+              </a>
+            </div>
+          </div>
         </div>
         <div className="lg:col-span-8">
           {faqs.map((f, i) => {
@@ -123,8 +138,6 @@ export const ContactV2: React.FC = () => {
   const [course, setCourse] = useState('');
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [state, setState] = useState<'idle' | 'loading' | 'sent'>('idle');
-  const closeRef = useRef<HTMLElement>(null);
-  const { scrollYProgress: closeP } = useScroll({ target: closeRef, offset: ['start end', 'end start'] });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,25 +179,27 @@ export const ContactV2: React.FC = () => {
 
 
   return (
-    <section ref={closeRef} id="contact" className="relative py-[14vh] overflow-hidden" aria-labelledby="contact-title">
-      {/* closing star */}
-      <Star3D progress={closeP} spin={55} className="absolute -left-[14vw] bottom-[-6%] w-[40vw] max-w-[560px] aspect-square pointer-events-none opacity-[.22] hidden lg:block" />
-
-      <div className="wrap grid lg:grid-cols-12 gap-12 lg:items-center relative z-10 [&>*]:min-w-0">
-        <div className="lg:col-span-6">
+    <section id="contact" className="relative sec overflow-hidden" aria-labelledby="contact-title">
+      {/* sarlavha qatori: chapda sarlavha, oʻngda izoh — ikki tomon teng ogʻirlikda */}
+      <div className="wrap grid lg:grid-cols-12 gap-6 lg:gap-8 lg:items-end relative z-10 mb-10 lg:mb-12">
+        <div className="lg:col-span-7">
           <p className="t-kicker mb-6">10 — Boshlash</p>
           <Mask>
-            <h2 id="contact-title" className="t-display">
+            <h2 id="contact-title" className="t-h2">
               Birinchi qadam — <span className="ink-grad">bepul</span> konsultatsiya.
             </h2>
           </Mask>
-          <p className="t-lead mt-6 max-w-lg">Raqamingizni qoldiring: menejer 1 ish kuni ichida qoʻngʻiroq qilib, sizga mos kurs va jadvalni tanlab beradi.</p>
+        </div>
+        <p className="lg:col-span-5 t-lead max-w-lg">Raqamingizni qoldiring: menejer 1 ish kuni ichida qoʻngʻiroq qilib, sizga mos kurs va jadvalni tanlab beradi.</p>
+      </div>
 
+      <div className="wrap grid lg:grid-cols-12 gap-6 lg:gap-8 lg:items-stretch relative z-10 [&>*]:min-w-0">
+        <div className="lg:col-span-6 contact-steps order-2 lg:order-1">
           <StartSteps />
         </div>
 
-        <div className="lg:col-span-5 lg:col-start-8">
-          <div className="panel p-7 sm:p-9">
+        <div className="lg:col-span-6 order-1 lg:order-2">
+          <div className="panel p-7 sm:p-9 h-full">
             {state === 'sent' ? (
               <div className="py-10 text-center" role="status">
                 <span className="mx-auto w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'var(--green)' }}>

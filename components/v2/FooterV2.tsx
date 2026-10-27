@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Instagram, Send, ArrowUpRight, ArrowRight, Sparkles, MapPin, Mail, Clock } from 'lucide-react';
 import { useStore } from '../../store/useStore';
@@ -26,6 +26,8 @@ export const FooterV2: React.FC = () => {
   const year = new Date().getFullYear();
   const reduced = useMotionReduced();
   const ref = useRef<HTMLElement>(null);
+  // bosh sahifada yakuniy CTA — aloqa boʻlimi; footer bandi takrorlanmasin
+  const showCta = useLocation().pathname !== '/';
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end end'] });
   const markY = useTransform(scrollYProgress, [0, 1], ['28%', '0%']);
   const markOpacity = useTransform(scrollYProgress, [0.35, 1], [0.15, 1]);
@@ -50,21 +52,27 @@ export const FooterV2: React.FC = () => {
       />
       <div className="wrap relative pt-16 sm:pt-20 pb-10">
         {/* 1 — the one action that matters */}
-        <div className="grid gap-8 lg:grid-cols-12 lg:items-end pb-14 sm:pb-16">
-          <div className="lg:col-span-8">
-            <p className="t-kicker mb-5">Boshlash</p>
-            <h2 className="t-h2 max-w-[18ch]">Qaysi kasb sizga mos?</h2>
-            <p className="t-lead mt-5 max-w-lg">Bepul karyera testi yoʻnalishingizni aniqlashga yordam beradi.</p>
+        {showCta && (
+          <div className="foot-cta grid gap-6 lg:gap-10 lg:grid-cols-12 lg:items-center mb-14 sm:mb-16">
+            {/* kompas — "yoʻnalishni topish" metaforasi, test CTA'siga ishora */}
+            <div className="lg:col-span-3 flex lg:justify-center" aria-hidden="true">
+              <img src="/images/v2/icons/why-test.webp" alt="" width={320} height={320} loading="lazy" decoding="async" className="foot-compass" />
+            </div>
+            <div className="lg:col-span-6">
+              <p className="t-kicker mb-4">Boshlash</p>
+              <h2 className="t-h2 max-w-[18ch]">Qaysi kasb sizga mos?</h2>
+              <p className="t-lead mt-4 max-w-lg">Bepul karyera testi yoʻnalishingizni aniqlashga yordam beradi.</p>
+            </div>
+            <div className="lg:col-span-3 flex flex-col sm:flex-row lg:flex-col lg:items-stretch gap-3">
+              <Link to="/karyera-testi" className="btn btn-primary">
+                <Sparkles size={18} aria-hidden="true" /> Kasbingizni aniqlang
+              </Link>
+              <Link to="/kurslar" className="btn btn-ghost">
+                Kurslarni koʻrish <ArrowRight size={18} aria-hidden="true" />
+              </Link>
+            </div>
           </div>
-          <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col lg:items-end gap-3">
-            <Link to="/karyera-testi" className="btn btn-primary">
-              <Sparkles size={18} aria-hidden="true" /> Kasbingizni aniqlang
-            </Link>
-            <Link to="/kurslar" className="btn btn-ghost">
-              Kurslarni koʻrish <ArrowRight size={18} aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
+        )}
 
         {/* 2 — directory */}
         <div className="grid gap-x-10 gap-y-12 grid-cols-2 lg:grid-cols-12">

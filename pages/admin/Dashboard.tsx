@@ -1,11 +1,13 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { UserPlus, TrendingUp, MousePointerClick, RefreshCw, Settings, BarChart3, Link2, PieChart as PieChartIcon, Percent, ArrowUp, ArrowDown, Minus, Eye, Compass } from 'lucide-react';
+import {
+    UserPlus, MousePointerClick, RefreshCw, Eye, Compass, ArrowUpRight, ArrowDownRight, Minus,
+    AlertTriangle, Inbox, ArrowRight, Link2,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../store/ThemeContext';
 import {
-    LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, FunnelChart, Funnel, LabelList
+    ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
 
 interface StatsData {
@@ -25,21 +27,123 @@ interface StatsData {
     siteVisitsPerDay: { date: string; count: number }[];
 }
 
-const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
+type Period = 7 | 14 | 30;
+const PERIODS: Period[] = [7, 14, 30];
+
+const nf = (n: number) => new Intl.NumberFormat('en-US').format(n).replace(/,/g, ' ');
+const pretty = (s: string) => (s || 'Umumiy').replace(/_/g, ' ');
+const pct = (a: number, b: number) => (b > 0 ? Math.min((a / b) * 100, 999) : 0);
+const fmtPct = (v: number) => `${v >= 10 ? v.toFixed(0) : v.toFixed(1)}%`;
+
+/** Oxirgi N kun (UTC, serverdagi date('now') kabi) bo'yicha uzluksiz qator; yo'q kunlar 0. */
+function buildSeries(n: number, a: { date: string; count: number }[] = [], b: { date: string; count: number }[] = []) {
+    const ma = new Map(a.map(r => [r.date, r.count]));
+    const mb = new Map(b.map(r => [r.date, r.count]));
+    return Array.from({ length: n }, (_, i) => {
+        const date = new Date(Date.now() - (n - 1 - i) * 864e5).toISOString().slice(0, 10);
+        return { date, leads: ma.get(date) ?? 0, visits: mb.get(date) ?? 0 };
+    });
+}
+
+const Delta: React.FC<{ today: number; yesterday: number; label: string }> = ({ today, yesterday, label }) => {
+    const diff = today - yesterday;
+    const Icon = diff > 0 ? ArrowUpRight : diff < 0 ? ArrowDownRight : Minus;
+    const color = diff > 0 ? 'var(--a-green-ink)' : diff < 0 ? 'var(--a-red-ink)' : 'var(--a-fg-3)';
+    const rel = yesterday > 0 ? ` (${diff > 0 ? '+' : ''}${Math.round((diff / yesterday) * 100)}%)` : '';
+    return (
+        <div className="flex items-center gap-1.5 text-xs mt-3 flex-wrap">
+            <span className="inline-flex items-center gap-0.5 font-semibold a-num" style={{ color }}>
+                <Icon size={14} aria-hidden="true" />
+                {diff > 0 ? '+' : ''}{diff}{rel}
+            </span>
+            <span className="a-muted">{label}</span>
+        </div>
+    );
+};
+
+const Skeleton: React.FC = () => (
+    <div className="space-y-6" aria-busy="true" aria-label="Yuklanmoqda">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="a-card a-card-pad">
+                    <div className="a-skel h-4 w-24 mb-5" />
+                    <div className="a-skel h-9 w-20 mb-4" />
+                    <div className="a-skel h-3 w-28" />
+                </div>
+            ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="a-card a-card-pad lg:col-span-2"><div className="a-skel h-[300px] w-full" /></div>
+            <div className="a-card a-card-pad"><div className="a-skel h-[300px] w-full" /></div>
+        </div>
+    </div>
+);
+
+const BarList: React.FC<{ rows: { label: string; value: number }[]; color: string; total?: number }> = ({ rows, color, total }) => {
+    const max = Math.max(...rows.map(r => r.value), 1);
+    const sum = total ?? rows.reduce((s, r) => s + r.value, 0);
+    return (
+        <ul className="space-y-3.5">
+            {rows.map((r, i) => (
+                <li key={r.label + i}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm mb-1.5">
+                        <span className="truncate font-medium" title={pretty(r.label)}>{pretty(r.label)}</span>
+                        <span className="shrink-0 a-num text-[13px]">
+                            <b className="font-semibold">{nf(r.value)}</b>
+                            <span className="a-muted ml-2">{fmtPct(pct(r.value, sum))}</span>
+                        </span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--a-surface-2)' }}>
+                        <motion.div
+                            className="h-full rounded-full"
+                            style={{ background: color }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(r.value / max) * 100}%` }}
+                            transition={{ duration: 0.6, delay: i * 0.04, ease: [0.22, 1, 0.36, 1] }}
+                        />
+                    </div>
+                </li>
+            ))}
+        </ul>
+    );
+};
+
+const CardHead: React.FC<{ title: string; hint?: string; right?: React.ReactNode }> = ({ title, hint, right }) => (
+    <div className="flex items-start justify-between gap-3 mb-5">
+        <div>
+            <h2 className="a-h2">{title}</h2>
+            {hint && <p className="a-sub mt-0.5" style={{ fontSize: '.8rem' }}>{hint}</p>}
+        </div>
+        {right}
+    </div>
+);
 
 export default function Dashboard() {
     const { isDark } = useTheme();
     const [stats, setStats] = useState<StatsData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [failed, setFailed] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [period, setPeriod] = useState<Period>(14);
+    const [showVisits, setShowVisits] = useState(true);
 
     const fetchStats = useCallback((silent = false) => {
         if (!silent) setLoading(true);
         const token = localStorage.getItem('adminToken');
-        fetch('/api/stats', { headers: { 'Authorization': `Bearer ${token}` } })
-            .then(r => r.json())
-            .then(data => { setStats(data); setLastUpdated(new Date()); })
-            .catch(() => setStats(null))
+        fetch('/api/stats', { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+            .then((data: StatsData) => {
+                if (!data || !Array.isArray(data.leadsPerDay)) throw new Error('bad');
+                setStats({
+                    ...data,
+                    siteVisitsPerDay: data.siteVisitsPerDay ?? [],
+                    leadsByCourse: data.leadsByCourse ?? [],
+                    topLinks: data.topLinks ?? [],
+                });
+                setFailed(false);
+                setLastUpdated(new Date());
+            })
+            .catch(() => { if (!silent) setStats(null); setFailed(true); })
             .finally(() => setLoading(false));
     }, []);
 
@@ -49,371 +153,276 @@ export default function Dashboard() {
         return () => clearInterval(interval);
     }, [fetchStats]);
 
-    const conversionRate = stats && stats.arizaViews > 0
-        ? ((stats.totalLeads / stats.arizaViews) * 100).toFixed(1)
-        : '0';
+    const series = useMemo(
+        () => buildSeries(period, stats?.leadsPerDay, stats?.siteVisitsPerDay),
+        [period, stats],
+    );
+    const periodLeads = series.reduce((s, r) => s + r.leads, 0);
+    const periodVisits = series.reduce((s, r) => s + r.visits, 0);
 
-    const cardCls = isDark
-        ? 'bg-slate-800/60 backdrop-blur-xl border border-white/10 rounded-2xl'
-        : 'bg-white border border-slate-200 rounded-2xl shadow-sm';
-
-    const yesterday = stats?.yesterdaySiteVisits ?? 0;
-    const todayDiff = stats ? stats.todaySiteVisits - yesterday : 0;
-
-    const statCards = stats ? [
-        { title: 'Sayt Tashriflari', value: stats.siteVisits, icon: Eye, color: 'text-blue-500', bg: isDark ? 'bg-blue-500/10' : 'bg-blue-50', sub: { diff: todayDiff, label: `Kecha: ${yesterday}` } },
-        { title: 'Karyera Testini Tugatganlar', value: stats.careerTestCompletions, icon: Compass, color: 'text-purple-500', bg: isDark ? 'bg-purple-500/10' : 'bg-purple-50', sub: null },
-        { title: 'Ariza Sahifasiga Kirganlar', value: stats.arizaViews, icon: MousePointerClick, color: 'text-cyan-500', bg: isDark ? 'bg-cyan-500/10' : 'bg-cyan-50', sub: null },
-        { title: 'Yuborilgan Arizalar', value: stats.totalLeads, icon: UserPlus, color: 'text-green-500', bg: isDark ? 'bg-green-500/10' : 'bg-green-50', sub: null },
-    ] : [];
-
-    const tooltipStyle = {
-        backgroundColor: isDark ? '#1e293b' : '#fff',
-        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-        borderRadius: '12px',
-        color: isDark ? '#e2e8f0' : '#1e293b',
+    // Chart ranglari (SVG ichida CSS o'zgaruvchisiz ham ishonchli bo'lsin)
+    const blue = isDark ? '#4d8dff' : '#0061ff';
+    const cyan = isDark ? '#60efff' : '#00a3b8';
+    const axis = isDark ? '#8590a2' : '#6b7587';
+    const grid = isDark ? 'rgba(255,255,255,.07)' : '#e3e8f0';
+    const tooltipStyle: React.CSSProperties = {
+        background: isDark ? '#13161d' : '#ffffff',
+        border: `1px solid ${isDark ? 'rgba(255,255,255,.14)' : '#cfd7e3'}`,
+        borderRadius: 12,
+        color: isDark ? '#f3f5f9' : '#0b1220',
+        boxShadow: '0 12px 30px -12px rgba(0,0,0,.5)',
+        fontSize: 13,
+        padding: '8px 12px',
     };
 
+    const kpis = stats ? [
+        {
+            title: 'Sayt tashriflari', value: stats.siteVisits, icon: Eye, tone: 'var(--a-blue-ink)',
+            foot: <Delta today={stats.todaySiteVisits} yesterday={stats.yesterdaySiteVisits} label={`bugun, kecha ${nf(stats.yesterdaySiteVisits)}`} />,
+            sub: `${period} kunda: ${nf(periodVisits)}`,
+        },
+        {
+            title: 'Karyera testi', value: stats.careerTestCompletions, icon: Compass, tone: 'var(--a-cyan-ink)',
+            foot: null, sub: 'Testni tugatganlar',
+        },
+        {
+            title: 'Ariza sahifasi', value: stats.arizaViews, icon: MousePointerClick, tone: 'var(--a-fg-2)',
+            foot: null, sub: 'Sahifaga kirganlar',
+        },
+        {
+            title: 'Arizalar', value: stats.totalLeads, icon: UserPlus, tone: 'var(--a-green-ink)',
+            foot: <Delta today={stats.todayLeads} yesterday={stats.yesterdayLeads ?? 0} label={`bugun, kecha ${nf(stats.yesterdayLeads ?? 0)}`} />,
+            sub: `${period} kunda: ${nf(periodLeads)}`,
+        },
+    ] : [];
+
+    const funnel = stats ? [
+        { label: 'Sayt tashriflari', value: stats.siteVisits, color: 'var(--a-blue)' },
+        { label: 'Ariza sahifasi', value: stats.arizaViews, color: '#2f9bff' },
+        { label: 'Yuborilgan arizalar', value: stats.totalLeads, color: 'var(--a-green)' },
+    ] : [];
+    const funnelMax = Math.max(...funnel.map(f => f.value), 1);
+
+    const sources = (stats?.sourceAttribution ?? []).map(s => ({ label: s.source_ref, value: s.count }));
+    const courses = (stats?.leadsByCourse ?? []).slice(0, 6).map(c => ({ label: c.course_id, value: c.count }));
+
     return (
-        <div className="space-y-8">
-            {/* Header */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <div className="space-y-6">
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h1 className={`text-3xl sm:text-4xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Dashboard</h1>
-                    <p className={`font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Analitika va statistikalar
-                        {lastUpdated && <span className="ml-2 text-xs opacity-60">· {lastUpdated.toLocaleTimeString('uz-UZ')} da yangilandi</span>}
+                    <p className="a-kicker mb-2">Umumiy koʻrinish</p>
+                    <h1 className="a-h1">Dashboard</h1>
+                    <p className="a-sub mt-1.5">
+                        Tashriflar, arizalar va manbalar
+                        {lastUpdated && <span className="a-muted"> · {lastUpdated.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })} da yangilandi</span>}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium ${isDark ? 'bg-green-900/20 text-green-400 border border-green-800' : 'bg-green-50 text-green-600 border border-green-200'}`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
-                        30s yangilanadi
-                    </span>
-                    <button onClick={() => fetchStats()} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
-                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                        Yangilash
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="a-tabs" role="tablist" aria-label="Davr">
+                        {PERIODS.map(p => (
+                            <button key={p} type="button" role="tab" aria-selected={period === p} className="a-tab a-num" onClick={() => setPeriod(p)}>
+                                {p} kun
+                            </button>
+                        ))}
+                    </div>
+                    <button type="button" onClick={() => fetchStats()} className="a-btn" aria-label="Yangilash">
+                        <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                        <span className="hidden sm:inline">Yangilash</span>
                     </button>
                 </div>
             </motion.div>
 
-            {/* Stat Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {loading ? (
-                    Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} className={`p-6 rounded-2xl animate-pulse ${isDark ? 'bg-slate-800/60 border border-white/10' : 'bg-white border border-slate-200'}`}>
-                            <div className={`w-12 h-12 rounded-2xl mb-4 ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`} />
-                            <div className={`h-8 w-16 rounded-lg mb-2 ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`} />
-                            <div className={`h-4 w-24 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`} />
-                        </div>
-                    ))
-                ) : (
-                    statCards.map((stat, idx) => (
-                        <motion.div key={idx} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: idx * 0.07 }}>
-                            <div className={`p-5 sm:p-6 ${cardCls} transition-all`}>
-                                <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${stat.bg}`}>
-                                    <stat.icon size={22} className={stat.color} />
-                                </div>
-                                <div className={`text-2xl sm:text-3xl font-black mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{stat.value}</div>
-                                <h3 className={`text-sm font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{stat.title}</h3>
-                                {stat.sub && (
-                                    <div className={`flex items-center gap-1 mt-1.5 text-xs font-bold ${
-                                        stat.sub.diff > 0 ? 'text-green-500' : stat.sub.diff < 0 ? 'text-red-500' : isDark ? 'text-slate-500' : 'text-slate-400'
-                                    }`}>
-                                        {stat.sub.diff > 0 ? <ArrowUp size={12} /> : stat.sub.diff < 0 ? <ArrowDown size={12} /> : <Minus size={12} />}
-                                        {stat.sub.diff > 0 ? `+${stat.sub.diff}` : stat.sub.diff} &nbsp;
-                                        <span className={`font-normal ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{stat.sub.label}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </motion.div>
-                    ))
-                )}
-            </div>
+            {loading && !stats && <Skeleton />}
 
-            {/* Conversion Rate Banner */}
-            {stats && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-                    className={`p-5 sm:p-6 ${cardCls} flex flex-col sm:flex-row items-start sm:items-center gap-4`}>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-                        <Percent size={24} className="text-indigo-500" />
-                    </div>
-                    <div className="flex-1">
-                        <p className={`text-sm font-bold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Ariza formasi konversiyasi (Sahifaga kirganlar → Yuborganlar)</p>
-                        <p className={`text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{conversionRate}%</p>
-                    </div>
-                    <div className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {stats.arizaViews} kirish → {stats.totalLeads} ariza
-                    </div>
-                </motion.div>
-            )}
-
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Leads per Day Line Chart */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-                    className={`lg:col-span-2 p-5 sm:p-6 ${cardCls}`}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-                            <BarChart3 size={20} className="text-blue-500" />
-                        </div>
-                        <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Kunlik Arizalar (30 kun)</h2>
-                    </div>
-                    {stats && stats.leadsPerDay.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={280}>
-                            <LineChart data={stats.leadsPerDay}>
-                                <XAxis
-                                    dataKey="date"
-                                    tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 12 }}
-                                    tickLine={false}
-                                    axisLine={{ stroke: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0' }}
-                                    tickFormatter={(v: string) => v.slice(5)}
-                                />
-                                <YAxis
-                                    tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 12 }}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    allowDecimals={false}
-                                />
-                                <Tooltip contentStyle={tooltipStyle} />
-                                <Line
-                                    type="monotone"
-                                    dataKey="count"
-                                    stroke="#3b82f6"
-                                    strokeWidth={2.5}
-                                    dot={{ r: 3, fill: '#3b82f6' }}
-                                    activeDot={{ r: 6 }}
-                                    name="Arizalar"
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className={`h-[280px] flex items-center justify-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            {loading ? 'Yuklanmoqda...' : "Ma'lumot yo'q"}
-                        </div>
-                    )}
-                </motion.div>
-
-                {/* Leads by Course Pie Chart */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-                    className={`p-5 sm:p-6 ${cardCls}`}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
-                            <PieChartIcon size={20} className="text-purple-500" />
-                        </div>
-                        <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Kurs bo'yicha</h2>
-                    </div>
-                    {stats && stats.leadsByCourse.length > 0 ? (
-                        <>
-                            <ResponsiveContainer width="100%" height={200}>
-                                <PieChart>
-                                    <Pie
-                                        data={stats.leadsByCourse}
-                                        dataKey="count"
-                                        nameKey="course_id"
-                                        cx="50%"
-                                        cy="50%"
-                                        outerRadius={80}
-                                        innerRadius={45}
-                                        paddingAngle={3}
-                                    >
-                                        {stats.leadsByCourse.map((_, i) => (
-                                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip contentStyle={tooltipStyle} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                            <div className="mt-4 space-y-2 max-h-[120px] overflow-y-auto">
-                                {stats.leadsByCourse.map((item, i) => (
-                                    <div key={i} className="flex items-center justify-between text-sm">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                                            <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{item.course_id}</span>
-                                        </div>
-                                        <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.count}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </>
-                    ) : (
-                        <div className={`h-[280px] flex items-center justify-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            {loading ? 'Yuklanmoqda...' : "Ma'lumot yo'q"}
-                        </div>
-                    )}
-                </motion.div>
-            </div>
-
-            {/* Top 5 Courses + Funnel */}
-            {stats && stats.leadsByCourse.length > 0 && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }}
-                    className={`p-5 sm:p-6 ${cardCls}`}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-                            <BarChart3 size={20} className="text-emerald-500" />
-                        </div>
-                        <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Top 5 Kurslar (Arizalar bo'yicha)</h2>
-                    </div>
-                    <div className="space-y-3">
-                        {stats.leadsByCourse.slice(0, 5).map((item, i) => {
-                            const max = stats.leadsByCourse[0]?.count || 1;
-                            const pct = Math.round((item.count / max) * 100);
-                            const colors = ['bg-blue-500', 'bg-purple-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500'];
-                            return (
-                                <div key={i} className="flex items-center gap-3">
-                                    <span className={`text-xs font-black w-5 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{i + 1}</span>
-                                    <span className={`text-sm font-bold truncate w-36 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.course_id || 'Umumiy'}</span>
-                                    <div className={`flex-1 rounded-full h-2.5 ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                                        <div className={`h-2.5 rounded-full ${colors[i % colors.length]} transition-all duration-700`} style={{ width: `${pct}%` }} />
-                                    </div>
-                                    <span className={`text-sm font-black w-8 text-right ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.count}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </motion.div>
-            )}
-
-            {/* Top Marketing Links Table */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
-                className={`p-5 sm:p-6 ${cardCls}`}>
-                <div className="flex items-center gap-3 mb-6">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
-                        <Link2 size={20} className="text-pink-500" />
-                    </div>
-                    <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Top Marketing Linklar</h2>
+            {!loading && !stats && failed && (
+                <div className="a-card a-empty" role="alert">
+                    <AlertTriangle size={28} className="mx-auto mb-3" style={{ color: 'var(--a-amber-ink)' }} />
+                    <p className="a-h2" style={{ color: 'var(--a-fg)' }}>Statistikani yuklab boʻlmadi</p>
+                    <p className="a-sub mt-1 mb-5">Server javob bermadi yoki sessiya tugagan. Qayta urinib koʻring.</p>
+                    <button type="button" onClick={() => fetchStats()} className="a-btn a-btn-primary">
+                        <RefreshCw size={15} /> Qayta urinish
+                    </button>
                 </div>
-                {stats && stats.topLinks.length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-                                    <th className="text-left py-3 px-4 font-bold">Nomi</th>
-                                    <th className="text-left py-3 px-4 font-bold">Ref kod</th>
-                                    <th className="text-right py-3 px-4 font-bold">Kirishlar</th>
-                                    <th className="text-right py-3 px-4 font-bold">Arizalar</th>
-                                    <th className="text-right py-3 px-4 font-bold">Konversiya</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {stats.topLinks.map((link, i) => {
-                                    const rate = link.clicks > 0 ? ((link.leads_count / link.clicks) * 100).toFixed(1) : '0';
+            )}
+
+            {stats && (
+                <>
+                    {failed && (
+                        <div className="a-badge is-amber" role="status">Yangilash muvaffaqiyatsiz — eski maʼlumot koʻrsatilmoqda</div>
+                    )}
+
+                    {/* KPI */}
+                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+                        {kpis.map((k, i) => (
+                            <motion.div key={k.title} className="a-card a-card-pad" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                                <div className="flex items-center justify-between gap-2 mb-4">
+                                    <span className="text-[13px] font-medium" style={{ color: 'var(--a-fg-2)' }}>{k.title}</span>
+                                    <k.icon size={17} style={{ color: k.tone }} aria-hidden="true" />
+                                </div>
+                                <div className="a-num font-semibold text-[1.75rem] sm:text-[2.1rem] leading-none">{nf(k.value)}</div>
+                                <div className="a-muted text-xs mt-2 a-num">{k.sub}</div>
+                                {k.foot}
+                            </motion.div>
+                        ))}
+                    </div>
+
+                    {/* Chart + funnel */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <motion.section className="a-card a-card-pad lg:col-span-2 min-w-0" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+                            <CardHead
+                                title="Kunlik arizalar"
+                                hint={`Oxirgi ${period} kun · jami ${nf(periodLeads)} ta ariza`}
+                                right={
+                                    <label className="inline-flex items-center gap-2 text-xs font-medium cursor-pointer min-h-[36px]" style={{ color: 'var(--a-fg-2)' }}>
+                                        <input type="checkbox" checked={showVisits} onChange={e => setShowVisits(e.target.checked)} className="w-4 h-4" style={{ accentColor: 'var(--a-blue)' }} />
+                                        Tashriflar
+                                    </label>
+                                }
+                            />
+                            <div className="h-[280px] sm:h-[320px] -ml-2" role="img" aria-label={`Oxirgi ${period} kunlik arizalar va tashriflar grafigi`}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ComposedChart data={series} margin={{ top: 8, right: showVisits ? 4 : 12, left: 0, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="leadFill" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor={blue} stopOpacity={0.32} />
+                                                <stop offset="100%" stopColor={blue} stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid stroke={grid} strokeDasharray="3 4" vertical={false} />
+                                        <XAxis
+                                            dataKey="date" tickLine={false} axisLine={false} tickMargin={8} minTickGap={18}
+                                            tick={{ fill: axis, fontSize: 11 }}
+                                            tickFormatter={(v: string) => `${v.slice(8, 10)}.${v.slice(5, 7)}`}
+                                        />
+                                        <YAxis yAxisId="l" width={34} tickLine={false} axisLine={false} allowDecimals={false} tick={{ fill: axis, fontSize: 11 }} />
+                                        {showVisits && (
+                                            <YAxis yAxisId="r" orientation="right" width={40} tickLine={false} axisLine={false} allowDecimals={false} tick={{ fill: axis, fontSize: 11 }} />
+                                        )}
+                                        <Tooltip
+                                            contentStyle={tooltipStyle}
+                                            cursor={{ stroke: axis, strokeDasharray: '3 4' }}
+                                            labelFormatter={(v: string) => `${v.slice(8, 10)}.${v.slice(5, 7)}.${v.slice(0, 4)}`}
+                                        />
+                                        <Legend verticalAlign="top" align="left" height={28} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: axis, paddingLeft: 8 }} />
+                                        <Area isAnimationActive={false} yAxisId="l" type="monotone" dataKey="leads" name="Arizalar" stroke={blue} strokeWidth={2.4} fill="url(#leadFill)" dot={period <= 14 ? { r: 3, fill: blue, strokeWidth: 0 } : false} activeDot={{ r: 5 }} />
+                                        {showVisits && (
+                                            <Line isAnimationActive={false} yAxisId="r" type="monotone" dataKey="visits" name="Tashriflar" stroke={cyan} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                                        )}
+                                    </ComposedChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </motion.section>
+
+                        <motion.section className="a-card a-card-pad min-w-0" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                            <CardHead title="Konversiya voronkasi" hint="Barcha vaqt boʻyicha" />
+                            <div className="space-y-1">
+                                {funnel.map((f, i) => {
+                                    const prev = i > 0 ? funnel[i - 1].value : null;
                                     return (
-                                        <tr key={i} className={`border-t ${isDark ? 'border-white/5 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'} transition-colors`}>
-                                            <td className={`py-3 px-4 font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{link.name}</td>
-                                            <td className={`py-3 px-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                <code className={`px-2 py-1 rounded-lg text-xs ${isDark ? 'bg-slate-700/50' : 'bg-slate-100'}`}>{link.ref_code}</code>
-                                            </td>
-                                            <td className={`py-3 px-4 text-right font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{link.clicks}</td>
-                                            <td className={`py-3 px-4 text-right font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{link.leads_count}</td>
-                                            <td className="py-3 px-4 text-right">
-                                                <span className={`inline-block px-2 py-1 rounded-lg text-xs font-bold ${
-                                                    parseFloat(rate) > 10
-                                                        ? 'bg-green-500/10 text-green-500'
-                                                        : parseFloat(rate) > 5
-                                                        ? 'bg-amber-500/10 text-amber-500'
-                                                        : 'bg-slate-500/10 text-slate-400'
-                                                }`}>{rate}%</span>
-                                            </td>
-                                        </tr>
+                                        <React.Fragment key={f.label}>
+                                            {prev !== null && (
+                                                <div className="flex items-center gap-2 py-1.5 pl-1 text-xs a-num" style={{ color: 'var(--a-fg-3)' }}>
+                                                    <ArrowRight size={13} className="rotate-90" aria-hidden="true" />
+                                                    <span className="font-semibold" style={{ color: 'var(--a-fg-2)' }}>{fmtPct(pct(f.value, prev))}</span>
+                                                    <span>oʻtdi</span>
+                                                </div>
+                                            )}
+                                            <div>
+                                                <div className="flex items-baseline justify-between text-sm mb-1.5">
+                                                    <span className="font-medium">{f.label}</span>
+                                                    <b className="a-num font-semibold">{nf(f.value)}</b>
+                                                </div>
+                                                <div className="h-9 rounded-[10px] overflow-hidden" style={{ background: 'var(--a-surface-2)' }}>
+                                                    <motion.div
+                                                        className="h-full rounded-[10px]"
+                                                        style={{ background: f.color, minWidth: 6 }}
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${(f.value / funnelMax) * 100}%` }}
+                                                        transition={{ duration: 0.7, delay: 0.2 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </React.Fragment>
                                     );
                                 })}
-                            </tbody>
-                        </table>
+                            </div>
+                            <div className="a-divider my-5" />
+                            <div className="flex items-end justify-between">
+                                <div>
+                                    <div className="a-kicker">Umumiy konversiya</div>
+                                    <div className="a-num font-semibold text-2xl mt-1">{fmtPct(pct(stats.totalLeads, stats.siteVisits))}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="a-kicker">Ariza formasi</div>
+                                    <div className="a-num font-semibold text-2xl mt-1" style={{ color: 'var(--a-green-ink)' }}>{fmtPct(pct(stats.totalLeads, stats.arizaViews))}</div>
+                                </div>
+                            </div>
+                        </motion.section>
                     </div>
-                ) : (
-                    <div className={`py-12 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {loading ? 'Yuklanmoqda...' : "Marketing linklar yo'q"}
+
+                    {/* Sources + courses */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <section className="a-card a-card-pad min-w-0">
+                            <CardHead title="Manbalar" hint="Arizalar qayerdan kelgan" />
+                            {sources.length ? <BarList rows={sources} color="var(--a-blue)" /> : <div className="a-empty">Manba maʼlumoti yoʻq</div>}
+                        </section>
+                        <section className="a-card a-card-pad min-w-0">
+                            <CardHead title="Top kurslar" hint="Arizalar soni boʻyicha" />
+                            {courses.length ? <BarList rows={courses} color="var(--a-green)" /> : <div className="a-empty">Kurs boʻyicha ariza yoʻq</div>}
+                        </section>
                     </div>
-                )}
-            </motion.div>
 
-            {/* Site Visits Trend + Source Attribution */}
-            {stats && (stats.siteVisitsPerDay.length > 0 || (stats.sourceAttribution && stats.sourceAttribution.length > 0)) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Site Visits Trend */}
-                    {stats.siteVisitsPerDay.length > 0 && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.47 }}
-                            className={`p-5 sm:p-6 ${cardCls}`}>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-                                    <Eye size={20} className="text-blue-500" />
-                                </div>
-                                <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Sayt Tashriflari (30 kun)</h2>
+                    {/* Top links */}
+                    <section className="a-card min-w-0">
+                        <div className="a-card-pad pb-2 flex items-start justify-between gap-3">
+                            <CardHead title="Top marketing havolalar" hint="Kirishlar boʻyicha, 5 tagacha" />
+                            <Link to="/paneladmindata/marketing" className="a-btn a-btn-ghost shrink-0" style={{ minHeight: 36 }}>
+                                <Link2 size={15} /> <span className="hidden sm:inline">Boshqarish</span>
+                            </Link>
+                        </div>
+                        {stats.topLinks.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="a-table" style={{ minWidth: 520 }}>
+                                    <thead>
+                                        <tr>
+                                            <th>Nomi</th><th>Kod</th>
+                                            <th style={{ textAlign: 'right' }}>Kirishlar</th>
+                                            <th style={{ textAlign: 'right' }}>Arizalar</th>
+                                            <th style={{ textAlign: 'right' }}>Konversiya</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {stats.topLinks.map((l, i) => {
+                                            const r = pct(l.leads_count, l.clicks);
+                                            return (
+                                                <tr key={l.ref_code + i}>
+                                                    <td className="font-medium">{l.name}</td>
+                                                    <td><code className="a-num text-xs px-2 py-1 rounded-md" style={{ background: 'var(--a-surface-2)' }}>{l.ref_code}</code></td>
+                                                    <td className="a-num" style={{ textAlign: 'right' }}>{nf(l.clicks)}</td>
+                                                    <td className="a-num" style={{ textAlign: 'right' }}>{nf(l.leads_count)}</td>
+                                                    <td style={{ textAlign: 'right' }}>
+                                                        <span className={`a-badge ${r >= 10 ? 'is-green' : r >= 5 ? 'is-amber' : ''} a-num`}>{fmtPct(r)}</span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
-                            <ResponsiveContainer width="100%" height={160}>
-                                <LineChart data={stats.siteVisitsPerDay}>
-                                    <XAxis
-                                        dataKey="date"
-                                        tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 12 }}
-                                        tickLine={false}
-                                        axisLine={{ stroke: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0' }}
-                                        tickFormatter={(v: string) => v.slice(5)}
-                                    />
-                                    <YAxis tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
-                                    <Tooltip contentStyle={tooltipStyle} />
-                                    <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, fill: '#3b82f6' }} activeDot={{ r: 6 }} name="Tashriflar" />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </motion.div>
-                    )}
+                        ) : (
+                            <div className="a-empty">Marketing havolalar yoʻq</div>
+                        )}
+                    </section>
 
-                    {/* Source Attribution Donut */}
-                    {stats.sourceAttribution && stats.sourceAttribution.length > 0 && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.49 }}
-                            className={`p-5 sm:p-6 ${cardCls}`}>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
-                                    <PieChartIcon size={20} className="text-pink-500" />
-                                </div>
-                                <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Manba Tahlili</h2>
-                            </div>
-                            <div className="flex gap-4">
-                                <ResponsiveContainer width="50%" height={160}>
-                                    <PieChart>
-                                        <Pie data={stats.sourceAttribution} dataKey="count" nameKey="source_ref" cx="50%" cy="50%" outerRadius={65} innerRadius={35} paddingAngle={3}>
-                                            {stats.sourceAttribution.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                                        </Pie>
-                                        <Tooltip contentStyle={tooltipStyle} />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <div className="flex-1 space-y-1.5 overflow-y-auto max-h-[160px]">
-                                    {stats.sourceAttribution.map((item, i) => (
-                                        <div key={i} className="flex items-center justify-between text-xs">
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                                                <span className={`truncate max-w-[80px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.source_ref}</span>
-                                            </div>
-                                            <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.count}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-                </div>
+                    {/* Quick actions */}
+                    <div className="flex flex-wrap gap-2">
+                        <Link to="/paneladmindata/leads" className="a-btn a-btn-primary"><Inbox size={16} /> Arizalarni koʻrish</Link>
+                        <Link to="/paneladmindata/courses" className="a-btn">Yangi kurs</Link>
+                        <Link to="/paneladmindata/marketing" className="a-btn">Marketing havola yaratish</Link>
+                        <Link to="/paneladmindata/media" className="a-btn">Matnlarni tahrirlash</Link>
+                    </div>
+                </>
             )}
-
-            {/* Quick Actions */}
-            <div className={`p-6 sm:p-8 ${cardCls}`}>
-                <h2 className={`text-xl font-bold mb-5 flex items-center gap-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    <Settings size={20} className={isDark ? 'text-[#60efff]' : 'text-blue-600'} />
-                    Tezkor Amallar
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {[
-                        { to: '/paneladmindata/courses', label: "Yangi kurs qo'shish" },
-                        { to: '/paneladmindata/team', label: "Xodim qo'shish" },
-                        { to: '/paneladmindata/media', label: "Asosiy matnlarni tahrirlash" },
-                        { to: '/paneladmindata/visibility', label: "Bo'limlarni yoqish/o'chirish" },
-                        { to: '/paneladmindata/marketing', label: "Marketing link yaratish" },
-                    ].map((item) => (
-                        <Link key={item.to} to={item.to} className={`p-4 rounded-2xl font-bold transition-colors border text-sm ${isDark ? 'bg-slate-800 border-white/5 text-slate-300 hover:bg-slate-700 hover:text-white' : 'bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border-slate-100'}`}>
-                            {item.label}
-                        </Link>
-                    ))}
-                </div>
-            </div>
         </div>
     );
 }

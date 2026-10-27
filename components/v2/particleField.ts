@@ -1,6 +1,6 @@
 // Lightweight 3D particle engine (Canvas 2D, no WebGL/three.js dependency).
 // Three formations are morphed by a 0..1 "progress" value — the hero's story:
-//   0.00 → planet  (the world: wireframe globe with an orbiting data ring)
+//   0.00 → helix   (the world's code: a DNA double helix of data with base-pair rungs)
 //   0.50 → galaxy  (the world dissolves into a swirling spiral of raw data)
 //   1.00 → star    (data condenses into the DATA 4-point brand star, a 3D lens)
 
@@ -10,7 +10,7 @@ export interface FieldOptions {
 }
 
 interface P {
-  g: [number, number, number]; // planet position
+  g: [number, number, number]; // helix position
   // galaxy is animated, so it's stored in polar form: radius, base angle, height
   gr: number;
   ga: number;
@@ -44,38 +44,38 @@ const gauss = (rnd: () => number) => rnd() + rnd() + rnd() - 1.5;
 function build(count: number): P[] {
   const rnd = mulberry32(2019);
   const pts: P[] = [];
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  const R = 1.0;
-  const RING_TILT = 0.42;
+  // DNK spirali: vertikal oʻq, ikki zanjir, ular orasida "asos juftlari" va atrofda maʼlumot changi
+  const HALF = 1.0; // half height
+  const HR = 0.6; // strand radius
+  const TWIST = 3.9; // radians per unit of height
+  const RUNGS = 22;
 
   for (let i = 0; i < count; i++) {
     let hueBias = -1;
 
-    // ---- planet: surface + parallels + meridians + a tilted orbit ring
     let g: [number, number, number];
     const kind = rnd();
-    if (kind < 0.3) {
-      const y = 1 - (i / (count - 1)) * 2;
-      const r = Math.sqrt(1 - y * y);
-      const th = golden * i;
-      g = [Math.cos(th) * r * R, y * R, Math.sin(th) * r * R];
-    } else if (kind < 0.58) {
-      const lat = (Math.floor(rnd() * 7) - 3) * (Math.PI / 8);
-      const lon = rnd() * TAU;
-      g = [Math.cos(lat) * Math.cos(lon) * R, Math.sin(lat) * R, Math.cos(lat) * Math.sin(lon) * R];
-    } else if (kind < 0.8) {
-      const lon = Math.floor(rnd() * 6) * (Math.PI / 6);
-      const lat = rnd() * TAU;
-      g = [Math.cos(lat) * Math.cos(lon) * R, Math.sin(lat) * R, Math.cos(lat) * Math.sin(lon) * R];
+    if (kind < 0.68) {
+      // the two backbones, slightly thick so they read as ribbons
+      const strand = kind < 0.34 ? 0 : 1;
+      const y = (rnd() * 2 - 1) * HALF;
+      const th = y * TWIST + strand * Math.PI;
+      const r = HR + gauss(rnd) * 0.035;
+      g = [Math.cos(th) * r, y + gauss(rnd) * 0.02, Math.sin(th) * r];
+      hueBias = strand === 0 ? 0 : 1;
+    } else if (kind < 0.9) {
+      // base-pair rungs between the strands, every third one glows green
+      const L = Math.floor(rnd() * RUNGS);
+      const y = -HALF * 0.96 + (L * (HALF * 1.92)) / (RUNGS - 1);
+      const th = y * TWIST;
+      const t = rnd() * 2 - 1;
+      g = [Math.cos(th) * HR * t, y + gauss(rnd) * 0.008, Math.sin(th) * HR * t];
+      hueBias = L % 3 === 0 ? 2 : 1;
     } else {
-      // orbit ring (data in transit) — slightly thick, tilted
+      // loose data dust drifting around the helix
       const a = rnd() * TAU;
-      const rr = 1.55 + gauss(rnd) * 0.09;
-      const x = Math.cos(a) * rr;
-      const z = Math.sin(a) * rr;
-      const y = gauss(rnd) * 0.03;
-      g = [x, y * Math.cos(RING_TILT) - z * Math.sin(RING_TILT), y * Math.sin(RING_TILT) + z * Math.cos(RING_TILT)];
-      hueBias = rnd() < 0.55 ? 2 : 1;
+      const rr = 0.85 + rnd() * 0.65;
+      g = [Math.cos(a) * rr, (rnd() * 2 - 1) * HALF * 1.1, Math.sin(a) * rr];
     }
 
     // ---- galaxy: 3-arm logarithmic spiral disk with a bright core
@@ -104,7 +104,7 @@ function build(count: number): P[] {
       gy,
       s: [sx, sy, sz],
       hue: hueBias >= 0 ? hueBias : hr < 0.6 ? 0 : hr < 0.92 ? 1 : 2,
-      size: 1.5 + rnd() * 2.0,
+      size: 1.2 + rnd() * 1.8,
       phase: rnd() * TAU,
     });
   }
@@ -224,16 +224,16 @@ export class ParticleField {
     this.sdim += (this.dim - this.sdim) * (still ? 1 : 0.06);
 
     const p = clamp01(this.sp);
-    // morph weights: planet→galaxy over [0, .5], galaxy→star over [.5, 1]
+    // morph weights: helix→galaxy over [0, .5], galaxy→star over [.5, 1]
     const m1 = ease(clamp01(p / 0.5));
     const m2 = ease(clamp01((p - 0.5) / 0.5));
 
-    // "burst": peaks mid-transition (planet->galaxy, galaxy->star): the camera flies in, the field
+    // "burst": peaks mid-transition (helix->galaxy, galaxy->star): the camera flies in, the field
     // spins up and glows, then everything settles into the next shape
     const burst = Math.sin(Math.PI * m1) * (1 - m2) + Math.sin(Math.PI * m2);
     this.spinAcc += dt * (0.25 + 1.5 * burst);
 
-    // camera: planet spins on its axis; galaxy is seen from above at an angle; star faces viewer
+    // camera: helix spins on its axis; galaxy is seen from above at an angle; star faces viewer
     const spin = still ? 0 : this.spinAcc;
     const rotY = spin * (1 - m2) + Math.sin(time * 0.6) * 0.3 * m2 + this.mx * 0.45;
     const rotX = -0.22 * (1 - m1) + 0.95 * m1 * (1 - m2) + this.my * 0.3 + Math.sin(time * 0.4) * 0.05;

@@ -7,7 +7,7 @@ import { useLanguage } from '../../i18n';
 import { ParticleField } from './particleField';
 import { uz, useFontReady, useHtmlDark, useIsDesktop, useMotionReduced } from './utils';
 
-// scroll progress (0..1 over the pinned section) → formation progress (0 chaos, .5 globe, 1 star)
+// scroll progress (0..1 over the pinned section) → formation progress (0 helix, .5 galaxy, 1 star)
 function formationAt(v: number) {
   if (v < 0.12) return 0;
   if (v < 0.42) return ((v - 0.12) / 0.3) * 0.5;
@@ -76,7 +76,7 @@ export const HeroSignal: React.FC = () => {
     if (!canvas) return;
     let field: ParticleField;
     try {
-      field = new ParticleField(canvas, { count: desktop ? 2600 : 1300, dark });
+      field = new ParticleField(canvas, { count: desktop ? 4200 : 2000, dark });
     } catch {
       return;
     }
@@ -174,7 +174,7 @@ export const HeroSignal: React.FC = () => {
   }
 
   return (
-    <section ref={sectionRef} className="relative" style={{ height: desktop ? '330vh' : '280vh' }} aria-label="DATA Taʼlim Stansiyasi">
+    <section ref={sectionRef} className="relative" style={{ height: desktop ? '230vh' : '200vh' }} aria-label="DATA Taʼlim Stansiyasi">
       <div className="sticky top-0 h-[100svh] overflow-hidden grain">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden="true" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: vignette }} />
@@ -186,7 +186,7 @@ export const HeroSignal: React.FC = () => {
           </div>
         </Stage>
 
-        {/* Stage B — the globe */}
+        {/* Stage B — data galaxy */}
         <Stage p={scrollYProgress} range={[0.2, 0.3, 0.42, 0.5]} innerRef={capBRef} className="cap-stage absolute inset-x-0 text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">01 — Maʼlumot</p>

@@ -41,6 +41,7 @@ const ManageMedia = lazy(() => import('./pages/admin/ManageMedia'));
 const ManageMarketing = lazy(() => import('./pages/admin/ManageMarketing'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 const ManagePosts = lazy(() => import('./pages/admin/ManageBlog'));
+const ManageLeads = lazy(() => import('./pages/admin/ManageLeads'));
 
 // Protected Route Wrapper with Session Timeout
 const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2 soat
@@ -182,6 +183,7 @@ function App() {
               }
             >
               <Route index element={<Dashboard />} />
+              <Route path="leads" element={<ManageLeads />} />
               <Route path="courses" element={<ManageCourses />} />
               <Route path="team" element={<ManageTeam />} />
               <Route path="visibility" element={<ManageVisibility />} />

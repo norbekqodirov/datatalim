@@ -195,3 +195,59 @@ export const getUsernameFromToken = (): string => {
     return decoded?.username || '';
 };
 
+
+// ---------- Arizalar CRM (admin) ----------
+export type LeadStatus = 'new' | 'called' | 'enrolled' | 'rejected';
+
+export interface Lead {
+    id: number;
+    name: string;
+    phone: string;
+    course_id: string | null;
+    source_ref: string | null;
+    status: LeadStatus;
+    notes: string;
+    created_at: string;
+}
+
+export interface LeadsResponse {
+    items: Lead[];
+    total: number;
+    counts: Record<LeadStatus, number>;
+}
+
+export interface LeadsQuery {
+    q?: string;
+    source?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+    offset?: number;
+}
+
+const adminRequest = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+    const response = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    });
+    if (response.status === 401 || response.status === 403) {
+        if (localStorage.getItem('adminAuth')) {
+            localStorage.removeItem('adminAuth');
+            localStorage.removeItem('adminToken');
+            window.location.href = '/paneladmindata/login';
+        }
+        throw new Error('Sessiya tugagan yoki ruxsat yoʻq');
+    }
+    if (!response.ok) throw new Error('Server xatosi');
+    return response.json();
+};
+
+export const fetchLeads = (query: LeadsQuery): Promise<LeadsResponse> => {
+    const params = new URLSearchParams();
+    Object.entries(query).forEach(([k, v]) => { if (v !== undefined && v !== '') params.set(k, String(v)); });
+    return adminRequest<LeadsResponse>(`/leads?${params.toString()}`);
+};
+
+export const updateLead = (id: number, patch: { status?: LeadStatus; notes?: string }): Promise<Lead> =>
+    adminRequest<Lead>(`/leads/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });

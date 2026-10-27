@@ -42,8 +42,9 @@ export const ProofBento: React.FC = () => {
   ];
 
   return (
-    <section className="relative pb-[14vh]" aria-label="DATA raqamlarda">
+    <section className="relative sec" aria-label="DATA raqamlarda">
       <div className="wrap">
+        <p className="t-kicker mb-8">02 — DATA raqamlarda</p>
         <ul className="bento grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 [grid-auto-flow:dense]">
           {tiles.map((t, i) => (
             <motion.li
@@ -58,15 +59,15 @@ export const ProofBento: React.FC = () => {
                 <div className="flex h-full flex-col justify-between gap-6">
                   <div className="flex items-start justify-between gap-4">
                     <CountUp to={t.n} from={t.from} suffix={t.suffix || ''} className={`block mono ${t.ink}`}
-                      style={{ fontSize: 'clamp(2.6rem, 5.2vw, 5rem)', lineHeight: 1, letterSpacing: '-0.04em', fontWeight: 500 }} />
-                    {t.icon && <TileIcon name={t.icon} size={`${t.span ? 'w-20 h-20' : 'hidden sm:block w-20 h-20'} sm:w-24 sm:h-24 -mt-2 -mr-2`} />}
+                      style={{ fontSize: 'clamp(2.4rem, 4.2vw, 4rem)', lineHeight: 1, letterSpacing: '-0.04em', fontWeight: 500 }} />
+                    {t.icon && <TileIcon name={t.icon} size={`${t.span ? 'w-16 h-16' : 'hidden sm:block w-16 h-16'} sm:w-20 sm:h-20 -mt-2 -mr-2`} />}
                   </div>
                   <p className="t-body max-w-[18rem]">{t.label}</p>
                 </div>
               )}
               {t.kind === 'claim' && (
                 <div className={`flex h-full gap-5 ${t.span ? 'flex-col sm:flex-row sm:items-end' : 'flex-col'}`}>
-                  <TileIcon name={t.icon} size={t.span ? 'w-24 h-24 sm:w-32 sm:h-32 shrink-0 -ml-2' : 'w-16 h-16 sm:w-24 sm:h-24 -ml-2'} />
+                  <TileIcon name={t.icon} size={t.span ? 'w-20 h-20 sm:w-28 sm:h-28 shrink-0 -ml-2' : 'w-14 h-14 sm:w-20 sm:h-20 -ml-2'} />
                   <div className="mt-auto">
                     <h3 className="bento-title">{t.title}</h3>
                     <p className="t-body mt-2 !text-[0.95rem]">{t.text}</p>

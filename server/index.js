@@ -586,6 +586,91 @@ app.post('/api/career-test-result', leadsLimiter, async (req, res) => {
     }
 });
 
+// --- LEADS CRM (admin) ---
+// Eslatma: bu yo'llar umumiy `app.get('/api/:key')` dan OLDIN turishi shart.
+const LEAD_STATUSES = ['new', 'called', 'enrolled', 'rejected'];
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Izoh: yangi qatorni saqlaydi, boshqa boshqaruv belgilari va HTML teglarini olib tashlaydi, 1000 belgigacha
+const cleanNotes = (v) => (typeof v === 'string'
+    // eslint-disable-next-line no-control-regex
+    ? v.substring(0, 4000).replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ').replace(/<[^>]*>/g, '').trim().substring(0, 1000)
+    : '');
+
+app.get('/api/leads', authenticateToken, (req, res) => {
+    try {
+        // Filtr shartlari: ruxsat etilgan ustunlar ro'yxati, qiymatlar faqat `?` parametr orqali
+        const where = [];
+        const params = [];
+        const q = cleanText(String(req.query.q ?? '')).slice(0, 100);
+        if (q) {
+            const like = `%${q.replace(/[\\%_]/g, (c) => '\\' + c)}%`;
+            where.push("(name LIKE ? ESCAPE '\\' OR phone LIKE ? ESCAPE '\\' OR course_id LIKE ? ESCAPE '\\')");
+            params.push(like, like, like);
+        }
+        const source = cleanText(String(req.query.source ?? ''));
+        if (source) { where.push('source_ref = ?'); params.push(source); }
+        const from = String(req.query.from ?? '');
+        if (ISO_DATE_RE.test(from)) { where.push('date(created_at) >= date(?)'); params.push(from); }
+        const to = String(req.query.to ?? '');
+        if (ISO_DATE_RE.test(to)) { where.push('date(created_at) <= date(?)'); params.push(to); }
+        const baseWhere = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+        // Holat sonlari status filtridan tashqari barcha filtrlarni hisobga oladi
+        const counts = { new: 0, called: 0, enrolled: 0, rejected: 0 };
+        const countRows = db.prepare(
+            `SELECT COALESCE(status, 'new') AS status, COUNT(*) AS count FROM leads ${baseWhere} GROUP BY COALESCE(status, 'new')`
+        ).all(...params);
+        for (const r of countRows) if (r.status in counts) counts[r.status] = r.count;
+
+        const status = String(req.query.status ?? '');
+        const listWhere = [...where];
+        const listParams = [...params];
+        if (LEAD_STATUSES.includes(status)) {
+            listWhere.push("COALESCE(status, 'new') = ?");
+            listParams.push(status);
+        }
+        const fullWhere = listWhere.length ? `WHERE ${listWhere.join(' AND ')}` : '';
+
+        const limit = Math.min(Math.max(parseInt(String(req.query.limit), 10) || 50, 1), 200);
+        const offset = Math.max(parseInt(String(req.query.offset), 10) || 0, 0);
+
+        const total = db.prepare(`SELECT COUNT(*) AS count FROM leads ${fullWhere}`).get(...listParams).count;
+        const items = db.prepare(
+            `SELECT id, name, phone, course_id, source_ref, COALESCE(status, 'new') AS status, COALESCE(notes, '') AS notes, created_at
+             FROM leads ${fullWhere} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
+        ).all(...listParams, limit, offset);
+
+        res.json({ items, total, counts });
+    } catch (err) {
+        serverError(res, err, 'GET /api/leads');
+    }
+});
+
+app.patch('/api/leads/:id', authenticateToken, (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid id' });
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const hasStatus = body.status !== undefined;
+        const hasNotes = body.notes !== undefined;
+        if (!hasStatus && !hasNotes) return res.status(400).json({ error: 'Nothing to update' });
+        if (hasStatus && !LEAD_STATUSES.includes(body.status)) return res.status(400).json({ error: 'Invalid status' });
+
+        const existing = db.prepare('SELECT id FROM leads WHERE id = ?').get(id);
+        if (!existing) return res.status(404).json({ error: 'Lead not found' });
+
+        if (hasStatus) db.prepare('UPDATE leads SET status = ? WHERE id = ?').run(body.status, id);
+        if (hasNotes) db.prepare('UPDATE leads SET notes = ? WHERE id = ?').run(cleanNotes(body.notes), id);
+
+        const row = db.prepare(
+            "SELECT id, name, phone, course_id, source_ref, COALESCE(status, 'new') AS status, COALESCE(notes, '') AS notes, created_at FROM leads WHERE id = ?"
+        ).get(id);
+        res.json(row);
+    } catch (err) {
+        serverError(res, err, 'PATCH /api/leads/:id');
+    }
+});
+
 // --- STATS API ---
 app.get('/api/stats', authenticateToken, (req, res) => {
     try {

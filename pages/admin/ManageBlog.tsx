@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Pencil, Trash2, X, Save, FileText, Eye, EyeOff, Bold, Italic, Heading, Code, Link, Image, AlignLeft, Columns } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Plus, Pencil, Trash2, Save, FileText, Eye, Bold, Italic, Heading, Code, Link, Image, AlignLeft, Columns, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DOMPurify from 'dompurify';
-import { useTheme } from '../../store/ThemeContext';
 import { uploadImageToAPI } from '../../utils/api';
+import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
+import { PageHeader, Field, Overlay, ConfirmDialog, CloseBtn, Switch, Spinner, useBeforeUnload } from '../../components/admin/ui/kit';
+
 
 // URL xavfsizligi: faqat http(s), mailto, nisbiy yo'l va #anchor; javascript:/data: bloklanadi.
 // Kirish matni allaqachon & < > dan escape qilingan, bu yerda qo'shtirnoqlar ham escape qilinadi.
@@ -57,8 +59,6 @@ interface Post {
   created_at: string;
 }
 
-type Lang = 'uz' | 'ru' | 'en';
-
 const emptyForm = {
   title_uz: '', title_ru: '', title_en: '',
   content_uz: '', content_ru: '', content_en: '',
@@ -76,16 +76,26 @@ const generateSlug = (title: string) =>
   title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
 
 const ManagePosts: React.FC = () => {
-  const { isDark } = useTheme();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [baseline, setBaseline] = useState(JSON.stringify(emptyForm));
   const [lang, setLang] = useState<Lang>('uz');
   const [previewMode, setPreviewMode] = useState<'edit' | 'split' | 'preview'>('edit');
   const [coverUploading, setCoverUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [titleError, setTitleError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Post | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<'all' | 'pub' | 'draft'>('all');
   const contentRef = useRef<HTMLTextAreaElement>(null);
+
+  const dirty = modalOpen && JSON.stringify(form) !== baseline;
+  useBeforeUnload(dirty);
 
   const insertMarkdown = (before: string, after = '', placeholder = 'matn') => {
     const ta = contentRef.current;
@@ -121,26 +131,35 @@ const ManagePosts: React.FC = () => {
   const openAdd = () => {
     setEditingPost(null);
     setForm(emptyForm);
+    setBaseline(JSON.stringify(emptyForm));
+    setTitleError('');
     setLang('uz');
     setModalOpen(true);
   };
 
   const openEdit = (post: Post) => {
-    setEditingPost(post);
-    setForm({
+    const next = {
       title_uz: post.title_uz || '', title_ru: post.title_ru || '', title_en: post.title_en || '',
       content_uz: post.content_uz || '', content_ru: post.content_ru || '', content_en: post.content_en || '',
       excerpt_uz: post.excerpt_uz || '', excerpt_ru: post.excerpt_ru || '', excerpt_en: post.excerpt_en || '',
       cover_image: post.cover_image || '',
       category: post.category || '', slug: post.slug || '',
       is_published: post.is_published ?? true,
-    });
+    };
+    setEditingPost(post);
+    setForm(next);
+    setBaseline(JSON.stringify(next));
+    setTitleError('');
     setLang('uz');
     setModalOpen(true);
   };
 
+  const requestClose = () => { if (dirty) setDiscardOpen(true); else setModalOpen(false); };
+
   const handleSave = async () => {
     if (!form.title_uz) {
+      setTitleError('Oʻzbek tili uchun sarlavha kerak');
+      setLang('uz');
       toast.error("O'zbek tili uchun sarlavha kerak");
       return;
     }
@@ -148,6 +167,7 @@ const ManagePosts: React.FC = () => {
       ...form,
       slug: form.slug || generateSlug(form.title_uz),
     };
+    setSaving(true);
     try {
       const res = editingPost
         ? await fetch(`/api/posts/${editingPost.id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(payload) })
@@ -161,19 +181,24 @@ const ManagePosts: React.FC = () => {
       setModalOpen(false);
       fetchPosts();
     } catch { toast.error('Xatolik yuz berdi'); }
+    finally { setSaving(false); }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Rostdan o\'chirmoqchimisiz?')) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/posts/${id}`, { method: 'DELETE', headers: headers() });
+      const res = await fetch(`/api/posts/${deleteTarget.id}`, { method: 'DELETE', headers: headers() });
       if (!res.ok) { toast.error('O\'chirib bo\'lmadi'); return; }
       toast.success('Post o\'chirildi');
+      setDeleteTarget(null);
       fetchPosts();
     } catch { toast.error('Xatolik'); }
+    finally { setDeleting(false); }
   };
 
   const updateField = (field: string, value: string | boolean) => {
+    if (field === 'title_uz' && value) setTitleError('');
     setForm(prev => {
       const next = { ...prev, [field]: value };
       if (field === 'title_uz' && !editingPost) {
@@ -183,283 +208,205 @@ const ManagePosts: React.FC = () => {
     });
   };
 
-  const langTabs: { code: Lang; label: string }[] = [
-    { code: 'uz', label: "O'zbekcha" },
-    { code: 'ru', label: 'Русский' },
-    { code: 'en', label: 'English' },
-  ];
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return posts.filter(p => {
+      if (status === 'pub' && !p.is_published) return false;
+      if (status === 'draft' && p.is_published) return false;
+      if (!q) return true;
+      return [p.title_uz, p.title_ru, p.title_en, p.category, p.slug].join(' ').toLowerCase().includes(q);
+    });
+  }, [posts, query, status]);
 
-  const inputClass = `w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all ${
-    isDark
-      ? 'bg-slate-800/80 text-white border border-slate-700 focus:border-blue-500 placeholder-slate-500'
-      : 'bg-slate-50 text-slate-900 border border-slate-200 focus:border-blue-400 placeholder-slate-400'
-  }`;
+  const pubCount = posts.filter(p => p.is_published).length;
+  const L = lang.toUpperCase();
+  const content = (form as any)[`content_${lang}`] as string;
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isDark ? 'bg-blue-500/15' : 'bg-blue-50'}`}>
-            <FileText className={isDark ? 'text-[#60efff]' : 'text-[#0061ff]'} size={24} />
-          </div>
-          <div>
-            <h1 className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Blog boshqaruvi</h1>
-            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{posts.length} ta post</p>
-          </div>
+      <PageHeader
+        kicker="Kontent"
+        title="Blog"
+        sub={`${posts.length} ta post, ${pubCount} tasi nashr qilingan.`}
+        actions={<button type="button" onClick={openAdd} className="a-btn a-btn-primary"><Plus size={18} aria-hidden="true" /> Yangi post</button>}
+      />
+
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <div className="a-search">
+          <Search size={16} aria-hidden="true" />
+          <input type="search" className="a-input" placeholder="Sarlavha, kategoriya yoki slug" aria-label="Postlarni qidirish" value={query} onChange={e => setQuery(e.target.value)} />
         </div>
-        <button onClick={openAdd} className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#0061ff] text-white font-bold text-sm hover:bg-blue-600 transition-colors">
-          <Plus size={18} /> Yangi post
-        </button>
+        <div className="a-scrollx" role="group" aria-label="Holat filtri">
+          {([['all', 'Hammasi', posts.length], ['pub', 'Nashr qilingan', pubCount], ['draft', 'Qoralama', posts.length - pubCount]] as const).map(([k, label, n]) => (
+            <button key={k} type="button" className="a-chip" aria-pressed={status === k} onClick={() => setStatus(k)}>
+              {label}<span className="a-chip-n">{n}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* List */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#0061ff]" />
+        <div className="grid gap-3" aria-busy="true" aria-label="Yuklanmoqda">
+          {[0, 1, 2].map(i => <div key={i} className="a-skel" style={{ height: 84 }} />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="a-card a-empty">
+          <FileText size={34} className="mx-auto mb-3" aria-hidden="true" />
+          <p className="font-semibold" style={{ color: 'var(--a-fg-2)' }}>{posts.length === 0 ? 'Hali postlar yo\'q' : 'Hech narsa topilmadi'}</p>
+          <p className="a-sub mt-1">{posts.length === 0 ? 'Birinchi maqolani yozing.' : 'Qidiruv yoki filtrni o\'zgartirib ko\'ring.'}</p>
+          {posts.length === 0
+            ? <button type="button" className="a-btn a-btn-primary mt-4" onClick={openAdd}><Plus size={16} aria-hidden="true" /> Yangi post</button>
+            : <button type="button" className="a-btn mt-4" onClick={() => { setQuery(''); setStatus('all'); }}>Filtrni tozalash</button>}
         </div>
       ) : (
-        <div className="space-y-3">
-          {posts.map(post => (
-            <div
-              key={post.id}
-              className={`flex items-center justify-between p-5 rounded-2xl transition-all ${
-                isDark ? 'bg-slate-800/60 border border-slate-700/50 hover:border-slate-600' : 'bg-white border border-slate-200 hover:shadow-md'
-              }`}
-            >
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                {post.cover_image && (
-                  <img src={post.cover_image} alt="" className="w-16 h-12 rounded-xl object-cover shrink-0" />
-                )}
-                <div className="min-w-0">
-                  <h3 className={`font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{post.title_uz}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    {post.category && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${isDark ? 'bg-blue-500/15 text-[#60efff]' : 'bg-blue-50 text-[#0061ff]'}`}>
-                        {post.category}
-                      </span>
-                    )}
-                    <span className={`text-xs flex items-center gap-1 ${post.is_published ? 'text-green-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {post.is_published ? <Eye size={12} /> : <EyeOff size={12} />}
-                      {post.is_published ? 'Published' : 'Draft'}
-                    </span>
-                    <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {new Date(post.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
+        <div className="grid gap-3">
+          {filtered.map(post => (
+            <article key={post.id} className="a-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4">
+              <div className="a-thumb" style={{ width: 84, height: 60, borderRadius: 12 }}>
+                {post.cover_image ? <img src={post.cover_image} alt="" loading="lazy" decoding="async" /> : <FileText size={20} aria-hidden="true" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold truncate">{post.title_uz}</h3>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1.5">
+                  <span className={`a-badge ${post.is_published ? 'is-green' : 'is-amber'}`}>{post.is_published ? 'Nashr qilingan' : 'Qoralama'}</span>
+                  {post.category && <span className="a-badge is-blue">{post.category}</span>}
+                  <span className="a-muted a-num text-xs">{new Date(post.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0 ml-4">
-                <button onClick={() => openEdit(post)} className={`p-2.5 rounded-xl transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
-                  <Pencil size={16} />
-                </button>
-                <button onClick={() => handleDelete(post.id)} className={`p-2.5 rounded-xl transition-colors ${isDark ? 'hover:bg-red-500/10 text-red-400' : 'hover:bg-red-50 text-red-500'}`}>
-                  <Trash2 size={16} />
-                </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button type="button" onClick={() => openEdit(post)} className="a-btn a-icon-btn" aria-label={`${post.title_uz} postini tahrirlash`}><Pencil size={16} aria-hidden="true" /></button>
+                <button type="button" onClick={() => setDeleteTarget(post)} className="a-btn a-btn-danger a-icon-btn" aria-label={`${post.title_uz} postini o'chirish`}><Trash2 size={16} aria-hidden="true" /></button>
               </div>
-            </div>
+            </article>
           ))}
-          {posts.length === 0 && (
-            <p className={`text-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Hali postlar yo'q</p>
-          )}
         </div>
       )}
 
-      {/* Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setModalOpen(false)}>
-          <div
-            onClick={e => e.stopPropagation()}
-            className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 ${
-              isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white shadow-2xl'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className={`text-xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {editingPost ? 'Postni tahrirlash' : 'Yangi post'}
-              </h2>
-              <button onClick={() => setModalOpen(false)} className={`p-2 rounded-xl ${isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
-                <X size={20} />
-              </button>
+      {/* Tahrirlash oynasi */}
+      <Overlay open={modalOpen} onClose={requestClose} labelledBy="post-dlg-title" wide lockClose={saving}>
+        <div className="a-dialog-head">
+          <div className="min-w-0">
+            <h2 id="post-dlg-title" className="a-h2">{editingPost ? 'Postni tahrirlash' : 'Yangi post'}</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <AdminLangTabs activeTab={lang} onTabChange={setLang} />
+            <CloseBtn onClick={requestClose} />
+          </div>
+        </div>
+
+        <div className="a-dialog-body grid gap-5">
+          <Field label={`Sarlavha (${L})`} error={lang === 'uz' ? titleError : ''}>
+            {id => <input id={id} className="a-input" value={(form as any)[`title_${lang}`]} onChange={e => updateField(`title_${lang}`, e.target.value)} placeholder="Sarlavha..." aria-invalid={!!titleError && lang === 'uz'} />}
+          </Field>
+
+          <Field label="Slug" help="Havola manzili: /blog/slug. Bo'sh qoldirsangiz sarlavhadan avtomatik yaratiladi.">
+            {id => <input id={id} className="a-input a-code" style={{ fontSize: '.85rem' }} value={form.slug} onChange={e => updateField('slug', e.target.value)} placeholder="post-slug" />}
+          </Field>
+
+          {/* Kontent — Markdown */}
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <label className="a-label" style={{ margin: 0 }} htmlFor="post-content">Kontent ({L}) — Markdown</label>
+              <div className="a-tabs" role="group" aria-label="Ko'rinish rejimi">
+                {([['edit', <AlignLeft size={13} />, 'Yozish'], ['split', <Columns size={13} />, 'Ikkiga'], ['preview', <Eye size={13} />, 'Ko\'rish']] as [typeof previewMode, React.ReactNode, string][]).map(([mode, icon, label]) => (
+                  <button key={mode} type="button" aria-pressed={previewMode === mode} aria-selected={previewMode === mode} onClick={() => setPreviewMode(mode)} className="a-tab inline-flex items-center gap-1.5" style={{ minHeight: 32 }}>
+                    {icon}{label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Language Tabs */}
-            <div className="flex gap-2 mb-6">
-              {langTabs.map(tab => (
-                <button
-                  key={tab.code}
-                  onClick={() => setLang(tab.code)}
-                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                    lang === tab.code
-                      ? 'bg-[#0061ff] text-white'
-                      : isDark ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-4">
-              {/* Title per language */}
-              <div>
-                <label className={`text-sm font-bold mb-1.5 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Sarlavha ({lang.toUpperCase()})
-                </label>
-                <input
-                  className={inputClass}
-                  value={(form as any)[`title_${lang}`]}
-                  onChange={e => updateField(`title_${lang}`, e.target.value)}
-                  placeholder="Sarlavha..."
-                />
+            {previewMode !== 'preview' && (
+              <div className="a-toolbar mb-2" role="toolbar" aria-label="Matn formati">
+                {[
+                  { icon: <Bold size={15} />, action: () => insertMarkdown('**', '**', 'qalin matn'), title: 'Qalin' },
+                  { icon: <Italic size={15} />, action: () => insertMarkdown('*', '*', 'kursiv'), title: 'Kursiv' },
+                  { icon: <Heading size={15} />, action: () => insertMarkdown('## ', '', 'Sarlavha'), title: 'Sarlavha (H2)' },
+                  { icon: <Code size={15} />, action: () => insertMarkdown('`', '`', 'kod'), title: 'Kod' },
+                  { icon: <Link size={15} />, action: () => insertMarkdown('[', '](https://)', 'link matni'), title: 'Havola' },
+                  { icon: <Image size={15} />, action: () => insertMarkdown('![', '](https://)', 'rasm'), title: 'Rasm' },
+                ].map((btn, i) => (
+                  <button key={i} type="button" onClick={btn.action} title={btn.title} aria-label={btn.title}>{btn.icon}</button>
+                ))}
+                <span className="a-muted text-xs ml-2 hidden sm:inline">Markdown qo&apos;llab-quvvatlanadi</span>
               </div>
+            )}
 
-              {/* Slug */}
-              <div>
-                <label className={`text-sm font-bold mb-1.5 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Slug</label>
-                <input
-                  className={inputClass}
-                  value={form.slug}
-                  onChange={e => updateField('slug', e.target.value)}
-                  placeholder="post-slug"
-                />
-              </div>
-
-              {/* Content — Markdown Editor */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Kontent ({lang.toUpperCase()}) — Markdown
-                  </label>
-                  {/* View mode toggle */}
-                  <div className={`flex rounded-xl overflow-hidden border text-xs font-bold ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                    {([['edit', <AlignLeft size={12} />, 'Yozish'], ['split', <Columns size={12} />, 'Split'], ['preview', <Eye size={12} />, 'Ko\'rish']] as [typeof previewMode, React.ReactNode, string][]).map(([mode, icon, label]) => (
-                      <button key={mode} onClick={() => setPreviewMode(mode)}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 transition-colors ${previewMode === mode ? 'bg-[#0061ff] text-white' : isDark ? 'bg-slate-800 text-slate-400' : 'bg-white text-slate-500'}`}>
-                        {icon} {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Toolbar */}
-                {previewMode !== 'preview' && (
-                  <div className={`flex items-center gap-1 mb-2 p-1.5 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                    {[
-                      { icon: <Bold size={14} />, action: () => insertMarkdown('**', '**', 'qalin matn'), title: 'Qalin' },
-                      { icon: <Italic size={14} />, action: () => insertMarkdown('*', '*', 'kursiv'), title: 'Kursiv' },
-                      { icon: <Heading size={14} />, action: () => insertMarkdown('## ', '', 'Sarlavha'), title: 'H2' },
-                      { icon: <Code size={14} />, action: () => insertMarkdown('`', '`', 'kod'), title: 'Kod' },
-                      { icon: <Link size={14} />, action: () => insertMarkdown('[', '](https://)', 'link matni'), title: 'Link' },
-                      { icon: <Image size={14} />, action: () => insertMarkdown('![', '](https://)', 'rasm'), title: 'Rasm' },
-                    ].map((btn, i) => (
-                      <button key={i} onClick={btn.action} title={btn.title}
-                        className={`p-2 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-900 hover:bg-white'}`}>
-                        {btn.icon}
-                      </button>
-                    ))}
-                    <div className={`w-px h-5 mx-1 ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
-                    <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Markdown qo'llab-quvvatlanadi</span>
-                  </div>
-                )}
-
-                {/* Editor / Preview */}
-                <div className={`flex gap-3 ${previewMode === 'split' ? 'flex-row' : 'flex-col'}`}>
-                  {previewMode !== 'preview' && (
-                    <textarea
-                      ref={contentRef}
-                      className={`${inputClass} resize-y font-mono text-xs leading-relaxed ${previewMode === 'split' ? 'flex-1 min-h-[300px]' : 'min-h-[250px]'}`}
-                      value={(form as any)[`content_${lang}`]}
-                      onChange={e => updateField(`content_${lang}`, e.target.value)}
-                      placeholder="# Sarlavha&#10;&#10;**Qalin** va *kursiv* matnlar&#10;&#10;- Ro'yxat elementi&#10;- Boshqa element"
-                    />
-                  )}
-                  {previewMode !== 'edit' && (
-                    <div
-                      className={`rounded-xl border p-4 text-sm leading-relaxed ${previewMode === 'split' ? 'flex-1 min-h-[300px] overflow-y-auto' : 'min-h-[200px]'} ${isDark ? 'bg-slate-800/50 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
-                      dangerouslySetInnerHTML={{ __html: (form as any)[`content_${lang}`] ? DOMPurify.sanitize(renderMarkdown((form as any)[`content_${lang}`])) : `<span style="opacity:0.4">Preview bu yerda ko'rinadi...</span>` }}
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Excerpt per language */}
-              <div>
-                <label className={`text-sm font-bold mb-1.5 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Qisqa tavsif ({lang.toUpperCase()})
-                </label>
+            <div className={`grid gap-3 ${previewMode === 'split' ? 'md:grid-cols-2' : ''}`}>
+              {previewMode !== 'preview' && (
                 <textarea
-                  className={`${inputClass} min-h-[80px] resize-y`}
-                  value={(form as any)[`excerpt_${lang}`]}
-                  onChange={e => updateField(`excerpt_${lang}`, e.target.value)}
-                  placeholder="Qisqa tavsif..."
+                  id="post-content" ref={contentRef}
+                  className="a-textarea a-code" style={{ fontSize: '.8rem', minHeight: previewMode === 'split' ? 320 : 260 }}
+                  value={content}
+                  onChange={e => updateField(`content_${lang}`, e.target.value)}
+                  placeholder={"# Sarlavha\n\n**Qalin** va *kursiv* matnlar\n\n- Ro'yxat elementi\n- Boshqa element"}
                 />
-              </div>
-
-              {/* Cover image */}
-              <div>
-                <label className={`text-sm font-bold mb-1.5 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Muqova rasmi</label>
-                <div className="flex gap-2">
-                  <input
-                    className={`${inputClass} flex-1`}
-                    value={form.cover_image}
-                    onChange={e => updateField('cover_image', e.target.value)}
-                    placeholder="https://... yoki fayldan yuklang"
-                  />
-                  <label className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-bold cursor-pointer transition-colors ${coverUploading ? 'opacity-50' : ''} ${isDark ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                    <Image size={14} /> {coverUploading ? 'Yuklanmoqda...' : 'Yuklash'}
-                    <input type="file" accept="image/*" className="hidden" disabled={coverUploading}
-                      onChange={e => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = ''; }} />
-                  </label>
-                </div>
-                {form.cover_image && (
-                  <img src={form.cover_image} alt="preview" className="mt-2 h-24 rounded-xl object-cover border border-slate-200" />
-                )}
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className={`text-sm font-bold mb-1.5 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Kategoriya</label>
-                <input
-                  className={inputClass}
-                  value={form.category}
-                  onChange={e => updateField('category', e.target.value)}
-                  placeholder="Texnologiya, Ta'lim..."
+              )}
+              {previewMode !== 'edit' && (
+                <div
+                  className="a-prose rounded-xl p-4 overflow-y-auto"
+                  style={{ border: '1px solid var(--a-line)', background: 'var(--a-surface-2)', minHeight: previewMode === 'split' ? 320 : 200, maxHeight: 420 }}
+                  dangerouslySetInnerHTML={{ __html: content ? DOMPurify.sanitize(renderMarkdown(content)) : `<span style="opacity:0.5">Ko'rinish shu yerda chiqadi...</span>` }}
                 />
-              </div>
-
-              {/* Published toggle */}
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => updateField('is_published', !form.is_published)}
-                  className={`w-12 h-7 rounded-full relative transition-colors ${form.is_published ? 'bg-[#0061ff]' : isDark ? 'bg-slate-700' : 'bg-slate-300'}`}
-                >
-                  <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-all ${form.is_published ? 'left-6' : 'left-1'}`} />
-                </button>
-                <span className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                  {form.is_published ? 'Published' : 'Draft'}
-                </span>
-              </div>
+              )}
             </div>
+          </div>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-3 mt-8">
-              <button
-                onClick={() => setModalOpen(false)}
-                className={`px-5 py-3 rounded-xl text-sm font-bold transition-colors ${isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-              >
-                Bekor qilish
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#0061ff] text-white text-sm font-bold hover:bg-blue-600 transition-colors"
-              >
-                <Save size={16} /> Saqlash
-              </button>
+          <Field label={`Qisqa tavsif (${L})`}>
+            {id => <textarea id={id} className="a-textarea" style={{ minHeight: 80 }} value={(form as any)[`excerpt_${lang}`]} onChange={e => updateField(`excerpt_${lang}`, e.target.value)} placeholder="Qisqa tavsif..." />}
+          </Field>
+
+          <div>
+            <Field label="Muqova rasmi (havola)">
+              {id => <input id={id} className="a-input" value={form.cover_image} onChange={e => updateField('cover_image', e.target.value)} placeholder="https://... yoki fayldan yuklang" />}
+            </Field>
+            <div className="a-dropzone mt-2.5">
+              <div className="a-thumb" style={{ width: 96, height: 64, borderRadius: 12 }}>
+                {form.cover_image ? <img src={form.cover_image} alt="Muqova ko'rinishi" /> : <Image size={22} aria-hidden="true" />}
+              </div>
+              <label className="a-btn" style={{ cursor: coverUploading ? 'wait' : 'pointer', opacity: coverUploading ? 0.6 : 1 }}>
+                {coverUploading ? <Spinner /> : <Image size={16} aria-hidden="true" />}
+                {coverUploading ? 'Yuklanmoqda...' : 'Fayldan yuklash'}
+                <input type="file" accept="image/*" className="sr-only" disabled={coverUploading}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = ''; }} />
+              </label>
+            </div>
+          </div>
+
+          <div className="a-grid2">
+            <Field label="Kategoriya">
+              {id => <input id={id} className="a-input" value={form.category} onChange={e => updateField('category', e.target.value)} placeholder="Texnologiya, Ta'lim..." />}
+            </Field>
+            <div>
+              <span className="a-label">Holat</span>
+              <div className="flex items-center gap-3 a-item" style={{ padding: '.3rem .85rem' }}>
+                <Switch checked={form.is_published} onChange={() => updateField('is_published', !form.is_published)} label="Nashr qilish" />
+                <span className="text-sm font-semibold">{form.is_published ? 'Nashr qilingan' : 'Qoralama'}</span>
+              </div>
             </div>
           </div>
         </div>
-      )}
+
+        <div className="a-dialog-foot">
+          {dirty && <span className="mr-auto inline-flex items-center gap-2 text-sm font-semibold"><span className="a-dot" aria-hidden="true" />Saqlanmagan</span>}
+          <button type="button" className="a-btn" onClick={requestClose} disabled={saving}>Bekor qilish</button>
+          <button type="button" className="a-btn a-btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? <Spinner /> : <Save size={16} aria-hidden="true" />}{saving ? 'Saqlanmoqda...' : 'Saqlash'}
+          </button>
+        </div>
+      </Overlay>
+
+      <ConfirmDialog
+        open={!!deleteTarget} title="Postni o'chirasizmi?" busy={deleting}
+        message={deleteTarget ? `"${deleteTarget.title_uz}" posti butunlay o'chiriladi. Bu amalni qaytarib bo'lmaydi.` : ''}
+        confirmLabel="Ha, o'chirish" onConfirm={confirmDelete} onCancel={() => setDeleteTarget(null)}
+      />
+      <ConfirmDialog
+        open={discardOpen} title="O'zgarishlar saqlanmasin?" danger={false}
+        message="Saqlanmagan o'zgarishlar bor. Chiqsangiz, ular yo'qoladi."
+        confirmLabel="Chiqish" cancelLabel="Tahrirlashda qolish"
+        onConfirm={() => { setDiscardOpen(false); setModalOpen(false); }} onCancel={() => setDiscardOpen(false)}
+      />
     </div>
   );
 };

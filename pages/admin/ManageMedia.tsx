@@ -1,20 +1,29 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { motion } from 'framer-motion';
-import { Save, Video, Type, Image as ImageIcon, MapPin, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { Video, Type, Image as ImageIcon, MapPin, Plus, Trash2, Home, Info, Phone, Globe2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useTheme } from '../../store/ThemeContext';
 import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
 import { uploadImageToAPIWithStats } from '../../utils/api';
+import { PageHeader, Section, Field, ImageField, SaveBar, useBeforeUnload } from '../../components/admin/ui/kit';
+
+type TabKey = 'hero' | 'about' | 'contact' | 'videos' | 'gallery';
+
+const TABS: { key: TabKey; label: string; icon: React.ReactNode; localized: boolean }[] = [
+  { key: 'hero', label: 'Bosh sahifa', icon: <Home size={15} aria-hidden="true" />, localized: true },
+  { key: 'about', label: 'Biz haqimizda', icon: <Info size={15} aria-hidden="true" />, localized: true },
+  { key: 'contact', label: 'Aloqa', icon: <Phone size={15} aria-hidden="true" />, localized: true },
+  { key: 'videos', label: 'Videolar', icon: <Video size={15} aria-hidden="true" />, localized: false },
+  { key: 'gallery', label: 'Galereya', icon: <ImageIcon size={15} aria-hidden="true" />, localized: false },
+];
 
 export default function ManageMedia() {
   const { siteContent, updateSiteContent } = useStore();
-  const { isDark } = useTheme();
   const [isSaving, setIsSaving] = useState(false);
   const [aboutSavings, setAboutSavings] = useState<string | null>(null);
   const [gallerySavings, setGallerySavings] = useState<Record<number, string>>({});
+  const [tab, setTab] = useState<TabKey>('hero');
 
-  const [formData, setFormData] = useState(() => {
+  const buildInitial = () => {
     const normalize = (val: any) => typeof val === 'string' ? { uz: val, ru: val, en: val } : (val || { uz: '', ru: '', en: '' });
     return {
       ...siteContent,
@@ -30,8 +39,13 @@ export default function ManageMedia() {
       contactLandmark: normalize(siteContent.contactLandmark),
       contactSchedule: normalize(siteContent.contactSchedule),
     };
-  });
+  };
+  const [formData, setFormData] = useState(buildInitial);
+  const [baseline, setBaseline] = useState(() => JSON.stringify(formData));
   const [activeLang, setActiveLang] = useState<Lang>('uz');
+
+  const dirty = useMemo(() => JSON.stringify(formData) !== baseline, [formData, baseline]);
+  useBeforeUnload(dirty);
 
   const handleAboutImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,6 +115,7 @@ export default function ManageMedia() {
     setIsSaving(true);
     try {
       await updateSiteContent(formData);
+      setBaseline(JSON.stringify(formData));
       toast.success('O\'zgarishlar muvaffaqiyatli saqlandi!');
     } catch (error) {
       toast.error('Saqlashda xatolik yuz berdi. Qaytadan urinib ko\'ring.');
@@ -109,195 +124,172 @@ export default function ManageMedia() {
     }
   };
 
-  const inputClass = `w-full px-4 py-3 rounded-2xl border outline-none transition-all font-medium ${isDark ? 'bg-slate-800 border-slate-700 text-white focus:border-[#60efff]' : 'bg-white border-slate-200 focus:border-[#0061ff] focus:ring-2 focus:ring-blue-100'}`;
-  const labelClass = `block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`;
-  const sectionTitleClass = `text-2xl font-bold mb-6 flex items-center gap-3 ${isDark ? 'text-white' : 'text-slate-900'}`;
+  const L = activeLang.toUpperCase();
+  const loc = (name: string) => ((formData as any)[name]?.[activeLang] as string) || '';
+  const current = TABS.find(t => t.key === tab)!;
 
   return (
-    <div className="space-y-8 pb-32">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
-        <div>
-          <h1 className={`text-4xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Media va Matnlar</h1>
-          <p className={`font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Asosiy matnlar, rasmlar va videolarni o\'zgartiring.</p>
-        </div>
-      </motion.div>
+    <div className="pb-6">
+      <PageHeader
+        kicker="Kontent"
+        title="Media va matnlar"
+        sub="Sayt matnlari, rasmlar va videolarni bo'limlar bo'yicha tahrirlang."
+      />
 
-      <div className={`rounded-[2.5rem] p-8 border shadow-sm space-y-12 relative ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-white border-slate-100'}`}>
-
-        <div className="sticky top-0 z-10 pt-4 pb-2 bg-inherit backdrop-blur-xl border-b -mx-8 px-8 mb-8" style={{ borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
-          <AdminLangTabs activeTab={activeLang} onTabChange={setActiveLang} />
-        </div>
-
-        {/* Hero Texts */}
-        <div>
-          <h2 className={sectionTitleClass}>
-            <Type className={isDark ? "text-[#60efff]" : "text-blue-600"} />
-            Bosh Sahifa Matnlari ({activeLang.toUpperCase()})
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Asosiy Sarlavha (1-qism)</label>
-              <input type="text" name="heroTitle" value={formData.heroTitle?.[activeLang] || ''} onChange={handleLocalizedChange} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Asosiy Sarlavha (2-qism, asosiy rangda)</label>
-              <input type="text" name="heroSubtitle" value={formData.heroSubtitle?.[activeLang] || ''} onChange={handleLocalizedChange} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Tavsif (Description)</label>
-              <textarea name="heroDescription" value={formData.heroDescription?.[activeLang] || ''} onChange={handleLocalizedChange} rows={3} className={`${inputClass} resize-none`} />
+      <div className="a-lockbar">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="a-scrollx" style={{ maxWidth: '100%' }}>
+            <div className="a-tabs" role="tablist" aria-label="Bo'limlar" style={{ flexWrap: 'nowrap' }}>
+              {TABS.map(t => (
+                <button
+                  key={t.key} type="button" role="tab" id={`mm-tab-${t.key}`} aria-controls="mm-panel"
+                  aria-selected={tab === t.key} onClick={() => setTab(t.key)}
+                  className="a-tab inline-flex items-center gap-1.5" style={{ whiteSpace: 'nowrap' }}
+                >
+                  {t.icon}{t.label}
+                </button>
+              ))}
             </div>
           </div>
+          {current.localized ? (
+            <div className="flex items-center gap-2">
+              <Globe2 size={15} className="a-muted" aria-hidden="true" />
+              <AdminLangTabs activeTab={activeLang} onTabChange={setActiveLang} />
+            </div>
+          ) : (
+            <span className="a-sub inline-flex items-center gap-1.5" style={{ fontSize: '.8rem' }}><Globe2 size={14} aria-hidden="true" />Bu bo&apos;lim barcha tillar uchun umumiy</span>
+          )}
         </div>
+      </div>
 
-        <hr className={isDark ? "border-slate-800" : "border-slate-100"} />
+      <div id="mm-panel" role="tabpanel" aria-labelledby={`mm-tab-${tab}`} className="space-y-4">
+        {tab === 'hero' && (
+          <Section title={`Bosh sahifa matnlari`} desc={`Birinchi ekrandagi sarlavha va tavsif. Hozirgi til: ${L}.`} icon={<Type size={18} />}>
+            <div className="grid gap-4">
+              <Field label="Asosiy sarlavha (1-qism)">
+                {id => <input id={id} type="text" name="heroTitle" value={loc('heroTitle')} onChange={handleLocalizedChange} className="a-input" />}
+              </Field>
+              <Field label="Asosiy sarlavha (2-qism, asosiy rangda)">
+                {id => <input id={id} type="text" name="heroSubtitle" value={loc('heroSubtitle')} onChange={handleLocalizedChange} className="a-input" />}
+              </Field>
+              <Field label="Tavsif">
+                {id => <textarea id={id} name="heroDescription" value={loc('heroDescription')} onChange={handleLocalizedChange} rows={3} className="a-textarea" />}
+              </Field>
+            </div>
+          </Section>
+        )}
 
-        {/* About Texts */}
-        <div>
-          <h2 className={sectionTitleClass}>
-            <Type className={isDark ? "text-[#60efff]" : "text-blue-600"} />
-            Biz Haqimizda Matnlari ({activeLang.toUpperCase()})
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Sarlavha</label>
-              <input type="text" name="aboutTitle" value={formData.aboutTitle?.[activeLang] || ''} onChange={handleLocalizedChange} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Tavsif</label>
-              <textarea name="aboutDescription" value={formData.aboutDescription?.[activeLang] || ''} onChange={handleLocalizedChange} rows={4} className={`${inputClass} resize-none`} />
-            </div>
-            <div>
-              <label className={labelClass}>Iqtibos (Quote)</label>
-              <textarea name="aboutQuote" value={formData.aboutQuote?.[activeLang] || ''} onChange={handleLocalizedChange} rows={2} className={`${inputClass} resize-none`} />
-            </div>
-            <div>
-              <label className={labelClass}>Biz haqimizda Rasmi — Asoschi surati (Yuklash)</label>
-              <div className="flex gap-4 items-center">
-                {formData.aboutImage && <img src={formData.aboutImage} loading="lazy" decoding="async" className={`w-16 h-16 rounded-xl object-cover shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />}
-                <div className="flex-1">
-                  <input type="file" accept="image/*" onChange={handleAboutImageUpload} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
-                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="flex items-center gap-1 text-xs font-bold text-emerald-500"><CheckCircle2 size={13} />WebP avtomatik</span>
-                    {aboutSavings && <span className="text-xs font-semibold text-blue-500">{aboutSavings}</span>}
-                  </div>
+        {tab === 'about' && (
+          <>
+            <Section title="Biz haqimizda matnlari" desc={`Bosh sahifadagi va alohida sahifadagi matn. Hozirgi til: ${L}.`} icon={<Type size={18} />}>
+              <div className="grid gap-4">
+                <Field label="Sarlavha">
+                  {id => <input id={id} type="text" name="aboutTitle" value={loc('aboutTitle')} onChange={handleLocalizedChange} className="a-input" />}
+                </Field>
+                <Field label="Tavsif">
+                  {id => <textarea id={id} name="aboutDescription" value={loc('aboutDescription')} onChange={handleLocalizedChange} rows={5} className="a-textarea" />}
+                </Field>
+                <Field label="Iqtibos (Quote)">
+                  {id => <textarea id={id} name="aboutQuote" value={loc('aboutQuote')} onChange={handleLocalizedChange} rows={2} className="a-textarea" />}
+                </Field>
+              </div>
+            </Section>
+            <Section title="Asoschi" desc="Asoschi kartochkasi: surat, ism va lavozim." icon={<Info size={18} />}>
+              <div className="grid gap-4">
+                <ImageField
+                  label="Asoschi surati"
+                  value={formData.aboutImage}
+                  onChange={handleAboutImageUpload}
+                  savings={aboutSavings}
+                  help={'Bosh sahifadagi "Biz haqimizda" bo\'limi va "Biz haqimizda" sahifasidagi asoschi kartochkasida ishlatiladi.'}
+                />
+                <div className="a-grid2">
+                  <Field label={`Asoschi ismi (${L})`}>
+                    {id => <input id={id} type="text" name="founderName" value={loc('founderName')} onChange={handleLocalizedChange} className="a-input" />}
+                  </Field>
+                  <Field label={`Asoschi lavozimi (${L})`}>
+                    {id => <input id={id} type="text" name="founderTitle" value={loc('founderTitle')} onChange={handleLocalizedChange} className="a-input" />}
+                  </Field>
                 </div>
               </div>
-              <p className={`text-xs mt-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Shu rasm bosh sahifadagi "Biz haqimizda" bo'limi va "Biz haqimizda" sahifasidagi asoschi kartochkasida ishlatiladi.</p>
-            </div>
-            <div>
-              <label className={labelClass}>Asoschi ismi ({activeLang.toUpperCase()})</label>
-              <input type="text" name="founderName" value={formData.founderName?.[activeLang] || ''} onChange={handleLocalizedChange} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Asoschi lavozimi ({activeLang.toUpperCase()})</label>
-              <input type="text" name="founderTitle" value={formData.founderTitle?.[activeLang] || ''} onChange={handleLocalizedChange} className={inputClass} />
-            </div>
-          </div>
-        </div>
+            </Section>
+          </>
+        )}
 
-        <hr className={isDark ? "border-slate-800" : "border-slate-100"} />
+        {tab === 'contact' && (
+          <Section title="Aloqa ma'lumotlari" desc="Manzil, telefon va ish vaqti saytning aloqa qismida ko'rinadi." icon={<MapPin size={18} />}>
+            <div className="a-grid2">
+              <Field label={`Manzil (${L})`}>
+                {id => <input id={id} type="text" name="contactAddress" value={loc('contactAddress')} onChange={handleLocalizedChange} className="a-input" />}
+              </Field>
+              <Field label={`Mo'ljal (${L})`}>
+                {id => <input id={id} type="text" name="contactLandmark" value={loc('contactLandmark')} onChange={handleLocalizedChange} className="a-input" />}
+              </Field>
+              <Field label="Telefon (umumiy)">
+                {id => <input id={id} type="text" inputMode="tel" name="contactPhone" value={formData.contactPhone || ''} onChange={handleStringChange} className="a-input" />}
+              </Field>
+              <Field label="Email (umumiy)">
+                {id => <input id={id} type="text" inputMode="email" name="contactEmail" value={formData.contactEmail || ''} onChange={handleStringChange} className="a-input" />}
+              </Field>
+              <Field label={`Ish vaqti (${L})`} className="a-span2">
+                {id => <input id={id} type="text" name="contactSchedule" value={loc('contactSchedule')} onChange={handleLocalizedChange} className="a-input" />}
+              </Field>
+            </div>
+          </Section>
+        )}
 
-        {/* Contact Info */}
-        <div>
-          <h2 className={sectionTitleClass}>
-            <MapPin className={isDark ? "text-[#60efff]" : "text-blue-600"} />
-            Aloqa Ma'lumotlari
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Manzil ({activeLang.toUpperCase()})</label>
-              <input type="text" name="contactAddress" value={formData.contactAddress?.[activeLang] || ''} onChange={handleLocalizedChange} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Mo'ljal ({activeLang.toUpperCase()})</label>
-              <input type="text" name="contactLandmark" value={formData.contactLandmark?.[activeLang] || ''} onChange={handleLocalizedChange} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Telefon (Umumiy)</label>
-              <input type="text" name="contactPhone" value={formData.contactPhone || ''} onChange={handleStringChange} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Email (Umumiy)</label>
-              <input type="text" name="contactEmail" value={formData.contactEmail || ''} onChange={handleStringChange} className={inputClass} />
-            </div>
-            <div className="md:col-span-2">
-              <label className={labelClass}>Ish vaqti ({activeLang.toUpperCase()})</label>
-              <input type="text" name="contactSchedule" value={formData.contactSchedule?.[activeLang] || ''} onChange={handleLocalizedChange} className={inputClass} />
-            </div>
-          </div>
-        </div>
-
-        <hr className={isDark ? "border-slate-800" : "border-slate-100"} />
-
-        {/* Videos */}
-        <div>
-          <h2 className={sectionTitleClass}>
-            <Video className={isDark ? "text-[#60efff]" : "text-blue-600"} />
-            Videolar (Umumiy)
-          </h2>
-          <div className="space-y-6">
-            <div>
-              <label className={labelClass}>DATAga Sayohat (YouTube Embed URL)</label>
-              <input type="text" name="tourVideoUrl" value={formData.tourVideoUrl || ''} onChange={handleStringChange} className={`${inputClass} font-mono text-sm`} />
-            </div>
-
-            <div>
-              <label className={labelClass}>O'quvchilar Fikri (YouTube Shorts ID'lari)</label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {tab === 'videos' && (
+          <>
+            <Section title="DATAga sayohat" desc="Bosh sahifadagi tur videosi." icon={<Video size={18} />}>
+              <Field label="YouTube embed URL" help="Masalan: https://www.youtube.com/embed/...">
+                {id => <input id={id} type="text" name="tourVideoUrl" value={formData.tourVideoUrl || ''} onChange={handleStringChange} className="a-input a-code" style={{ fontSize: '.85rem' }} />}
+              </Field>
+            </Section>
+            <Section title="O'quvchilar fikri" desc="YouTube Shorts video ID'lari (havoladagi oxirgi qism)." icon={<Video size={18} />}>
+              <div className="a-grid3">
                 {formData.testimonialVideos.map((id, idx) => (
-                  <div key={idx}>
-                    <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Video {idx + 1} ID</label>
-                    <input type="text" value={id} onChange={(e) => handleTestimonialChange(idx, e.target.value)} className={`${inputClass} font-mono text-sm`} />
+                  <Field key={idx} label={`Video ${idx + 1} ID`}>
+                    {fid => <input id={fid} type="text" value={id} onChange={(e) => handleTestimonialChange(idx, e.target.value)} className="a-input a-code" style={{ fontSize: '.85rem' }} />}
+                  </Field>
+                ))}
+              </div>
+            </Section>
+          </>
+        )}
+
+        {tab === 'gallery' && (
+          <Section
+            title="Galereya rasmlari"
+            desc={`${formData.galleryImages.length} ta rasm. Barcha tillar uchun umumiy.`}
+            icon={<ImageIcon size={18} />}
+            action={<button type="button" onClick={addGalleryImage} className="a-btn"><Plus size={16} aria-hidden="true" /> Rasm qo&apos;shish</button>}
+          >
+            {formData.galleryImages.length === 0 ? (
+              <div className="a-empty"><ImageIcon size={32} className="mx-auto mb-2" aria-hidden="true" />Galereyada hali rasm yo&apos;q.</div>
+            ) : (
+              <div className="grid gap-3">
+                {formData.galleryImages.map((url, idx) => (
+                  <div key={idx} className="a-item flex items-start gap-3">
+                    <ImageField
+                      className="flex-1 min-w-0"
+                      label={`Rasm ${idx + 1}`}
+                      value={url}
+                      onChange={(e) => handleGalleryUpload(idx, e)}
+                      savings={gallerySavings[idx]}
+                    />
+                    <button type="button" onClick={() => removeGalleryImage(idx)} className="a-btn a-btn-danger a-icon-btn mt-6 shrink-0" aria-label={`Rasm ${idx + 1} ni olib tashlash`}>
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-        </div>
+            )}
+          </Section>
+        )}
+      </div>
 
-        <hr className={isDark ? "border-slate-800" : "border-slate-100"} />
-
-        {/* Gallery */}
-        <div>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className={`text-2xl font-bold flex items-center gap-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              <ImageIcon className={isDark ? "text-[#60efff]" : "text-blue-600"} />
-              Galereya Rasmlari (Umumiy)
-            </h2>
-            <button onClick={addGalleryImage} className={`flex items-center gap-2 text-sm font-bold transition-colors ${isDark ? 'text-[#60efff] hover:text-white' : 'text-blue-600 hover:text-blue-800'}`}>
-              <Plus size={18} /> Rasm qo'shish
-            </button>
-          </div>
-          <div className="space-y-4">
-            {formData.galleryImages.map((url, idx) => (
-              <div key={idx} className={`flex items-center gap-4 p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                {url && (
-                  <div className={`w-16 h-16 rounded-xl overflow-hidden shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                    <img src={url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                  </div>
-                )}
-                <div className="flex-1">
-                  <input type="file" accept="image/*" onChange={(e) => handleGalleryUpload(idx, e)} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
-                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="flex items-center gap-1 text-xs font-bold text-emerald-500"><CheckCircle2 size={13} />WebP avtomatik</span>
-                    {gallerySavings[idx] && <span className="text-xs font-semibold text-blue-500">{gallerySavings[idx]}</span>}
-                  </div>
-                </div>
-                <button onClick={() => removeGalleryImage(idx)} className={`p-3 rounded-xl transition-colors shrink-0 ${isDark ? 'text-slate-500 hover:text-red-400 hover:bg-slate-800' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}>
-                  <Trash2 size={20} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="pt-6 flex justify-end sticky bottom-8 z-20">
-          <button onClick={handleSave} disabled={isSaving} className={`bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2 ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}>
-            {isSaving ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Save size={20} />}
-            {isSaving ? 'Saqlanmoqda...' : 'Saqlash'}
-          </button>
-        </div>
+      <div className="mt-6">
+        <SaveBar dirty={dirty} saving={isSaving} onSave={handleSave} />
       </div>
     </div>
   );

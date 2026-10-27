@@ -36,10 +36,10 @@ export const Manifesto: React.FC = () => {
   const spin = useTransform(scrollYProgress, [0, 1], reduced ? [0, 0] : [-50, 50]);
 
   return (
-    <section ref={secRef} className="relative py-[16vh] overflow-hidden" aria-labelledby="manifesto-k">
+    <section ref={secRef} className="relative sec overflow-hidden" aria-labelledby="manifesto-k">
       <div className="wrap grid lg:grid-cols-12 gap-14 lg:gap-16 items-center">
         <div className="lg:col-span-7">
-          <p id="manifesto-k" className="t-kicker mb-8">03 — Yondashuv</p>
+          <p id="manifesto-k" className="t-kicker mb-8">04 — Yondashuv</p>
           <p className="manifesto-text">
             <ScrollText text={TEXT} />
           </p>

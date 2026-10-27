@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatePresence, motion, useMotionValue, useMotionValueEvent, useScroll, useSpring, useTransform, type MotionValue } from 'framer-motion';
+import { motion, useMotionValueEvent, useScroll, useTransform, type MotionValue } from 'framer-motion';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { openConsult } from './consult';
 import { useStore } from '../../store/useStore';
@@ -47,59 +47,114 @@ export const Directions: React.FC = () => {
   return pinned ? <PinnedTrack /> : <StackedList />;
 };
 
-// ---------------------------------------------------------------- desktop: sticky explorer
-// Chapda toʻrt yoʻnalish — katta tipografik roʻyxat, scroll yoki bosish bilan faollashadi.
-// Oʻngda sahna: faol yoʻnalishning 3D muqovasi (kursorga egiladi), kurslari va keyingi qadam.
-const STEP_VH = 70;
+// ---------------------------------------------------------------- desktop: "metro xaritasi"
+// Pin qilingan gorizontal sayohat: har yoʻnalish — oʻz rangidagi metro liniyasi, kurslar — uning bekatlari.
+// Ekran markazidagi "poyezd" liniya boʻylab yuradi; 3D obyektlar oʻz bobiga yaqinlashganda jonlanadi.
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+// vertikal scroll gorizontal masofaning shu ulushi: trek scroll'dan ~1.8x tez yuradi, bo'lim ~2 ekran
+const TRAVEL = 0.55;
+
+// Har yoʻnalishning fonsiz 3D obyekti (public/images/v2/dirs). Fayl topilmasa kurs muqovasi qoʻyiladi.
+const dirArt = (id: string) => `/images/v2/dirs/dir-${id}.webp`;
 
 const PinnedTrack: React.FC = () => {
   const { courses } = useStore();
   const sectionRef = useRef<HTMLElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [geo, setGeo] = useState({ dist: 0, vw: 1440, centers: [] as number[], edges: [] as number[] });
   const [active, setActive] = useState(0);
+
+  // trek qancha yurishi kerak va har bob qayerda turgani
+  useLayoutEffect(() => {
+    const measure = () => {
+      const track = trackRef.current;
+      if (!track) return;
+      const vw = window.innerWidth;
+      const kids: HTMLElement[] = Array.from(track.querySelectorAll<HTMLElement>('.mt-chapter'));
+      setGeo({
+        dist: Math.max(0, track.scrollWidth - vw),
+        vw,
+        centers: kids.map((k) => k.offsetLeft + k.offsetWidth / 2),
+        edges: kids.map((k) => k.offsetLeft),
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (trackRef.current) ro.observe(trackRef.current);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [courses.length]);
+
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ['start start', 'end end'] });
-  useMotionValueEvent(scrollYProgress, 'change', (v) => {
-    const i = Math.min(CATS.length - 1, Math.max(0, Math.floor(v * CATS.length * 0.999)));
+  const x = useTransform(scrollYProgress, (p) => -p * geo.dist);
+  useMotionValueEvent(x, 'change', (v) => {
+    // poyezd ekran markazida: qaysi bob chegarasidan oʻtgan boʻlsa, oʻsha faol
+    const mid = -v + geo.vw / 2;
+    let i = 0;
+    geo.edges.forEach((e, k) => { if (mid >= e) i = k; });
     setActive((cur) => (cur === i ? cur : i));
   });
 
-  // bosilgan yoʻnalish — shu qadamning oʻrtasiga scroll
+  // bosilgan yoʻnalish — oʻsha bobning markaziga scroll
   const go = (i: number) => {
     const sec = sectionRef.current;
-    if (!sec) return;
-    const travel = sec.offsetHeight - window.innerHeight;
+    if (!sec || !geo.dist) return;
+    const want = Math.min(1, Math.max(0, (geo.centers[i] - geo.vw / 2) / geo.dist));
     const top = sec.getBoundingClientRect().top + window.scrollY;
-    window.scrollTo({ top: top + travel * ((i + 0.5) / CATS.length), behavior: 'smooth' });
+    window.scrollTo({ top: top + want * (sec.offsetHeight - window.innerHeight), behavior: 'smooth' });
   };
 
+  const cat = CATS[active];
+
   return (
-    <section
-      ref={sectionRef}
-      id="yonalishlar"
-      className="relative"
-      style={{ height: `calc(100vh + ${CATS.length * STEP_VH}vh)` }}
-      aria-label="Taʼlim yoʻnalishlari"
-    >
-      <div className="sticky top-0 h-screen flex flex-col justify-center overflow-hidden">
+    <section ref={sectionRef} id="yonalishlar" className="relative" style={{ height: `calc(100vh + ${Math.round(geo.dist * TRAVEL)}px)` }} aria-label="Taʼlim yoʻnalishlari">
+      <div className="sticky top-0 h-screen overflow-hidden flex flex-col justify-center">
         <div className="wrap w-full">
-          <div className="flex items-end justify-between gap-10 mb-[4.5vh]">
-            <div>
-              <p className="t-kicker mb-4">04 — Yoʻnalishlar</p>
-              <h2 className="dx-title">
+          <div className="grid grid-cols-12 gap-8 items-end">
+            <div className="col-span-8">
+              <p className="t-kicker mb-4">03 — Yoʻnalishlar</p>
+              <h2 className="t-h2">
                 Toʻrt yoʻnalish. <span className="ink-3 whitespace-nowrap">{courses.length || 14} ta kurs.</span>
               </h2>
             </div>
-            <p className="t-body max-w-[22rem] text-right hidden xl:block">Har biri bozorda talab qilinadigan kasbga olib boradi.</p>
-          </div>
-
-          <div className="grid grid-cols-12 gap-8 items-stretch">
-            <ol className="col-span-5 flex flex-col justify-center" role="tablist" aria-label="Yoʻnalishni tanlang">
-              {CATS.map((c, i) => (
-                <DirTab key={c.id} cat={c} i={i} active={i === active} p={scrollYProgress} onPick={() => go(i)} />
-              ))}
-            </ol>
-            <div className="col-span-7">
-              <Stage index={active} />
+            <div className="col-span-4 flex flex-col items-end gap-4">
+              <p className="t-body text-right max-w-[20rem]">Har biri bozorda talab qilinadigan kasbga olib boradi.</p>
+              {/* liniya tanlagich — metro xaritasidagi rangli belgilar */}
+              <div className="mt-legend" role="tablist" aria-label="Yoʻnalishni tanlang">
+                {CATS.map((c, i) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === active}
+                    aria-label={c.title}
+                    title={c.title}
+                    onClick={() => go(i)}
+                    className={`mt-legend-btn ${i === active ? 'is-active' : ''}`}
+                    style={{ ['--c' as string]: c.color }}
+                  >
+                    {String(i + 1).padStart(2, '0')}
+                  </button>
+                ))}
+              </div>
             </div>
+          </div>
+        </div>
+
+        <div className="relative mt-[4vh]">
+          <motion.div ref={trackRef} className="mt-track" style={{ x }}>
+            {CATS.map((c, i) => (
+              <Chapter key={c.id} cat={c} i={i} x={x} center={geo.centers[i] ?? 0} vw={geo.vw} />
+            ))}
+          </motion.div>
+
+          {/* poyezd: ekran markazida turadi, liniya uning ostidan oʻtadi */}
+          <div className="mt-train" aria-hidden="true" style={{ ['--c' as string]: cat.color }}>
+            <span className="mt-train-pulse" />
+            <span className="mt-train-dot" />
           </div>
         </div>
       </div>
@@ -107,143 +162,68 @@ const PinnedTrack: React.FC = () => {
   );
 };
 
-const DirTab: React.FC<{ cat: (typeof CATS)[number]; i: number; active: boolean; p: MotionValue<number>; onPick: () => void }> = ({ cat, i, active, p, onPick }) => {
-  const n = CATS.length;
-  // shu qadam ichidagi progress — faol tab ostidagi chiziq toʻladi
-  const fill = useTransform(p, [i / n, (i + 1) / n], [0, 1]);
-  return (
-    <li className={`dx-tab ${active ? 'is-active' : ''}`}>
-      <button type="button" role="tab" aria-selected={active} onClick={onPick} className="dx-tab-btn">
-        <span className={`mono dx-num ${active ? cat.ink : ''}`}>{String(i + 1).padStart(2, '0')}</span>
-        <span className="dx-name">{cat.title}</span>
-      </button>
-      <AnimatePresence initial={false}>
-        {active && (
-          <motion.p
-            className="dx-blurb"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {cat.blurb}
-          </motion.p>
-        )}
-      </AnimatePresence>
-      <span className="dx-line" aria-hidden="true">
-        {active && <motion.span className="dx-line-fill" style={{ scaleX: fill, background: cat.color }} />}
-      </span>
-    </li>
-  );
-};
-
-// Har yoʻnalishning fonsiz 3D obyekti (public/images/v2/dirs). Fayl topilmasa kurs muqovasi qoʻyiladi.
-const dirArt = (id: string) => `/images/v2/dirs/dir-${id}.webp`;
-
-const Stage: React.FC<{ index: number }> = ({ index }) => {
+const Chapter: React.FC<{ cat: (typeof CATS)[number]; i: number; x: MotionValue<number>; center: number; vw: number }> = ({ cat, i, x, center, vw }) => {
   const { courses } = useStore();
   const { tField } = useLanguage();
-  const reduced = useMotionReduced();
-  const cat = CATS[index];
   const list = courses.filter((c) => c.category === cat.id);
   const fallback = list.find((c) => c.coverImage);
-  const [broken, setBroken] = useState<Record<string, boolean>>({});
+  const [broken, setBroken] = useState(false);
 
-  // kursorga qarab obyekt egiladi
-  const mx = useMotionValue(0);
-  const my = useMotionValue(0);
-  const rx = useSpring(useTransform(my, [-0.5, 0.5], [10, -10]), { stiffness: 120, damping: 16 });
-  const ry = useSpring(useTransform(mx, [-0.5, 0.5], [-14, 14]), { stiffness: 120, damping: 16 });
-  const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    mx.set((e.clientX - r.left) / r.width - 0.5);
-    my.set((e.clientY - r.top) / r.height - 0.5);
-  };
-  const onLeave = () => {
-    mx.set(0);
-    my.set(0);
-  };
+  // -1 = bob markazi chap chekkada, 0 = ekran markazida, +1 = oʻng chekkada
+  const pos = useTransform(x, (v) => (center + v - vw / 2) / (vw / 2));
+  const artX = useTransform(pos, [-1, 0, 1], [-90, 0, 120]);
+  const artRot = useTransform(pos, [-1, 0, 1], [-16, 0, 20]);
+  const artScale = useTransform(pos, [-1, 0, 1], [0.82, 1, 0.78]);
+  const ghostX = useTransform(pos, [-1, 1], [80, -80]);
+  const copyO = useTransform(pos, [-1.1, -0.45, 0.45, 1.1], [0.25, 1, 1, 0.25]);
 
-  const art = broken[cat.id] ? (fallback ? optimizedCover(fallback.coverImage) : '') : dirArt(cat.id);
+  const art = broken ? (fallback ? optimizedCover(fallback.coverImage) : '') : dirArt(cat.id);
 
   return (
-    <div className="dx-stage" role="tabpanel" aria-label={cat.title} onPointerMove={onMove} onPointerLeave={onLeave}>
-      {/* fon qatlami alohida kesiladi — obyekt esa ramkadan chiqib turishi mumkin */}
-      <div className="dx-stage-bg panel" aria-hidden="true">
-        <motion.span
-          className="dx-glow"
-          animate={{ background: `radial-gradient(60% 70% at 30% 55%, ${cat.color}38 0%, transparent 70%)` }}
-          transition={{ duration: 0.8 }}
-        />
-        <span className="dx-ghost mono">{String(index + 1).padStart(2, '0')}</span>
-      </div>
+    <article className="mt-chapter" style={{ ['--c' as string]: cat.color }} aria-label={cat.title}>
+      <div className="mt-body">
+        <motion.div className="mt-copy" style={{ opacity: copyO }}>
+          <span className="mt-badge mono">{String(i + 1).padStart(2, '0')} · {list.length} kurs</span>
+          <h3 className="mt-title">{cat.title}</h3>
+          <p className="t-body mt-3 max-w-[26rem]">{cat.blurb}</p>
+          <button type="button" onClick={() => openConsult(cat.title)} className="btn btn-primary mt-6">
+            Mos kursni tanlashda yordam <ArrowRight size={18} aria-hidden="true" />
+          </button>
+        </motion.div>
 
-      <div className="relative grid grid-cols-12 gap-6 h-full">
-        <div className="col-span-6 relative" style={{ perspective: '1100px' }} aria-hidden="true">
-          <span className="dx-shadow" style={{ background: `radial-gradient(closest-side, ${cat.color}55, transparent)` }} />
-          <AnimatePresence mode="popLayout" initial={false}>
-            {art && (
-              <motion.div
-                key={cat.id + (broken[cat.id] ? '-f' : '')}
-                className={`dx-art ${broken[cat.id] ? 'is-boxed' : ''}`}
-                style={{ rotateX: rx, rotateY: ry }}
-                initial={{ opacity: 0, scale: 0.8, rotateZ: -10, y: 40 }}
-                animate={{ opacity: 1, scale: 1, rotateZ: 0, y: 0 }}
-                exit={{ opacity: 0, scale: 1.08, y: -30, filter: 'blur(6px)' }}
-                transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <motion.img
-                  src={art}
-                  alt=""
-                  width={640}
-                  height={640}
-                  decoding="async"
-                  onError={() => setBroken((b) => ({ ...b, [cat.id]: true }))}
-                  className="w-full h-full object-contain"
-                  animate={reduced ? undefined : { y: [-10, 10, -10] }}
-                  transition={reduced ? undefined : { duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        <div className="col-span-6 flex flex-col justify-center min-h-0 py-2 pr-1">
-          <p className={`mono text-[0.78rem] tracking-[0.14em] ${cat.ink}`}>KURSLAR · {String(list.length).padStart(2, '0')}</p>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.ul
-              key={cat.id}
-              className="dx-list mt-3"
-              initial="hide"
-              animate="show"
-              exit="hide"
-              variants={{ show: { transition: { staggerChildren: 0.05 } }, hide: {} }}
-            >
-              {list.map((c, i) => (
-                <motion.li
-                  key={c.id}
-                  variants={{ hide: { opacity: 0, x: 18 }, show: { opacity: 1, x: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } } }}
-                >
-                  <Link to={`/kurslar/${c.id}`} className="dx-row group">
-                    <span className="mono ink-3 text-[0.75rem] w-6 shrink-0">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="flex-1 min-w-0 font-semibold leading-snug group-hover:underline underline-offset-4">{uz(tField(c.title))}</span>
-                    <span className="mono ink-3 text-[0.78rem] shrink-0">{uz(tField(c.duration)).split(/[.(]/)[0].trim()}</span>
-                    <ArrowUpRight size={17} className="ink-3 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
-                  </Link>
-                </motion.li>
-              ))}
-            </motion.ul>
-          </AnimatePresence>
-
-          <div className="mt-6">
-            <button type="button" onClick={() => openConsult(cat.title)} className="btn btn-primary !min-h-[48px]">
-              Mos kursni tanlashda yordam <ArrowRight size={18} aria-hidden="true" />
-            </button>
-            <p className="mono ink-3 text-[0.75rem] mt-3">Bepul konsultatsiya · 1 ish kunida qoʻngʻiroq</p>
-          </div>
+        <div className="mt-stage" aria-hidden="true">
+          <motion.span className="mt-ghost mono" style={{ x: ghostX }}>{String(i + 1).padStart(2, '0')}</motion.span>
+          <span className="mt-glow" />
+          {art && (
+            <motion.img
+              src={art}
+              alt=""
+              width={640}
+              height={640}
+              decoding="async"
+              loading="lazy"
+              onError={() => setBroken(true)}
+              className={`mt-art ${broken ? 'is-boxed' : ''}`}
+              style={{ x: artX, rotate: artRot, scale: artScale }}
+            />
+          )}
         </div>
       </div>
-    </div>
+
+      {/* liniya va bekatlar */}
+      <ol className="mt-line">
+        {list.map((c, k) => (
+          <li key={c.id} className="mt-stop">
+            <Link to={`/kurslar/${c.id}`} className="mt-stop-link group">
+              <span className="mt-stop-dot" aria-hidden="true" />
+              <span className="mono mt-stop-n">{String(k + 1).padStart(2, '0')}</span>
+              <span className="mt-stop-t group-hover:underline underline-offset-4">{uz(tField(c.title))}</span>
+              <span className="mono mt-stop-d">{uz(tField(c.duration)).split(/[.(]/)[0].trim()}</span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </article>
   );
 };
 
@@ -252,9 +232,9 @@ const StackedList: React.FC = () => {
   const { courses } = useStore();
   const { tField } = useLanguage();
   return (
-    <section id="yonalishlar" className="relative py-[12vh]" aria-label="Taʼlim yoʻnalishlari">
+    <section id="yonalishlar" className="relative sec" aria-label="Taʼlim yoʻnalishlari">
       <div className="wrap">
-        <p className="t-kicker mb-6">04 — Yoʻnalishlar</p>
+        <p className="t-kicker mb-6">03 — Yoʻnalishlar</p>
         <h2 className="t-display">
           Toʻrt yoʻnalish. <span className="ink-3">{courses.length || 14} ta kurs.</span>
         </h2>

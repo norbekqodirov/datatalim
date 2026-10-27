@@ -18,6 +18,19 @@ const initials = (name: string) =>
     .join('')
     .toUpperCase();
 
+// lavozim matnidan mos emoji: rasm boʻlmasa ham chipta "tirik" koʻrinsin
+const ROLE_EMOJI: [RegExp, string][] = [
+  [/direktor/i, '🧭'],
+  [/ta.lim/i, '🎓'],
+  [/language|til|ingliz|rus/i, '🌍'],
+  [/moliya|buxgalter|hisob/i, '📊'],
+  [/dastur|developer|python|frontend/i, '💻'],
+  [/dizayn|design|grafik/i, '🎨'],
+  [/smm|marketing|media|video/i, '🎬'],
+  [/robot/i, '🤖'],
+];
+const roleEmoji = (role: string) => ROLE_EMOJI.find(([re]) => re.test(role))?.[1] ?? '✦';
+
 /** Founder pull-quote + student video stories. */
 export const Voices: React.FC = () => {
   const { siteContent } = useStore();
@@ -28,61 +41,64 @@ export const Voices: React.FC = () => {
   const videos = (siteContent.testimonialVideos || []).map(youtubeId).filter(Boolean).slice(0, 3);
 
   return (
-    <section className="relative py-[14vh]" aria-labelledby="voices-title">
-      <div className="wrap">
-        <p className="t-kicker mb-10 text-center">07 — Ovozlar</p>
-        {quote && (
-          <figure className="max-w-5xl mx-auto text-center">
-            <blockquote>
-              <p id="voices-title" className="t-h2" style={{ fontWeight: 500 }}>
-                <span className="ink-grad" aria-hidden="true">«</span>
-                <ScrollText text={quote} />
-                <span className="ink-grad" aria-hidden="true">»</span>
-              </p>
-            </blockquote>
-            <figcaption className="mt-8 flex items-center justify-center gap-4 text-left">
-              {siteContent.aboutImage ? (
-                <img src={siteContent.aboutImage} alt={founder} className="w-14 h-14 rounded-full object-cover" loading="lazy" width={56} height={56} />
-              ) : (
-                <span className="w-14 h-14 rounded-full flex items-center justify-center mono" style={{ background: 'var(--bg-3)' }} aria-hidden="true">
-                  {initials(founder)}
+    <section className="relative sec" aria-labelledby="voices-title">
+      {/* 2 ustun: chapda asoschi so'zi + keyingi qadam, o'ngda o'quvchi videolari — vazn teng */}
+      <div className={`wrap grid grid-cols-1 gap-12 lg:gap-8 [&>*]:min-w-0 ${videos.length ? 'lg:grid-cols-12 lg:items-center' : ''}`}>
+        <div className={videos.length ? 'lg:col-span-5' : 'max-w-4xl mx-auto text-center'}>
+          <p className="t-kicker mb-8">07 — Ovozlar</p>
+          {quote && (
+            <figure>
+              <blockquote>
+                <p id="voices-title" className="voice-quote">
+                  <span className="ink-grad" aria-hidden="true">«</span>
+                  <ScrollText text={quote} />
+                  <span className="ink-grad" aria-hidden="true">»</span>
+                </p>
+              </blockquote>
+              <figcaption className={`mt-7 flex items-center gap-4 text-left ${videos.length ? '' : 'justify-center'}`}>
+                {siteContent.aboutImage ? (
+                  <img src={siteContent.aboutImage} alt={founder} className="w-12 h-12 rounded-full object-cover" loading="lazy" width={48} height={48} />
+                ) : (
+                  <span className="w-12 h-12 rounded-full flex items-center justify-center mono" style={{ background: 'var(--bg-3)' }} aria-hidden="true">
+                    {initials(founder)}
+                  </span>
+                )}
+                <span>
+                  <span className="block font-semibold">{founder}</span>
+                  <span className="block text-sm ink-3">{founderTitle}</span>
                 </span>
-              )}
-              <span>
-                <span className="block font-semibold">{founder}</span>
-                <span className="block text-sm ink-3">{founderTitle}</span>
-              </span>
-            </figcaption>
-          </figure>
-        )}
+              </figcaption>
+            </figure>
+          )}
+
+          {/* ijtimoiy isbotdan keyin — keyingi qadam */}
+          <div className={`voice-next mt-10 pt-8 flex flex-col gap-4 ${videos.length ? 'items-start' : 'items-center'}`}>
+            <p className="t-lead">Siz ham shu yoʻlni boshlashingiz mumkin — bitta qoʻngʻiroqdan.</p>
+            <button type="button" onClick={() => openConsult()} className="btn btn-primary">
+              Konsultatsiyaga yozilish <ArrowRight size={18} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
 
         {videos.length > 0 && (
-          <>
-            <h3 className="t-h3 mt-24 mb-8 text-center">Oʻquvchilarimiz oʻz tajribasi haqida</h3>
-            <div className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-4 -mx-[var(--gutter)] px-[var(--gutter)] lg:grid lg:grid-cols-3 lg:overflow-visible lg:mx-0 lg:px-0">
+          <div className="lg:col-span-7">
+            <h3 className="t-kicker mb-5">Oʻquvchilarimiz oʻz tajribasi haqida</h3>
+            <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-px-[var(--gutter)] pb-4 -mx-[var(--gutter)] px-[var(--gutter)] lg:grid lg:grid-cols-3 lg:overflow-visible lg:mx-0 lg:px-0 lg:pb-0">
               {videos.map((id, i) => (
                 <motion.div
                   key={id}
-                  className="snap-start shrink-0 w-[72vw] sm:w-[46vw] lg:w-auto"
+                  className="snap-start shrink-0 w-[62vw] sm:w-[40vw] lg:w-auto"
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.7, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  <YouTubeFacade id={id} vertical title={`Oʻquvchi fikri ${i + 1}`} className="rounded-[24px]" />
+                  <YouTubeFacade id={id} vertical title={`Oʻquvchi fikri ${i + 1}`} className="rounded-[20px]" />
                 </motion.div>
               ))}
             </div>
-          </>
+          </div>
         )}
-
-        {/* ijtimoiy isbotdan keyin — keyingi qadam */}
-        <div className="mt-14 flex flex-col items-center text-center gap-4">
-          <p className="t-lead max-w-xl">Siz ham shu yoʻlni boshlashingiz mumkin — bitta qoʻngʻiroqdan.</p>
-          <button type="button" onClick={() => openConsult()} className="btn btn-primary">
-            Konsultatsiyaga yozilish <ArrowRight size={18} aria-hidden="true" />
-          </button>
-        </div>
       </div>
     </section>
   );
@@ -93,35 +109,47 @@ export const TeamStrip: React.FC = () => {
   const { tField } = useLanguage();
   if (!team.length) return null;
   return (
-    <section className="relative py-[12vh]" aria-labelledby="team-title">
+    <section className="relative sec" aria-labelledby="team-title">
       <div className="wrap">
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
+        <div className="sec-head">
           <div>
             <p className="t-kicker mb-6">08 — Jamoa</p>
             <Mask><h2 id="team-title" className="t-h2 max-w-[18ch]">Sizni kasbga olib chiqadigan odamlar.</h2></Mask>
           </div>
           <Link to="/jamoa" className="link-arrow min-h-[44px]">Butun jamoa →</Link>
         </div>
-        <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px rounded-[var(--radius)] overflow-hidden" style={{ background: 'var(--line)' }}>
+        {/* "stansiya chiptasi": har bir ustoz — alohida yoʻnalishga olib boruvchi chipta */}
+        <ul className="tk-grid">
           {team.slice(0, 6).map((m, i) => {
             const name = uz(tField(m.name));
+            const role = uz(tField(m.role));
             return (
-              <li key={m.id} className="p-6 flex flex-col" style={{ background: 'var(--bg)' }}>
-                <div
-                  className="aspect-square w-full rounded-2xl overflow-hidden mb-5"
-                  style={{ background: `radial-gradient(120% 120% at 100% 0%, ${['#0061ff', '#60efff', '#00b26b'][i % 3]}33 0%, var(--bg-3) 60%)` }}
-                >
-                  {m.image ? (
-                    <img src={m.image} alt={name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="w-full h-full flex items-center justify-center mono text-3xl ink-3" aria-hidden="true">
-                      {initials(name)}
-                    </span>
-                  )}
+              <motion.li
+                key={m.id}
+                className="tk"
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-10% 0px' }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: (i % 3) * 0.07 }}
+              >
+                <div className="tk-stub" style={{ ['--tk-c' as string]: ['#0061ff', '#60efff', '#00b26b'][i % 3] }}>
+                  <span className="tk-avatar">
+                    {m.image ? (
+                      <img src={m.image} alt={name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="mono" aria-hidden="true">{initials(name)}</span>
+                    )}
+                  </span>
                 </div>
-                <span className="font-semibold leading-snug">{name}</span>
-                <span className="text-sm ink-3 mt-1">{uz(tField(m.role))}</span>
-              </li>
+                <div className="tk-body">
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="mono tk-code">DTS · {String(i + 1).padStart(2, '0')}</span>
+                    <span className="tk-emoji" aria-hidden="true">{roleEmoji(role)}</span>
+                  </span>
+                  <span className="block font-semibold leading-snug mt-3 text-[1.05rem]">{name}</span>
+                  <span className="block text-sm ink-3 mt-1">{role}</span>
+                </div>
+              </motion.li>
             );
           })}
         </ul>

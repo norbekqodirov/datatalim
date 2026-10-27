@@ -1,45 +1,59 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore, TeamMember } from '../../store/useStore';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Save, X, Loader2, CheckCircle2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Users, ArrowLeft, User } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useTheme } from '../../store/ThemeContext';
 import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
 import { uploadImageToAPIWithStats } from '../../utils/api';
 import { useLanguage } from '../../i18n';
+import { PageHeader, Section, Field, ImageField, ConfirmDialog, SaveBar, useBeforeUnload } from '../../components/admin/ui/kit';
 
 export default function ManageTeam() {
   const { team, deleteTeamMember, addTeamMember, updateTeamMember } = useStore();
-  const { isDark } = useTheme();
   const { tField } = useLanguage();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [webpSavings, setWebpSavings] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<TeamMember>>({});
+  const [baseline, setBaseline] = useState('');
+  const [skillsText, setSkillsText] = useState('');
   const [activeLang, setActiveLang] = useState<Lang>('uz');
   const [saving, setSaving] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TeamMember | null>(null);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [errors, setErrors] = useState<{ name?: string; role?: string }>({});
+
+  const editing = isAdding || !!editingId;
+  const dirty = editing && JSON.stringify(formData) !== baseline;
+  useBeforeUnload(dirty);
+
+  const begin = (data: Partial<TeamMember>) => {
+    setFormData(data);
+    setBaseline(JSON.stringify(data));
+    setSkillsText((data.skills || []).map((s: any) => typeof s === 'string' ? s : s.uz).join(', '));
+    setWebpSavings(null);
+    setErrors({});
+    setActiveLang('uz');
+  };
 
   const handleEdit = (member: TeamMember) => {
     setEditingId(member.id);
     const normalize = (val: any) => typeof val === 'string' ? { uz: val, ru: val, en: val } : val;
-    setFormData({
+    begin({
       ...member,
       name: normalize(member.name),
       role: normalize(member.role),
       bio: normalize(member.bio)
     });
     setIsAdding(false);
-    setActiveLang('uz');
   };
 
   const handleAdd = () => {
     setIsAdding(true);
     setEditingId(null);
-    setActiveLang('uz');
-    setFormData({
+    begin({
       id: `team-${Date.now()}`,
       name: { uz: '', ru: '', en: '' },
       role: { uz: '', ru: '', en: '' },
@@ -49,8 +63,16 @@ export default function ManageTeam() {
     });
   };
 
+  const closeEditor = () => { setIsAdding(false); setEditingId(null); setDiscardOpen(false); };
+  const requestClose = () => { if (dirty) setDiscardOpen(true); else closeEditor(); };
+
   const handleSave = async () => {
     if (!formData.name?.uz || !formData.role?.uz) {
+      setErrors({
+        name: formData.name?.uz ? undefined : 'Oʻzbek tilida ism kiritilishi shart',
+        role: formData.role?.uz ? undefined : 'Oʻzbek tilida lavozim kiritilishi shart',
+      });
+      setActiveLang('uz');
       toast.error('O\'zbek tilida Ism va Lavozim kiritilishi shart!');
       return;
     }
@@ -68,15 +90,11 @@ export default function ManageTeam() {
     setIsAdding(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (deleteConfirmId === id) {
-      deleteTeamMember(id);
-      toast.success('Xodim o\'chirildi!');
-      setDeleteConfirmId(null);
-    } else {
-      setDeleteConfirmId(id);
-      setTimeout(() => setDeleteConfirmId(null), 4000);
-    }
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    deleteTeamMember(deleteTarget.id);
+    toast.success('Xodim o\'chirildi!');
+    setDeleteTarget(null);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,13 +111,9 @@ export default function ManageTeam() {
     }
   };
 
-  const handleStringChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
   const handleLocalizedChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    if (value && (name === 'name' || name === 'role')) setErrors(p => ({ ...p, [name]: undefined }));
     setFormData(prev => ({
       ...prev,
       [name]: {
@@ -110,121 +124,134 @@ export default function ManageTeam() {
   };
 
   const handleSkillsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSkillsText(e.target.value);
     const skillsArray = e.target.value.split(',').map(s => s.trim()).filter(Boolean).map(s => ({ uz: s, ru: s, en: s }));
     setFormData(prev => ({ ...prev, skills: skillsArray }));
   };
 
-  return (
-    <div className="space-y-8">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
-        <div>
-          <h1 className={`text-4xl font-black mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Jamoa</h1>
-          <p className={`font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Saytdagi barcha jamoa a\'zolarini boshqarish.</p>
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return team;
+    return team.filter(m => {
+      const txt = [m.name, m.role].map((f: any) => typeof f === 'string' ? f : Object.values(f || {}).join(' ')).join(' ');
+      return txt.toLowerCase().includes(q);
+    });
+  }, [team, query]);
+
+  const L = activeLang.toUpperCase();
+
+  /* ------------------------------------------------ tahrirlash shakli ------------------------------------------------ */
+  if (editing) {
+    return (
+      <div>
+        <PageHeader
+          kicker="Jamoa"
+          title={isAdding ? 'Yangi xodim' : 'Xodimni tahrirlash'}
+          sub={isAdding ? 'Ma\'lumotlarni to\'ldiring, keyin saqlang.' : (formData.name?.uz || '')}
+          actions={<button type="button" className="a-btn" onClick={requestClose}><ArrowLeft size={16} aria-hidden="true" /> Ro&apos;yxatga qaytish</button>}
+        />
+        <div className="a-lockbar">
+          <div className="flex flex-wrap items-center gap-3">
+            <AdminLangTabs activeTab={activeLang} onTabChange={setActiveLang} />
+            <span className="a-sub" style={{ fontSize: '.8rem' }}>Tilga bog&apos;liq maydonlar ({L}) shu yerdan almashadi.</span>
+          </div>
         </div>
-        {!isAdding && !editingId && (
-          <button
-            onClick={handleAdd}
-            className="bg-[#0061ff] hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2"
-          >
-            <Plus size={20} />
-            Yangi Xodim
-          </button>
-        )}
-      </motion.div>
 
-      {(isAdding || editingId) ? (
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className={`rounded-[2.5rem] p-8 border shadow-sm ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-white border-slate-100'}`}>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{isAdding ? "Yangi Xodim Qo'shish" : 'Xodimni Tahrirlash'}</h2>
-            <button onClick={() => { setIsAdding(false); setEditingId(null); }} className={`p-2 rounded-full transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}>
-              <X size={24} />
-            </button>
-          </div>
+        <div className="space-y-4">
+          <Section title="Asosiy ma'lumotlar" desc="Ism, lavozim va surat." icon={<User size={18} />}>
+            <div className="a-grid2">
+              <Field label={`Ism familiya (${L})`} error={activeLang === 'uz' ? errors.name : ''}>
+                {id => <input id={id} type="text" name="name" value={formData.name?.[activeLang] || ''} onChange={handleLocalizedChange} className="a-input" aria-invalid={!!errors.name && activeLang === 'uz'} />}
+              </Field>
+              <Field label={`Lavozim (${L})`} error={activeLang === 'uz' ? errors.role : ''}>
+                {id => <input id={id} type="text" name="role" value={formData.role?.[activeLang] || ''} onChange={handleLocalizedChange} className="a-input" aria-invalid={!!errors.role && activeLang === 'uz'} />}
+              </Field>
+              <ImageField className="a-span2" round label="Xodim rasmi" value={formData.image} onChange={handleImageUpload} savings={webpSavings} help="Rasm avtomatik siqiladi va WebP formatida saqlanadi." />
+            </div>
+          </Section>
 
-          <AdminLangTabs activeTab={activeLang} onTabChange={setActiveLang} />
+          <Section title="Bio va ko'nikmalar" icon={<Users size={18} />}>
+            <div className="grid gap-4">
+              <Field label={`Qisqacha ma'lumot — bio (${L})`}>
+                {id => <textarea id={id} name="bio" value={formData.bio?.[activeLang] || ''} onChange={handleLocalizedChange} rows={4} className="a-textarea" />}
+              </Field>
+              <Field label="Ko'nikmalar (umumiy)" help="Vergul bilan ajrating: Python, SQL, Figma">
+                {id => <input id={id} type="text" value={skillsText} onChange={handleSkillsChange} className="a-input" />}
+              </Field>
+            </div>
+          </Section>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Ism Familiya ({activeLang.toUpperCase()})</label>
-              <input type="text" name="name" value={formData.name?.[activeLang] || ''} onChange={handleLocalizedChange} className={`w-full px-4 py-3 rounded-2xl border outline-none transition-all font-medium ${isDark ? 'bg-slate-800 border-slate-700 text-white focus:border-[#60efff]' : 'bg-white border-slate-200 focus:border-[#0061ff] focus:ring-2 focus:ring-blue-100'}`} />
-            </div>
-            <div>
-              <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Lavozim ({activeLang.toUpperCase()})</label>
-              <input type="text" name="role" value={formData.role?.[activeLang] || ''} onChange={handleLocalizedChange} className={`w-full px-4 py-3 rounded-2xl border outline-none transition-all font-medium ${isDark ? 'bg-slate-800 border-slate-700 text-white focus:border-[#60efff]' : 'bg-white border-slate-200 focus:border-[#0061ff] focus:ring-2 focus:ring-blue-100'}`} />
-            </div>
-            <div className="md:col-span-2">
-              <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Xodim Rasmi (Yuklash)</label>
-              <div className="flex gap-4 items-center">
-                {formData.image && <img src={formData.image} loading="lazy" decoding="async" className={`w-16 h-16 rounded-xl object-cover shrink-0 border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />}
-                <div className="flex-1">
-                  <input type="file" accept="image/*" onChange={handleImageUpload} className={`w-full text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'} file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#0061ff]/10 file:text-[#0061ff] hover:file:bg-[#0061ff]/20 transition-all focus:outline-none`} />
-                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="flex items-center gap-1 text-xs font-bold text-emerald-500"><CheckCircle2 size={13} />WebP avtomatik</span>
-                    {webpSavings && <span className="text-xs font-semibold text-blue-500">{webpSavings}</span>}
-                  </div>
-                </div>
-              </div>
-              <p className={`text-xs mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>*Rasm avtomatik tarzda siqiladi va saqlanadi.</p>
-            </div>
-            <div className="md:col-span-2">
-              <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Ko'nikmalar (Vergul bilan ajrating, Umumiy)</label>
-              <input type="text" value={formData.skills?.map((s: any) => typeof s === 'string' ? s : s.uz).join(', ') || ''} onChange={handleSkillsChange} className={`w-full px-4 py-3 rounded-2xl border outline-none transition-all font-medium ${isDark ? 'bg-slate-800 border-slate-700 text-white focus:border-[#60efff]' : 'bg-white border-slate-200 focus:border-[#0061ff] focus:ring-2 focus:ring-blue-100'}`} />
-            </div>
-            <div className="md:col-span-2">
-              <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Qisqacha ma'lumot - Bio ({activeLang.toUpperCase()})</label>
-              <textarea name="bio" value={formData.bio?.[activeLang] || ''} onChange={handleLocalizedChange} rows={4} className={`w-full px-4 py-3 rounded-2xl border outline-none transition-all font-medium resize-none ${isDark ? 'bg-slate-800 border-slate-700 text-white focus:border-[#60efff]' : 'bg-white border-slate-200 focus:border-[#0061ff] focus:ring-2 focus:ring-blue-100'}`} />
-            </div>
-          </div>
+        <div className="mt-6">
+          <SaveBar dirty={dirty} saving={saving} onSave={handleSave} onCancel={requestClose} alwaysEnabled={isAdding} saveLabel={isAdding ? 'Xodimni qo\'shish' : 'Saqlash'} hint={isAdding ? 'Yangi xodim hali saqlanmagan' : undefined} />
+        </div>
 
-          <div className="mt-8 flex justify-end gap-4">
-            <button onClick={() => { setIsAdding(false); setEditingId(null); }} className={`px-6 py-3 rounded-2xl font-bold transition-colors ${isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
-              Bekor qilish
-            </button>
-            <button onClick={handleSave} disabled={saving} className="bg-[#0061ff] hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-3 px-8 rounded-2xl transition-colors shadow-lg shadow-blue-500/30 flex items-center gap-2">
-              {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-              {saving ? 'Saqlanmoqda...' : 'Saqlash'}
-            </button>
-          </div>
-        </motion.div>
+        <ConfirmDialog
+          open={discardOpen} title="O'zgarishlar saqlanmasin?" danger={false}
+          message="Saqlanmagan o'zgarishlar bor. Chiqsangiz, ular yo'qoladi."
+          confirmLabel="Chiqish" cancelLabel="Tahrirlashda qolish" onConfirm={closeEditor} onCancel={() => setDiscardOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  /* ------------------------------------------------ ro'yxat ------------------------------------------------ */
+  return (
+    <div>
+      <PageHeader
+        kicker="Kontent"
+        title="Jamoa"
+        sub={`Saytdagi jamoa a'zolari: ${team.length} ta.`}
+        actions={<button type="button" onClick={handleAdd} className="a-btn a-btn-primary"><Plus size={18} aria-hidden="true" /> Yangi xodim</button>}
+      />
+
+      {team.length > 3 && (
+        <div className="a-search mb-5" style={{ maxWidth: 420 }}>
+          <Search size={16} aria-hidden="true" />
+          <input type="search" className="a-input" placeholder="Ism yoki lavozim bo'yicha qidirish" aria-label="Jamoani qidirish" value={query} onChange={e => setQuery(e.target.value)} />
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <div className="a-card a-empty">
+          <Users size={34} className="mx-auto mb-3" aria-hidden="true" />
+          <p className="font-semibold" style={{ color: 'var(--a-fg-2)' }}>{team.length === 0 ? 'Hali xodim yo\'q' : 'Hech kim topilmadi'}</p>
+          {team.length === 0 && <button type="button" className="a-btn a-btn-primary mt-4" onClick={handleAdd}><Plus size={16} aria-hidden="true" /> Yangi xodim</button>}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {team.map((member) => (
-            <motion.div key={member.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className={`p-6 rounded-[2rem] border shadow-sm flex flex-col justify-between group hover:shadow-md transition-all ${isDark ? 'bg-slate-900/50 border-white/5 shadow-black/50 hover:bg-slate-800' : 'bg-white border-slate-100'}`}>
-              <div className="flex items-center gap-4 mb-6">
-                <img src={member.image} alt={tField(member.name)} loading="lazy" decoding="async" className={`w-16 h-16 rounded-full object-cover border ${isDark ? 'border-slate-700' : 'border-slate-200'}`} />
-                <div>
-                  <h3 className={`text-lg font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{tField(member.name)}</h3>
-                  <p className={`text-sm font-medium ${isDark ? 'text-[#60efff]' : 'text-blue-600'}`}>{tField(member.role)}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map((member) => (
+            <motion.article key={member.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="a-card p-4 flex flex-col gap-3">
+              <div className="flex items-center gap-3.5">
+                <div className="a-thumb" style={{ width: 56, height: 56, borderRadius: 999 }}>
+                  {member.image ? <img src={member.image} alt="" loading="lazy" decoding="async" /> : <User size={22} aria-hidden="true" />}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="a-h2 leading-tight truncate">{tField(member.name)}</h3>
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--a-blue-ink)' }}>{tField(member.role)}</p>
                 </div>
               </div>
-              <p className={`text-sm line-clamp-3 mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{tField(member.bio)}</p>
-              <div className="flex flex-wrap gap-2 mb-6">
-                {member.skills.slice(0, 3).map((skill: any, idx: number) => (
-                  <span key={idx} className={`px-2 py-1 border rounded-lg text-xs font-bold ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
-                    {tField(skill)}
-                  </span>
-                ))}
-                {member.skills.length > 3 && <span className={`px-2 py-1 border rounded-lg text-xs font-bold ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>+{member.skills.length - 3}</span>}
+              <p className="a-sub line-clamp-3" style={{ fontSize: '.82rem' }}>{tField(member.bio)}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(member.skills || []).slice(0, 3).map((skill: any, idx: number) => <span key={idx} className="a-badge">{tField(skill)}</span>)}
+                {(member.skills || []).length > 3 && <span className="a-badge">+{member.skills.length - 3}</span>}
               </div>
-              <div className={`flex justify-end gap-2 pt-4 border-t ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                <button onClick={() => handleEdit(member)} className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-400 hover:text-[#60efff] hover:bg-slate-800' : 'text-slate-400 hover:text-[#0061ff] hover:bg-blue-50'}`}>
-                  <Edit size={20} />
+              <div className="flex items-center gap-2 pt-3 mt-auto" style={{ borderTop: '1px solid var(--a-line)' }}>
+                <button type="button" onClick={() => handleEdit(member)} className="a-btn flex-1"><Pencil size={15} aria-hidden="true" /> Tahrirlash</button>
+                <button type="button" onClick={() => setDeleteTarget(member)} className="a-btn a-btn-danger a-icon-btn" aria-label={`${tField(member.name)} ni o'chirish`}>
+                  <Trash2 size={16} aria-hidden="true" />
                 </button>
-                {deleteConfirmId === member.id ? (
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => handleDelete(member.id)} className="text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-xl">O'chirish</button>
-                    <button onClick={() => setDeleteConfirmId(null)} className={`text-xs font-bold px-3 py-1.5 rounded-xl ${isDark ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-100'}`}>Bekor</button>
-                  </div>
-                ) : (
-                  <button onClick={() => handleDelete(member.id)} className={`p-2 rounded-xl transition-colors ${isDark ? 'text-slate-400 hover:text-red-400 hover:bg-slate-800' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}>
-                    <Trash2 size={20} />
-                  </button>
-                )}
               </div>
-            </motion.div>
+            </motion.article>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget} title="Xodimni o'chirasizmi?"
+        message={deleteTarget ? `"${tField(deleteTarget.name)}" jamoa ro'yxatidan olib tashlanadi. Bu amalni qaytarib bo'lmaydi.` : ''}
+        confirmLabel="Ha, o'chirish" onConfirm={confirmDelete} onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

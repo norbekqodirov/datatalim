@@ -1,18 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, BookOpen, Settings, LogOut, Eye, Video, Sun, Moon,
-  Target, Menu, X, FileText,
-  Zap, Globe
+  Target, Menu, X, FileText, Inbox, Globe,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../store/ThemeContext';
+import './admin.css';
 
 const NAV_GROUPS = [
   {
     label: 'Asosiy',
     items: [
       { path: '/paneladmindata', icon: LayoutDashboard, label: 'Dashboard', exact: true },
+      { path: '/paneladmindata/leads', icon: Inbox, label: 'Arizalar' },
       { path: '/paneladmindata/marketing', icon: Target, label: 'Marketing' },
     ],
   },
@@ -28,17 +29,43 @@ const NAV_GROUPS = [
   {
     label: 'Tizim',
     items: [
-      { path: '/paneladmindata/visibility', icon: Eye, label: "Bo'limlar" },
+      { path: '/paneladmindata/visibility', icon: Eye, label: "Boʻlimlar" },
       { path: '/paneladmindata/settings', icon: Settings, label: 'Sozlamalar' },
     ],
   },
 ];
+
+const CRUMBS: { match: string; label: string }[] = [
+  { match: '/leads', label: 'Asosiy / Arizalar' },
+  { match: '/marketing', label: 'Asosiy / Marketing' },
+  { match: '/courses', label: 'Kontent / Kurslar' },
+  { match: '/posts', label: 'Kontent / Blog' },
+  { match: '/team', label: 'Kontent / Jamoa' },
+  { match: '/media', label: 'Kontent / Media & Matnlar' },
+  { match: '/visibility', label: "Tizim / Boʻlimlar" },
+  { match: '/settings', label: 'Tizim / Sozlamalar' },
+];
+
+const BrandMark: React.FC<{ size?: number }> = ({ size = 32 }) => (
+  <span
+    aria-hidden="true"
+    className="shrink-0 grid place-items-center text-white font-bold a-num"
+    style={{
+      width: size, height: size, borderRadius: size * 0.32, fontSize: size * 0.46,
+      background: 'var(--a-grad)', boxShadow: '0 6px 16px -6px rgba(0,97,255,.65)', letterSpacing: '-0.06em',
+    }}
+  >
+    D
+  </span>
+);
 
 export const AdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleLogout = () => {
     localStorage.removeItem('adminAuth');
@@ -52,17 +79,52 @@ export const AdminLayout: React.FC = () => {
     return location.pathname === path || location.pathname.startsWith(path);
   };
 
-  const NavContent = ({ onClose }: { onClose?: () => void }) => (
-    <div className="flex flex-col h-full">
-      {/* Scrollable nav */}
-      <div className="flex-1 overflow-y-auto py-3 px-3 space-y-5 scrollbar-thin">
+  // Sahifa almashsa drawer yopiladi
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
-        {/* CRM Nav Groups */}
+  // Drawer: Esc, fokus tuzog'i, scroll qulfi, fokusni qaytarish
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const btn = menuBtnRef.current;
+    const focusables = (): HTMLElement[] => {
+      const root = drawerRef.current;
+      return root ? Array.from(root.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')) : [];
+    };
+    requestAnimationFrame(() => focusables()[0]?.focus());
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setMobileOpen(false); return; }
+      if (e.key !== 'Tab') return;
+      const els = focusables();
+      if (!els.length) return;
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      btn?.focus();
+    };
+  }, [mobileOpen]);
+
+  const crumb = location.pathname.replace(/\/$/, '') === '/paneladmindata'
+    ? 'Asosiy / Dashboard'
+    : CRUMBS.find(c => location.pathname.includes(c.match))?.label ?? 'Admin panel';
+
+  const navItemCls = (active: boolean) =>
+    `relative flex items-center gap-3 px-3 min-h-[44px] lg:min-h-[38px] rounded-[10px] text-[13.5px] font-medium transition-colors ${
+      active ? 'text-[var(--a-fg)] bg-[var(--a-surface-2)]' : 'text-[var(--a-fg-2)] hover:text-[var(--a-fg)] hover:bg-[var(--a-surface-2)]'
+    }`;
+
+  const NavContent = ({ idPrefix }: { idPrefix: string }) => (
+    <div className="flex flex-col h-full min-h-0">
+      <nav aria-label="Asosiy navigatsiya" className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className={`px-3 pb-1.5 text-[10px] font-black uppercase tracking-widest ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-              {group.label}
-            </p>
+            <p className="a-kicker px-3 pb-2">{group.label}</p>
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const active = isActive(item.path, item.exact);
@@ -70,55 +132,39 @@ export const AdminLayout: React.FC = () => {
                   <Link
                     key={item.path}
                     to={item.path}
-                    onClick={onClose}
-                    className={`group flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold text-[13px] transition-all relative ${
-                      active
-                        ? isDark
-                          ? 'bg-[#0061ff]/15 text-[#60efff] border border-[#0061ff]/20'
-                          : 'bg-blue-50 text-[#0061ff] border border-blue-100'
-                        : isDark
-                          ? 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
+                    aria-current={active ? 'page' : undefined}
+                    className={navItemCls(active)}
                   >
                     {active && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-[#0061ff] rounded-r-full" />
+                      <motion.span
+                        layoutId={`${idPrefix}-indicator`}
+                        className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full"
+                        style={{ background: 'var(--a-grad)' }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                      />
                     )}
-                    <item.icon size={15} className={active ? 'text-[#0061ff]' : ''} />
-                    <span className="flex-1">{item.label}</span>
-                    {(item as any).badge && (
-                      <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
-                        {(item as any).badge}
-                      </span>
-                    )}
+                    <item.icon size={17} strokeWidth={active ? 2.2 : 1.8} style={active ? { color: 'var(--a-blue-ink)' } : undefined} />
+                    <span className="flex-1 truncate">{item.label}</span>
                   </Link>
                 );
               })}
             </div>
           </div>
         ))}
-      </div>
+      </nav>
 
-      {/* Bottom actions */}
-      <div className={`p-3 border-t space-y-1 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-        <button
-          onClick={toggleTheme}
-          className={`flex items-center gap-3 px-3 py-2 w-full rounded-xl font-semibold text-sm transition-colors ${
-            isDark ? 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-          }`}
-        >
-          {isDark
-            ? <Sun size={16} className="text-amber-400" />
-            : <Moon size={16} className="text-slate-500" />}
-          {isDark ? 'Yorug\' rejim' : 'Qorong\'i rejim'}
+      <div className="p-3 space-y-0.5" style={{ borderTop: '1px solid var(--a-line)' }}>
+        <button type="button" onClick={toggleTheme} className={`${navItemCls(false)} w-full`}>
+          {isDark ? <Sun size={17} strokeWidth={1.8} /> : <Moon size={17} strokeWidth={1.8} />}
+          {isDark ? 'Yorugʻ rejim' : 'Qorongʻi rejim'}
         </button>
         <button
+          type="button"
           onClick={handleLogout}
-          className={`flex items-center gap-3 px-3 py-2 w-full rounded-xl font-semibold text-sm transition-colors ${
-            isDark ? 'text-red-400 hover:bg-red-500/10' : 'text-red-500 hover:bg-red-50'
-          }`}
+          className="relative flex items-center gap-3 px-3 min-h-[44px] lg:min-h-[38px] w-full rounded-[10px] text-[13.5px] font-medium transition-colors hover:bg-[color-mix(in_srgb,var(--a-red)_10%,transparent)]"
+          style={{ color: 'var(--a-red-ink)' }}
         >
-          <LogOut size={16} />
+          <LogOut size={17} strokeWidth={1.8} />
           Chiqish
         </button>
       </div>
@@ -126,120 +172,112 @@ export const AdminLayout: React.FC = () => {
   );
 
   return (
-    <div className={`min-h-screen flex font-sans transition-colors duration-300 ${isDark ? 'bg-[#0a0f1e] text-slate-200' : 'bg-slate-50 text-slate-900'}`}>
-
-      {/* Desktop Sidebar */}
-      <aside className={`w-60 flex-col fixed h-full z-20 transition-colors duration-300 hidden lg:flex ${
-        isDark
-          ? 'bg-slate-950/90 border-r border-slate-800/80 backdrop-blur-xl'
-          : 'bg-white border-r border-slate-200 shadow-sm'
-      }`}>
-        {/* Logo */}
-        <div className={`h-14 flex items-center justify-between px-4 border-b shrink-0 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#0061ff] to-[#60efff] flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <Zap size={14} className="text-white" />
-            </div>
-            <div>
-              <span className="text-base font-black tracking-tight text-[#0061ff]">DATA</span>
-              <span className={`text-[10px] font-bold ml-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>CRM</span>
-            </div>
+    <div className="adm min-h-screen flex transition-colors duration-300">
+      {/* Desktop sidebar */}
+      <aside
+        className="w-60 flex-col fixed h-full z-20 hidden lg:flex"
+        style={{ background: 'var(--a-surface)', borderRight: '1px solid var(--a-line)' }}
+      >
+        <div className="h-16 flex items-center justify-between px-5 shrink-0" style={{ borderBottom: '1px solid var(--a-line)' }}>
+          <Link to="/paneladmindata" className="flex items-center gap-2.5" aria-label="DATA admin">
+            <BrandMark />
+            <span className="leading-none">
+              <span className="block text-[15px] font-bold tracking-tight">DATA</span>
+              <span className="a-kicker block mt-1" style={{ fontSize: '.62rem' }}>Admin</span>
+            </span>
           </Link>
-          <div className={`w-2 h-2 rounded-full bg-green-500 shadow shadow-green-500/50`} title="Online" />
+          <span className="w-2 h-2 rounded-full" style={{ background: 'var(--a-green)', boxShadow: '0 0 0 4px color-mix(in srgb, var(--a-green) 18%, transparent)' }} title="Online" />
         </div>
-
-        <NavContent />
+        <NavContent idPrefix="d" />
       </aside>
 
       {/* Mobile top bar */}
-      <div className={`lg:hidden fixed top-0 left-0 right-0 z-30 h-14 flex items-center justify-between px-4 border-b ${
-        isDark ? 'bg-slate-950/95 border-slate-800 backdrop-blur-xl' : 'bg-white border-slate-200 shadow-sm'
-      }`}>
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#0061ff] to-[#60efff] flex items-center justify-center">
-            <Zap size={13} className="text-white" />
-          </div>
-          <span className="text-base font-black text-[#0061ff]">DATA <span className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>CRM</span></span>
+      <header
+        className="lg:hidden fixed top-0 left-0 right-0 z-30 h-14 flex items-center justify-between px-3 pl-4"
+        style={{ background: 'color-mix(in srgb, var(--a-surface) 92%, transparent)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--a-line)' }}
+      >
+        <Link to="/paneladmindata" className="flex items-center gap-2.5" aria-label="DATA admin">
+          <BrandMark size={30} />
+          <span className="text-[15px] font-bold tracking-tight">DATA <span className="a-kicker" style={{ fontSize: '.62rem' }}>Admin</span></span>
         </Link>
-        <div className="flex items-center gap-2">
-          <button onClick={toggleTheme} className={`p-2 rounded-xl ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-            {isDark ? <Sun size={17} className="text-amber-400" /> : <Moon size={17} />}
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={toggleTheme} className="a-btn a-btn-ghost a-icon-btn" style={{ width: 44, height: 44 }} aria-label={isDark ? 'Yorugʻ rejimga oʻtish' : 'Qorongʻi rejimga oʻtish'}>
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button onClick={() => setMobileOpen(true)} className={`p-2 rounded-xl ${isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
+          <button
+            ref={menuBtnRef}
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="a-btn a-btn-ghost a-icon-btn"
+            style={{ width: 44, height: 44 }}
+            aria-label="Menyuni ochish"
+            aria-expanded={mobileOpen}
+            aria-controls="admin-drawer"
+          >
             <Menu size={20} />
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Mobile drawer */}
       <AnimatePresence>
         {mobileOpen && (
           <>
             <motion.div
+              key="scrim"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+              className="adm fixed inset-0 z-40 lg:hidden"
+              style={{ background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(3px)' }}
+              aria-hidden="true"
             />
             <motion.aside
-              initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`fixed left-0 top-0 bottom-0 w-64 z-50 flex flex-col lg:hidden ${isDark ? 'bg-slate-950 border-r border-slate-800' : 'bg-white border-r border-slate-200'}`}
+              key="drawer"
+              id="admin-drawer"
+              ref={drawerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Navigatsiya menyusi"
+              initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
+              transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+              className="adm fixed left-0 top-0 bottom-0 w-[280px] max-w-[86vw] z-50 flex flex-col lg:hidden"
+              style={{ background: 'var(--a-surface)', borderRight: '1px solid var(--a-line)' }}
             >
-              <div className={`h-14 flex items-center justify-between px-4 border-b shrink-0 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                <span className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#0061ff] to-[#60efff] flex items-center justify-center">
-                    <Zap size={13} className="text-white" />
-                  </div>
-                  <span className="text-base font-black text-[#0061ff]">DATA <span className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>CRM</span></span>
+              <div className="h-14 flex items-center justify-between pl-4 pr-2 shrink-0" style={{ borderBottom: '1px solid var(--a-line)' }}>
+                <span className="flex items-center gap-2.5">
+                  <BrandMark size={30} />
+                  <span className="text-[15px] font-bold tracking-tight">DATA <span className="a-kicker" style={{ fontSize: '.62rem' }}>Admin</span></span>
                 </span>
-                <button onClick={() => setMobileOpen(false)} className={`p-2 rounded-xl ${isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'}`}>
-                  <X size={18} />
+                <button type="button" onClick={() => setMobileOpen(false)} className="a-btn a-btn-ghost a-icon-btn" style={{ width: 44, height: 44 }} aria-label="Menyuni yopish">
+                  <X size={20} />
                 </button>
               </div>
-              <NavContent onClose={() => setMobileOpen(false)} />
+              <NavContent idPrefix="m" />
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
-      {/* Main Content */}
-      <main className="flex-1 lg:ml-60 pt-14 lg:pt-0 min-h-screen relative">
-        {/* Subtle bg gradient */}
-        {isDark && (
-          <>
-            <div className="fixed top-0 right-0 w-[600px] h-[400px] bg-[#0061ff] blur-[200px] opacity-[0.03] rounded-full pointer-events-none" />
-            <div className="fixed bottom-0 left-64 w-[400px] h-[300px] bg-purple-500 blur-[200px] opacity-[0.03] rounded-full pointer-events-none" />
-          </>
-        )}
-
-        {/* Top header bar */}
-        <div className={`hidden lg:flex items-center justify-between px-8 py-3 border-b ${isDark ? 'border-slate-800/80 bg-slate-950/50 backdrop-blur-sm' : 'border-slate-100 bg-white/80 backdrop-blur-sm'}`}>
-          <div className={`text-xs font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {location.pathname === '/paneladmindata' ? 'Dashboard' :
-              location.pathname.includes('/courses') ? 'Kontent → Kurslar' :
-              location.pathname.includes('/posts') ? 'Kontent → Blog' :
-              location.pathname.includes('/team') ? 'Kontent → Jamoa' :
-              location.pathname.includes('/marketing') ? 'Asosiy → Marketing' :
-              location.pathname.includes('/media') ? 'Kontent → Media & Matnlar' :
-              location.pathname.includes('/visibility') ? 'Tizim → Bo\'limlar' :
-              location.pathname.includes('/settings') ? 'Tizim → Sozlamalar' : 'Admin Panel'}
-          </div>
-          <div className="flex items-center gap-3">
-            <a href="/" target="_blank" rel="noopener noreferrer"
-              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}>
-              <Globe size={13} />
-              Saytni ko'rish
+      {/* Main */}
+      <main className="flex-1 min-w-0 lg:ml-60 pt-14 lg:pt-0 min-h-screen relative">
+        <div
+          className="hidden lg:flex items-center justify-between px-8 h-14 sticky top-0 z-10"
+          style={{ background: 'color-mix(in srgb, var(--a-bg) 85%, transparent)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--a-line)' }}
+        >
+          <div className="a-kicker" style={{ textTransform: 'none', letterSpacing: '.04em', fontSize: '.78rem' }}>{crumb}</div>
+          <div className="flex items-center gap-2">
+            <a href="/" target="_blank" rel="noopener noreferrer" className="a-btn a-btn-ghost" style={{ minHeight: 36, fontSize: '.8rem' }}>
+              <Globe size={15} />
+              Saytni ko&apos;rish
             </a>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${isDark ? 'bg-slate-800/60' : 'bg-slate-50'}`}>
-              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#0061ff] to-[#60efff] flex items-center justify-center">
-                <span className="text-white text-[9px] font-black">A</span>
-              </div>
-              <span className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Admin</span>
+            <div className="flex items-center gap-2 pl-1.5 pr-3 h-9 rounded-full" style={{ background: 'var(--a-surface)', border: '1px solid var(--a-line)' }}>
+              <span className="w-6 h-6 rounded-full grid place-items-center text-white text-[11px] font-bold" style={{ background: 'var(--a-grad)' }}>A</span>
+              <span className="text-xs font-semibold">Admin</span>
             </div>
           </div>
         </div>
 
-        <div className="px-5 py-6 lg:px-8 lg:py-7 max-w-7xl mx-auto">
+        <div className="px-4 py-5 sm:px-6 lg:px-8 lg:py-8 max-w-[1280px] mx-auto">
           <Outlet />
         </div>
       </main>

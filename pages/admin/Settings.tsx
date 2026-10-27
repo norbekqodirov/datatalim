@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Lock, Database, Download, Eye, EyeOff } from 'lucide-react';
+import { Lock, Database, Download, Eye, EyeOff, AlertCircle, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useTheme } from '../../store/ThemeContext';
+import { PageHeader, Section, Field, Spinner } from '../../components/admin/ui/kit';
 
 const headers = () => ({
   'Content-Type': 'application/json',
@@ -9,18 +9,25 @@ const headers = () => ({
 });
 
 const Settings: React.FC = () => {
-  const { isDark } = useTheme();
-
   // Password
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
+  const [pwBusy, setPwBusy] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [errors, setErrors] = useState<{ current?: string; next?: string; confirm?: string; form?: string }>({});
 
-  const changePassword = async () => {
-    if (!currentPassword || !newPassword) { toast.error('Barcha maydonlarni to\'ldiring'); return; }
-    if (newPassword !== confirmPassword) { toast.error('Parollar mos kelmaydi'); return; }
-    if (newPassword.length < 10) { toast.error('Parol kamida 10 belgidan iborat bo\'lsin'); return; }
+  const changePassword = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const err: typeof errors = {};
+    if (!currentPassword) err.current = 'Joriy parolni kiriting';
+    if (!newPassword) err.next = 'Yangi parolni kiriting';
+    else if (newPassword.length < 10) err.next = 'Parol kamida 10 belgidan iborat bo\'lsin';
+    if (newPassword && newPassword !== confirmPassword) err.confirm = 'Parollar mos kelmaydi';
+    if (err.current || err.next || err.confirm) { setErrors(err); return; }
+    setErrors({});
+    setPwBusy(true);
     try {
       const res = await fetch('/api/admin/change-password', {
         method: 'POST', headers: headers(),
@@ -33,13 +40,15 @@ const Settings: React.FC = () => {
         toast.success('Parol o\'zgartirildi');
         setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       } else {
-        const data = await res.json();
-        toast.error(data.error || 'Xatolik');
+        const data = await res.json().catch(() => ({}));
+        setErrors({ form: data.error || 'Parolni oʻzgartirib boʻlmadi' });
       }
-    } catch { toast.error('Xatolik'); }
+    } catch { setErrors({ form: 'Server bilan aloqa yoʻq. Qaytadan urinib koʻring.' }); }
+    finally { setPwBusy(false); }
   };
 
   const downloadBackup = async () => {
+    setBackupBusy(true);
     try {
       const res = await fetch('/api/admin/backup', { headers: headers() });
       if (!res.ok) throw new Error();
@@ -52,59 +61,51 @@ const Settings: React.FC = () => {
       URL.revokeObjectURL(url);
       toast.success('Backup yuklandi');
     } catch { toast.error('Backup yuklashda xatolik'); }
+    finally { setBackupBusy(false); }
   };
 
-  const cardCls = `rounded-2xl border p-6 ${isDark ? 'bg-slate-800/60 backdrop-blur-xl border-white/10' : 'bg-white border-slate-200'}`;
-  const inputCls = `w-full px-4 py-3 rounded-xl border outline-none transition-colors ${isDark ? 'bg-slate-700/50 border-white/10 text-white placeholder-slate-500 focus:border-[#0061ff]' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-[#0061ff]'}`;
-  const labelCls = `block text-sm font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`;
-  const sectionTitle = (icon: React.ReactNode, title: string) => (
-    <div className="flex items-center gap-2 mb-4">
-      {icon}
-      <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{title}</h2>
-    </div>
-  );
+  const type = showPasswords ? 'text' : 'password';
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <SettingsIcon className="text-[#0061ff]" size={28} />
-        <h1 className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>Sozlamalar</h1>
-      </div>
+    <div>
+      <PageHeader kicker="Tizim" title="Sozlamalar" sub="Admin paroli va ma'lumotlar zaxirasi." />
 
-      {/* Password */}
-      <div className={cardCls}>
-        {sectionTitle(<Lock size={20} className="text-[#0061ff]" />, 'Parolni o\'zgartirish')}
-        <div className="space-y-4 max-w-md">
-          <div>
-            <label className={labelCls}>Joriy parol</label>
-            <div className="relative">
-              <input type={showPasswords ? 'text' : 'password'} className={inputCls} value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
-              <button onClick={() => setShowPasswords(!showPasswords)} className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
+      <div className="grid gap-4 lg:grid-cols-2 items-start">
+        <Section title="Parolni o'zgartirish" desc="Kamida 10 belgi. Oʻzgargach boshqa qurilmalardagi sessiyalar tugaydi." icon={<Lock size={18} />}>
+          <form onSubmit={changePassword} className="grid gap-4" noValidate>
+            {errors.form && <div className="a-error" role="alert"><AlertCircle size={16} className="shrink-0 mt-px" aria-hidden="true" />{errors.form}</div>}
+
+            <Field label="Joriy parol" error={errors.current}>
+              {id => (
+                <div className="relative">
+                  <input id={id} type={type} autoComplete="current-password" className="a-input" style={{ paddingRight: 52 }} value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} aria-invalid={!!errors.current} />
+                  <button type="button" onClick={() => setShowPasswords(s => !s)} aria-pressed={showPasswords} aria-label={showPasswords ? 'Parollarni yashirish' : 'Parollarni koʻrsatish'} className="a-btn a-btn-ghost a-icon-btn absolute right-0.5 top-0.5" style={{ width: 40, height: 40 }}>
+                    {showPasswords ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
+                  </button>
+                </div>
+              )}
+            </Field>
+            <Field label="Yangi parol" error={errors.next}>
+              {id => <input id={id} type={type} autoComplete="new-password" className="a-input" value={newPassword} onChange={e => setNewPassword(e.target.value)} aria-invalid={!!errors.next} />}
+            </Field>
+            <Field label="Parolni tasdiqlash" error={errors.confirm}>
+              {id => <input id={id} type={type} autoComplete="new-password" className="a-input" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} aria-invalid={!!errors.confirm} />}
+            </Field>
+
+            <div>
+              <button type="submit" disabled={pwBusy} className="a-btn a-btn-primary">
+                {pwBusy ? <Spinner /> : <ShieldCheck size={16} aria-hidden="true" />}{pwBusy ? 'Saqlanmoqda...' : 'Parolni oʻzgartirish'}
               </button>
             </div>
-          </div>
-          <div>
-            <label className={labelCls}>Yangi parol</label>
-            <input type={showPasswords ? 'text' : 'password'} className={inputCls} value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-          </div>
-          <div>
-            <label className={labelCls}>Parolni tasdiqlash</label>
-            <input type={showPasswords ? 'text' : 'password'} className={inputCls} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
-          </div>
-          <button onClick={changePassword} className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-white hover:scale-105 transition-all" style={{ background: 'linear-gradient(135deg, #0061ff, #60efff)' }}>
-            <Lock size={16} /> Parolni o'zgartirish
-          </button>
-        </div>
-      </div>
+          </form>
+        </Section>
 
-      {/* Backup */}
-      <div className={cardCls}>
-        {sectionTitle(<Database size={20} className="text-[#0061ff]" />, 'Ma\'lumotlar zaxirasi')}
-        <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Barcha ma'lumotlarning JSON nusxasini yuklab oling.</p>
-        <button onClick={downloadBackup} className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-white hover:scale-105 transition-all" style={{ background: 'linear-gradient(135deg, #0061ff, #60efff)' }}>
-          <Download size={18} /> Backup yuklash
-        </button>
+        <Section title="Ma'lumotlar zaxirasi" desc="Barcha sayt maʼlumotlarining JSON nusxasi." icon={<Database size={18} />}>
+          <p className="a-sub mb-4">Zaxirani vaqti-vaqti bilan, ayniqsa katta o&apos;zgarishlardan oldin yuklab oling va xavfsiz joyda saqlang.</p>
+          <button type="button" onClick={downloadBackup} disabled={backupBusy} className="a-btn a-btn-primary">
+            {backupBusy ? <Spinner /> : <Download size={16} aria-hidden="true" />}{backupBusy ? 'Tayyorlanmoqda...' : 'Backup yuklash'}
+          </button>
+        </Section>
       </div>
     </div>
   );
