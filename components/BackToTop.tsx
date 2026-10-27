@@ -28,7 +28,7 @@ export const BackToTop: React.FC = () => {
           exit={{ opacity: 0, scale: 0.5, y: 20 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20 }}
           onClick={scrollToTop}
-          className="fixed bottom-24 right-6 z-50 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all group"
+          className="fixed bottom-24 right-6 z-50 w-12 h-12 rounded-2xl hidden lg:flex items-center justify-center shadow-lg transition-all group"
           style={{
             background: isDark
               ? 'linear-gradient(135deg, rgba(0,97,255,0.9) 0%, rgba(96,239,255,0.9) 100%)'

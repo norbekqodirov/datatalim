@@ -203,7 +203,7 @@ const Tour: React.FC<{ vid: string }> = ({ vid }) => {
 const Stacked: React.FC<{ vid: string; reduced: boolean }> = ({ vid, reduced }) => (
   <section className="relative sec" aria-labelledby="campus-title">
     <div className="wrap">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
+      <div className="sec-head">
         <div><Heading /></div>
         <Lead />
       </div>

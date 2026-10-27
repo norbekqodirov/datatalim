@@ -74,15 +74,12 @@
 - **Arizalar (Leads)** sahifasi: `pages/admin/ManageLeads.tsx`. API: `GET /api/leads` (q, source, status, from, to, limit, offset) va `PATCH /api/leads/:id` (status, notes).
 
 ### Commit holati
-Hammasi `7e4e8f4` da commit qilingan (2026-10-27) va GitHub `origin/redesign-v2` ga push qilingan. `main` ga hali merge qilinmagan.
+Hammasi `redesign-v2` branchida commit qilingan. GitHub'ga oxirgi push: `a18e3cf` (2026-10-27); undan keyingi commitlar faqat lokal (`git log origin/redesign-v2..` bilan ko'ring). `main` ga hali merge qilinmagan.
 
 ### Keyingi ishlar (backlog)
 - [ ] Egasi landingni ko'rib, fikr bersin. Qaysi bo'lim hali yoqmasa, o'shandan davom etiladi.
-- [ ] Mobil **qorong'i** rejimni to'liq tekshirish (yorug' rejim tekshirilgan).
-- [ ] `.sec-head` ni qolgan sarlavhalarga ham qo'llash, agar mos kelsa (Campus stacked, Directions stacked).
-- [ ] Mobilda «↑» (BackToTop) tugmasi kontent ustiga chiqib turadi. MobileCtaBar bor ekan, mobilda uni yashirishni ko'rib chiqish.
-- [ ] `components/v2/ParticleStar.tsx` ishlatilmayapti: o'chirish yoki ishlatish.
 - [ ] Deploydan oldin `/claude-security` tekshiruvi.
+- [ ] `redesign-v2` → `main` merge (PR) va deploy — faqat egasi tasdiqlagach.
 
 ### Egasi qilishi kerak (kod emas)
 - `.env.local` faylida `JWT_SECRET` ni **32+ belgili** qilib qo'ying. Hozir u yo'q yoki qisqa, shuning uchun har restartdan keyin admin qayta login qiladi.
@@ -96,6 +93,7 @@ Hammasi `7e4e8f4` da commit qilingan (2026-10-27) va GitHub `origin/redesign-v2`
 - Admin'da muqovasi yo'q kurs kartalari qorong'i rejimda deyarli ko'rinmaydi.
 
 ## 6. Jurnal (eng yangisi tepada, har yozuv 1–3 qator)
+- **2026-10-27 · 3-bosqich yakuni** — Mobil qorong'i rejim tekshirildi (390 px, muammo yo'q). Campus/Directions stacked sarlavhalari `.sec-head` ga o'tdi (Directions: `t-display` → `t-h2`). BackToTop mobilda yashirildi (`hidden lg:flex`). `ParticleStar.tsx` o'chirildi.
 - **2026-10-27** — Status fayli va `scripts/qa/` yaratildi. Dev server :3002 da, chunki :3000 ni boshqa loyiha band qilgan.
 - **2026-10-26 · 2-bosqich** —
   - Voices 3 qavatdan 2 ustunga o'tdi (1541 → 799 px); mobilda iqtibos ekrandan chiqib ketishi tuzatildi.

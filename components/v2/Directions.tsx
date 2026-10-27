@@ -234,11 +234,15 @@ const StackedList: React.FC = () => {
   return (
     <section id="yonalishlar" className="relative sec" aria-label="Taʼlim yoʻnalishlari">
       <div className="wrap">
-        <p className="t-kicker mb-6">03 — Yoʻnalishlar</p>
-        <h2 className="t-display">
-          Toʻrt yoʻnalish. <span className="ink-3">{courses.length || 14} ta kurs.</span>
-        </h2>
-        <div className="mt-12 grid md:grid-cols-2 gap-5">
+        <div className="sec-head">
+          <div>
+            <p className="t-kicker mb-6">03 — Yoʻnalishlar</p>
+            <h2 className="t-h2">
+              Toʻrt yoʻnalish. <span className="ink-3">{courses.length || 14} ta kurs.</span>
+            </h2>
+          </div>
+        </div>
+        <div className="grid md:grid-cols-2 gap-5">
           {CATS.map((cat, index) => {
             const list = courses.filter((c) => c.category === cat.id);
             const cover = list.find((c) => c.coverImage);
