@@ -29,7 +29,7 @@ const Art: React.FC<{ i: number }> = ({ i }) => {
   return broken ? (
     <span className="cx-art-fallback"><f.Icon size={34} strokeWidth={1.6} /></span>
   ) : (
-    <img src={`/images/v2/icons/${f.art}.webp`} alt="" width={320} height={320} loading="lazy" decoding="async" onError={() => setBroken(true)} />
+    <img src={`/images/v2/icons/${f.art}.webp`} srcSet={`/images/v2/icons/${f.art}-sm.webp 192w, /images/v2/icons/${f.art}.webp 320w`} sizes="(min-width: 1024px) 210px, 132px" alt="" width={320} height={320} loading="lazy" decoding="async" onError={() => setBroken(true)} />
   );
 };
 

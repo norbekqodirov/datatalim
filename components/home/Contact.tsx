@@ -8,7 +8,7 @@ import { submitLeadToAPI } from '../../utils/api';
 import { useTheme } from '../../store/ThemeContext';
 import { useLanguage } from '../../i18n';
 import { PatternBg, Star1, Star2 } from '../BrandElements';
-import { trackEvent } from '../../utils/pixel';
+import { trackLead } from '../../utils/pixel';
 
 export const Contact: React.FC = () => {
   const { siteContent } = useStore();
@@ -94,7 +94,7 @@ export const Contact: React.FC = () => {
     setLoading(false);
 
     if (crmData) {
-      trackEvent('Lead', { source: 'Contact' });
+      trackLead({ source: 'Contact', phone: formData.phone });
       toast.success('Xabaringiz muvaffaqiyatli yuborildi! Tez orada siz bilan bog\'lanamiz.');
       setSent(true);
       setFormData({ name: '', phone: '', message: '' });

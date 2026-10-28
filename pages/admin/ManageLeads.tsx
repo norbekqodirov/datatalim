@@ -288,7 +288,7 @@ export default function ManageLeads() {
                         <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--a-fg-3)' }} aria-hidden="true" />
                         <input
                             type="search" className="a-input" style={{ paddingLeft: '2.4rem' }} value={qInput}
-                            onChange={e => setQInput(e.target.value)} placeholder="Ism, telefon yoki kurs boʻyicha qidirish"
+                            onChange={e => setQInput(e.target.value)} placeholder="Ism, telefon, kurs yoki UTM boʻyicha qidirish"
                             aria-label="Qidirish"
                         />
                     </div>
@@ -336,7 +336,7 @@ export default function ManageLeads() {
                         <table className="a-table">
                             <thead>
                                 <tr>
-                                    <th>Ariza</th><th>Telefon</th><th>Kurs</th><th>Manba</th><th>Holat</th><th>Izoh</th>
+                                    <th>Ariza</th><th>Telefon</th><th>Kurs</th><th>Manba / UTM</th><th>Holat</th><th>Izoh</th>
                                 </tr>
                             </thead>
                             <tbody>

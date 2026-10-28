@@ -202,7 +202,7 @@ const EventRow: React.FC<{ i: number; title: string; desc: string; Icon: React.E
   const x = useTransform(scrollYProgress, [0, 1], [24, 0]);
   return (
     <motion.li ref={ref} className="event-row hairline py-7 sm:py-8 grid grid-cols-[auto_1fr] gap-x-5 sm:gap-x-8 gap-y-2" style={reduced ? undefined : { opacity, x }}>
-      <span className="icon-tile" aria-hidden="true"><Icon size={28} /></span>
+      <span className="icon-tile ev-tile" aria-hidden="true"><Icon size={22} /></span>
       <div className="min-w-0">
         <p className="mono text-[0.8125rem] ink-3">{pad(i)}</p>
         <h3 className="t-h3 mt-1 break-words">{title}</h3>
@@ -255,7 +255,7 @@ export const LangClosing: React.FC<{ onEnroll: () => void }> = ({ onEnroll }) =>
           progress={scrollYProgress}
           layers={7}
           spin={70}
-          className="pointer-events-none absolute right-[4vw] top-[8%] hidden sm:block sm:top-1/2 sm:-translate-y-1/2 sm:w-[min(26vw,360px)] sm:h-[min(26vw,360px)] opacity-40 sm:opacity-50"
+          className="pointer-events-none absolute right-[max(var(--gutter),calc((100vw_-_var(--maxw))/2_+_var(--gutter)))] top-[8%] hidden sm:block sm:top-1/2 sm:-translate-y-1/2 sm:w-[min(22vw,300px)] sm:h-[min(22vw,300px)] opacity-40 sm:opacity-50"
         />
       )}
       <div className="wrap relative">

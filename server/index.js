@@ -91,6 +91,22 @@ const cleanUtm = (v) => (typeof v === 'string'
     ? v.substring(0, 1000).normalize('NFC').replace(/[\s\u0000-\u001f\u007f]+/g, ' ').replace(/[^\p{L}\p{N} _.:/=|,+@-]/gu, '').replace(/ {2,}/g, ' ').trim().substring(0, UTM_MAX_LEN)
     : '');
 
+// leads.utm ("ref:x | fb | utm:instagram/cpc/kampaniya") qatorlaridan birinchi segment (utm_source) bo'yicha sanaydi
+const utmSourceCounts = (rows, limit = 8) => {
+    const map = new Map();
+    for (const r of rows || []) {
+        // Tartib "ref:x | fb | utm:instagram/..." (eski qatorlarda utm: boshida) — ' | ' bo'yicha utm: bo'lagini topamiz
+        const seg = String(r.utm || '').split(' | ').map((x) => x.trim()).find((x) => x.startsWith('utm:'));
+        if (!seg) continue;
+        const m = /^utm:([^/]*)/.exec(seg);
+        const key = m[1].trim().toLowerCase().slice(0, 40) || '-';
+        map.set(key, (map.get(key) || 0) + Number(r.count || 0));
+    }
+    return [...map.entries()]
+        .map(([source, count]) => ({ source, count }))
+        .sort((a, b) => b.count - a.count || a.source.localeCompare(b.source))
+        .slice(0, limit);
+};
 // Statistikada eski qatorlar ("Kurs | utm:instagram/...") ham kurs bo'yicha birlashishi uchun ' | ' dan oldingi qism
 const COURSE_BASE_SQL = "substr(course_id, 1, CASE WHEN instr(course_id, ' | ') > 0 THEN instr(course_id, ' | ') - 1 ELSE length(course_id) END)";
 
@@ -726,6 +742,10 @@ app.get('/api/stats', authenticateToken, (req, res) => {
             SELECT source_ref, COUNT(*) as count FROM leads
             WHERE source_ref IS NOT NULL GROUP BY source_ref ORDER BY count DESC LIMIT 8
         `).all();
+        // Reklama manbasi: leads.utm "utm:instagram/cpc/kampaniya | fb | ref:x" -> birinchi segment ("instagram")
+        const utmSources = utmSourceCounts(
+            db.prepare(`SELECT utm, COUNT(*) as count FROM leads WHERE utm LIKE '%utm:%' GROUP BY utm`).all()
+        );
         const daily7 = db.prepare(`
             SELECT date(created_at) as date, COUNT(*) as count FROM leads
             WHERE created_at >= date('now', '-7 days')
@@ -764,6 +784,7 @@ app.get('/api/stats', authenticateToken, (req, res) => {
             leadsByCourse,
             topLinks,
             sourceAttribution,
+            utmSources,
             daily7,
             hotLeads: hotLeads.count,
             siteVisits,

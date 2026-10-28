@@ -414,6 +414,13 @@ html .v2 .field[aria-invalid="true"],
 
 /* hero captions: above the story rail (back-to-top and the mobile CTA bar only appear after the hero) */
 .v2 .cap-stage { bottom: 11vh; }
+/* hero exit: the pinned frame (canvas + grain) fades into the page background — no hard seam when it scrolls away */
+.v2 .hero-fade { height: 160px; background: linear-gradient(to bottom, transparent, var(--bg)); }
+.v2 [data-hero] .grain::after {
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 160px), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 160px), transparent);
+}
+@media (max-width: 639.98px) { .v2 .hero-fade { height: 120px; } }
 .v2 .cap-stage .t-lead { text-wrap: balance; }
 @media (max-width: 639.98px) { .v2 .cap-stage { bottom: 5.5rem; } }
 
@@ -508,15 +515,12 @@ html:not(.dark) .v2 .nf-dark { display: none; }
   border: 1px solid var(--line-2); color: var(--fg);
 }
 @media (min-width: 1024px) { .v2 .mobile-cta { display: none; } }
-/* telefonda ishonch qatori — bitta qator kichik chiplar (fold'da isbot qolsin) */
+/* telefonda ishonch qatori — 12px, --fg-2: o'qiladigan isbot; pill ramkasiz, shunda 375px+ ekranda bitta qatorga sig'adi
+   (ramkali 12px chiplar 2 qatorga tushib, stansiyani kichraytirardi) */
 @media (max-width: 639.98px) {
-  .v2 .hero-proof { margin-top: 1rem; gap: 5px; }
-  .v2 .hero-proof li {
-    font-size: 0.66rem !important; line-height: 1; white-space: nowrap; gap: 4px;
-    padding: 6px 8px 6px 5px; border: 1px solid var(--line-2); border-radius: 999px;
-    background: color-mix(in srgb, var(--bg) 70%, transparent);
-  }
-  .v2 .hero-proof li svg { width: 12px; height: 12px; }
+  .v2 .hero-proof { margin-top: 1rem; column-gap: 8px; row-gap: 6px; }
+  .v2 .hero-proof li { font-size: 0.75rem !important; line-height: 1.2; white-space: nowrap; gap: 3px; color: var(--fg-2); }
+  .v2 .hero-proof li svg { width: 11px; height: 11px; flex-shrink: 0; }
 }
 
 /* ---------- manifesto: o'lchovli matn + natijalar orbitasi ---------- */

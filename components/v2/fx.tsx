@@ -56,9 +56,12 @@ const ScrollWord: React.FC<{ p: MotionValue<number>; start: number; end: number;
 };
 
 /** A real 3D object: the DATA 4-point star as a stack of extruded layers that turns with scroll.
- *  The turn is capped at 28° (and the tilt at 10°): past that the thin layers collapse into a "spike" seen edge-on. */
+ *  The turn is capped at 28° (and the tilt at 10°): past that the thin layers collapse into a "spike" seen edge-on.
+ *  A shallow stack (5 layers, 6px apart) reads as one solid body instead of a smeared "stalactite";
+ *  the front face is a glossy cyan→blue glass gradient with a soft highlight, matching the 3D glass icons. */
+const STAR_FACE = 'linear-gradient(140deg, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 40%), linear-gradient(135deg, var(--cyan) 8%, var(--blue) 92%)';
 const STAR_MAX_SPIN = 28;
-export const Star3D: React.FC<{ progress: MotionValue<number>; className?: string; layers?: number; spin?: number; drift?: number }> = ({ progress, className, layers = 9, spin = STAR_MAX_SPIN, drift = 70 }) => {
+export const Star3D: React.FC<{ progress: MotionValue<number>; className?: string; layers?: number; spin?: number; drift?: number }> = ({ progress, className, layers = 5, spin = STAR_MAX_SPIN, drift = 70 }) => {
   const turn = Math.min(Math.abs(spin), STAR_MAX_SPIN);
   const rotateY = useTransform(progress, [0, 0.5, 1], [-turn, 0, turn]);
   const rotateX = useTransform(progress, [0, 0.5, 1], [10, -4, 8]);
@@ -74,9 +77,10 @@ export const Star3D: React.FC<{ progress: MotionValue<number>; className?: strin
             <i
               key={k}
               style={{
-                transform: `translateZ(${(k - mid) * 16}px)`,
-                color: front ? 'var(--cyan)' : back ? 'var(--blue)' : 'var(--blue)',
-                opacity: front ? 0.55 : back ? 0.3 : 0.07 + (k / layers) * 0.16,
+                transform: `translateZ(${(k - mid) * 6}px)`,
+                color: 'var(--blue)',
+                background: front ? STAR_FACE : undefined,
+                opacity: front ? 0.85 : back ? 0.35 : 0.14 + (k / layers) * 0.12,
               }}
             />
           );

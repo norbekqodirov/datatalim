@@ -17,6 +17,17 @@ function lightTier(): boolean {
   return cores <= 4 || mem <= 4 || /Instagram|FBAN|FBAV/i.test(nav.userAgent || '');
 }
 
+// right edge of the copy's actual text (the copy box itself is a fixed max-width), measured per block with a Range
+function textRight(el: HTMLElement, fallback: number): number {
+  let r = 0;
+  const range = document.createRange();
+  for (const child of Array.from(el.children)) {
+    range.selectNodeContents(child);
+    r = Math.max(r, range.getBoundingClientRect().right);
+  }
+  return r > 0 ? Math.min(r, fallback) : fallback;
+}
+
 // scroll progress (0..1 over the pinned section) → station story progress
 // (0 far-away station, .5 approach — data pulses, 1 arrival — the brand star faces us)
 function formationAt(v: number) {
@@ -67,27 +78,31 @@ export const HeroSignal: React.FC = () => {
     const w = canvas.getBoundingClientRect().width;
     const phone = w < 1024 && h > w * 1.1;
     const v = vRef.current;
-    const top = phone ? 58 : 76;
+    // phones: ≥20px under the navbar (bar ends at 64px; the hull's dust and bob need a few px more)
+    const top = phone ? 80 : 76;
     // desktop first screen: the station keeps a ≥64px gap to the headline and centres in the space to its right
     f.bandX = null;
     if (!phone && v < 0.14 && w >= 1024) {
       const c = copyRef.current;
       if (c) {
+        const cv = canvas.getBoundingClientRect();
         const cr = c.getBoundingClientRect();
-        const left = cr.right - canvas.getBoundingClientRect().left + 64;
-        const right = w - (cr.left - canvas.getBoundingClientRect().left) * 0.5;
-        if (right - left > 160) f.bandX = [left, right];
+        // the copy box is a fixed max-width; the station keys off the real text edge (narrow 1024–1100px screens)
+        const left = textRight(c, cr.right) - cv.left + 64;
+        const right = w - (cr.left - cv.left) * 0.5;
+        if (right - left > 120) f.bandX = [left, right];
       }
     }
     let bottom = h - 80;
     if (v < 0.14) {
       if (phone) {
         const c = copyRef.current;
-        if (c) bottom = c.getBoundingClientRect().top - canvas.getBoundingClientRect().top - 6;
+        if (c) bottom = c.getBoundingClientRect().top - canvas.getBoundingClientRect().top - 16;
       }
     } else {
       const cap = v < 0.56 ? capBRef.current : capCRef.current;
-      if (cap) bottom = cap.offsetTop - (phone ? 10 : 8);
+      // the ring's dust and glow reach past the fitted hull: keep a clear gap above the caption kicker
+      if (cap) bottom = cap.offsetTop - (phone ? 28 : 48);
     }
     f.band = [top, Math.max(top + 120, bottom)];
   }, []);
@@ -237,9 +252,11 @@ export const HeroSignal: React.FC = () => {
       <div className="sticky top-0 h-[100svh] overflow-hidden grain">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden="true" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: vignette }} />
+        {/* exit seam: the pinned frame melts into the page background instead of ending on a hard edge */}
+        <div className="hero-fade absolute inset-x-0 bottom-0 pointer-events-none" aria-hidden="true" />
 
         {/* Stage A — headline + CTAs (left), the space station far away (right) */}
-        <Stage p={scrollYProgress} range={[-1, 0, 0.08, 0.16]} className="absolute inset-0 flex items-end pb-[calc(13svh+2.25rem)] lg:items-center lg:pb-0">
+        <Stage p={scrollYProgress} range={[-1, 0, 0.06, 0.12]} className="absolute inset-0 flex items-end pb-[calc(13svh+2.25rem)] lg:items-center lg:pb-0">
           <div className="wrap pt-24" style={copyHide}>
             <HeroCopy title={title} subtitle={subtitle} description={description} copyRef={copyRef} fontReady={fontReady} />
           </div>
@@ -305,7 +322,8 @@ const StoryRail: React.FC<{ p: MotionValue<number> }> = ({ p }) => {
   const show = useTransform(p, [0.03, 0.1, 0.94, 1], [0, 1, 1, 0]);
   const fill = useTransform(p, [0.02, 0.9], [0, 1]);
   return (
-    <motion.div style={{ opacity: show }} className="absolute left-[var(--gutter)] right-[var(--gutter)] bottom-5 pointer-events-none" aria-hidden="true">
+    <motion.div style={{ opacity: show }} className="absolute inset-x-0 bottom-5 pointer-events-none" aria-hidden="true">
+      <div className="wrap">
       <div className="flex justify-between mb-3">
         {STEPS.map((s, i) => (
           <RailStep key={s.label} p={p} label={s.label} at={s.at} i={i} />
@@ -313,6 +331,7 @@ const StoryRail: React.FC<{ p: MotionValue<number> }> = ({ p }) => {
       </div>
       <div className="h-px w-full" style={{ background: 'var(--line-2)' }}>
         <motion.div className="h-px origin-left" style={{ scaleX: fill, background: 'var(--grad)' }} />
+      </div>
       </div>
     </motion.div>
   );

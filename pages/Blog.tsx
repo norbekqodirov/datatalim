@@ -94,7 +94,7 @@ const Blog: React.FC = () => {
             progress={scrollYProgress}
             layers={7}
             spin={60}
-            className="pointer-events-none absolute right-[4vw] top-24 w-24 h-24 sm:right-[5vw] sm:w-[min(20vw,260px)] sm:h-[min(20vw,260px)] opacity-40 sm:opacity-80"
+            className="pointer-events-none absolute right-[4vw] top-24 w-24 h-24 sm:right-[max(var(--gutter),calc((100vw_-_var(--maxw))/2_+_var(--gutter)))] sm:top-[4.5rem] sm:w-[min(15vw,210px)] sm:h-[min(15vw,210px)] opacity-40 sm:opacity-80"
           />
         )}
         <div className="wrap relative">

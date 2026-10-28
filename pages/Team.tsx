@@ -56,7 +56,7 @@ export default function Team() {
         <Star3D
           progress={starP}
           spin={60}
-          className="ab-star absolute right-[4vw] top-[8%] w-[26vw] aspect-square pointer-events-none opacity-[.3] md:right-[3vw] md:top-[14%] md:w-[min(24vw,340px)] md:opacity-80"
+          className="ab-star absolute right-[4vw] top-[8%] w-[26vw] aspect-square pointer-events-none opacity-[.3] md:right-[max(var(--gutter),calc((100vw_-_var(--maxw))/2_+_var(--gutter)))] md:top-[16%] md:w-[min(22vw,300px)] md:opacity-80"
         />
         <motion.div className="wrap relative" style={reduced ? undefined : { y: textY, opacity: textOpacity }}>
           <p className="t-kicker mb-5">01 — Bizning jamoa</p>

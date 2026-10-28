@@ -58,7 +58,7 @@ export const FooterV2: React.FC = () => {
           <div className="foot-cta grid gap-6 lg:gap-10 lg:grid-cols-12 lg:items-center mb-14 sm:mb-16">
             {/* kompas — "yoʻnalishni topish" metaforasi, test CTA'siga ishora */}
             <div className="lg:col-span-3 flex lg:justify-center" aria-hidden="true">
-              <img src="/images/v2/icons/why-test.webp" alt="" width={320} height={320} loading="lazy" decoding="async" className="foot-compass" />
+              <img src="/images/v2/icons/why-test.webp" srcSet="/images/v2/icons/why-test-sm.webp 192w, /images/v2/icons/why-test.webp 320w" sizes="(min-width: 1024px) 190px, 120px" alt="" width={320} height={320} loading="lazy" decoding="async" className="foot-compass" />
             </div>
             <div className="lg:col-span-6">
               <p className="t-kicker mb-4">Boshlash</p>

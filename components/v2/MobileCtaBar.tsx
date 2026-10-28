@@ -4,14 +4,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Phone } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { openConsult } from './consult';
-import { afterHeroY, useIsDesktop } from './utils';
+import { useIsDesktop, useScrolledPastHero } from './utils';
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-// O'z pastki paneli/oqimi bor sahifalar: kurs sahifasi (narx + yozilish paneli) va karyera testi
+// O'z pastki paneli/oqimi bor sahifalar: kurslar katalogi (o'z banneri), kurs sahifasi (narx + yozilish paneli) va karyera testi
 const hiddenOn = (path: string) => {
   const p = path.length > 1 ? path.replace(/\/+$/, '') : path;
-  return p === '/karyera-testi' || /^\/kurslar\/[^/]+$/.test(p);
+  return p === '/karyera-testi' || /^\/kurslar(\/[^/]+)?$/.test(p);
 };
 
 // Ko'rinib turganda panel yashirinadi: o'zi CTA bo'lgan bloklar (forma, yakuniy CTA) va footer.
@@ -25,27 +25,10 @@ export const MobileCtaBar: React.FC = () => {
   // lg+ ekranda panel umuman yo'q — scroll/resize listener va observer'lar ham ishlamaydi
   const desktop = useIsDesktop();
   const off = desktop || hiddenOn(pathname);
-  const [past, setPast] = useState(false);
   const [blocked, setBlocked] = useState(false);
 
-  // ~0.6 ekrandan keyin chiqadi; bosh sahifada — hero sahnasi tugagach (afterHeroY)
-  useEffect(() => {
-    if (off) return;
-    let raf = 0;
-    const check = () => {
-      raf = 0;
-      setPast(window.scrollY > afterHeroY(window.innerHeight * 0.6));
-    };
-    const on = () => { if (!raf) raf = requestAnimationFrame(check); };
-    check();
-    window.addEventListener('scroll', on, { passive: true });
-    window.addEventListener('resize', on);
-    return () => {
-      window.removeEventListener('scroll', on);
-      window.removeEventListener('resize', on);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [off, pathname]);
+  // ~0.6 ekrandan keyin chiqadi; bosh sahifada — hero sahnasi tugagach. Chegara keshlanadi (scroll kadrida layout o'qilmaydi)
+  const past = useScrolledPastHero(() => window.innerHeight * 0.6, !off, pathname);
 
   // yashiruvchi bloklar IntersectionObserver bilan kuzatiladi (scroll kadrida layout o'qilmaydi);
   // lazy sahifa kontenti keyin paydo bo'lgani uchun DOM o'zgarsa qayta qidiriladi

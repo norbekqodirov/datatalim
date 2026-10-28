@@ -17,7 +17,7 @@ import { SEO } from '../components/SEO';
 import { EnrollModal } from '../components/EnrollModal';
 import { trackSiteEvent } from '../utils/analytics';
 import { submitLeadToAPI, submitCareerTestResult } from '../utils/api';
-import { trackLead, newEventId } from '../utils/pixel';
+import { trackLead, trackCustom, newEventId } from '../utils/pixel';
 import { uz, useMotionReduced, v2Toast } from '../components/v2/utils';
 import { useStore } from '../store/useStore';
 import '../components/v2/v2.css';
@@ -1246,6 +1246,7 @@ export default function CareerTest() {
       return;
     }
     clearPending();
+    trackCustom('CareerTestStart');
     autoSubmittedRef.current = false;
     sentPartsRef.current = { lead: false, result: false };
     setDelivered(false);
@@ -1358,6 +1359,7 @@ export default function CareerTest() {
     const o = buildOutcome(s1Answers, s2Answers, newS3, userAge, availableIds);
     setOutcome(o);
     trackSiteEvent('career_test_complete');
+    trackCustom('CareerTestComplete');
     submitCareerTestAuto(o.pcts, o.results);
     schedule(() => {
       setView('calculating');
@@ -1403,7 +1405,7 @@ export default function CareerTest() {
       }).then((res) => {
         sent.lead = true;
         // Meta Pixel Lead: bir sessiyada bir marta (modal orqali yuborilsa ham ikkilanmaydi)
-        trackLead({ source: 'Karyera_Testi', course: topCourseNames[0], onceKey: 'Karyera_Testi', eventId, duplicate: !!res?.duplicate });
+        trackLead({ source: 'Karyera_Testi', course: topCourseNames[0], onceKey: 'Karyera_Testi', eventId, duplicate: !!res?.duplicate, phone: fullPhone });
       }));
     }
     if (!sent.result) {
@@ -1565,72 +1567,72 @@ export default function CareerTest() {
 
         {/* ═══ INTRO ═══ */}
         {view === 'intro' && (
-          <motion.section key="intro" {...fade} className="relative pt-28 pb-20 lg:pt-36 lg:pb-28" aria-labelledby="ct-title">
+          <motion.section key="intro" {...fade} className="relative pt-[5.25rem] pb-20 sm:pt-28 lg:pt-36 lg:pb-28" aria-labelledby="ct-title">
             <HexBackdrop reduced={reduced} />
-            <div className="wrap relative grid gap-9 lg:grid-cols-12 lg:gap-x-8 lg:gap-y-0 items-start">
+            <div className="wrap relative grid gap-6 sm:gap-9 lg:grid-cols-12 lg:gap-x-8 lg:gap-y-0 items-start">
               {/* tartib: mobilda sarlavha -> forma -> tafsilotlar; desktopda chapda nusxa (7), o'ngda forma (5) */}
               <div className="lg:col-span-7 lg:row-start-1">
                 <p className="t-kicker">Karyera laboratoriyasi · Holland RIASEC</p>
-                <h1 id="ct-title" className="t-hero mt-6">
+                <h1 id="ct-title" className="t-hero mt-4 sm:mt-6">
                   Kasbingizni <span className="ink-grad">maʼlumot</span> bilan aniqlang.
                 </h1>
-                <p className="t-lead mt-6 max-w-[34rem]">
+                <p className="t-lead mt-4 sm:mt-6 max-w-[34rem]">
                   {TOTAL_Q} ta savol qiziqishlaringizni olti oʻlchovda baholaydi va sizga eng mos yoʻnalishni — dasturlash, media, dizayn yoki moliyani — koʻrsatadi.
                 </p>
               </div>
 
               <div className="order-none lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-28">
-                <form onSubmit={startTest} noValidate className="panel p-6 sm:p-9 backdrop-blur-xl" style={{ background: 'color-mix(in srgb, var(--bg-2) 88%, transparent)' }} aria-labelledby="ct-form-title">
+                <form onSubmit={startTest} noValidate className="panel p-5 sm:p-9 backdrop-blur-xl" style={{ background: 'color-mix(in srgb, var(--bg-2) 88%, transparent)' }} aria-labelledby="ct-form-title">
                   <p id="ct-form-title" className="t-h3">Natijani kimga tayyorlaymiz?</p>
                   <p className="t-body mt-2 !text-[0.95rem]">Hisobot shaxsiy boʻladi, mos kurslar yoshingizga qarab saralanadi.</p>
 
-                  <div className="mt-7 grid gap-5">
+                  <div className="mt-4 sm:mt-7 grid gap-3.5 sm:gap-5">
                     <div>
-                      <label htmlFor="ct-name" className="block text-sm font-medium mb-2">Ismingiz</label>
+                      <label htmlFor="ct-name" className="block text-sm font-medium mb-1.5 sm:mb-2">Ismingiz</label>
                       <input
                         ref={nameRef} id="ct-name" name="name" autoComplete="given-name" maxLength={60}
                         value={userName} onChange={e => setUserName(e.target.value)}
                         aria-invalid={!!errors.name} aria-describedby={errors.name ? 'ct-name-err' : undefined}
-                        className={fieldCls} placeholder="Masalan, Dilnoza"
+                        className={`${fieldCls} max-sm:!h-12`} placeholder="Masalan, Dilnoza"
                       />
                       {errors.name && <p id="ct-name-err" className="field-err">{errors.name}</p>}
                     </div>
                     <div>
-                      <label htmlFor="ct-phone" className="block text-sm font-medium mb-2">Telefon raqamingiz</label>
+                      <label htmlFor="ct-phone" className="block text-sm font-medium mb-1.5 sm:mb-2">Telefon raqamingiz</label>
                       <div className="field-group" data-invalid={!!errors.phone || undefined}>
                         <span className="flex items-center pl-5 pr-2 mono ink-3 select-none" aria-hidden="true">+998</span>
                         <input
                           ref={phoneRef} id="ct-phone" name="phone" type="tel" inputMode="numeric" autoComplete="tel-national"
                           value={userPhone} onChange={handlePhoneChange} maxLength={14}
                           aria-invalid={!!errors.phone} aria-describedby={errors.phone ? 'ct-phone-err' : 'ct-phone-hint'}
-                          className="bare-input flex-1 min-w-0 h-14 pr-5 outline-none text-[1.0625rem]"
+                          className="bare-input flex-1 min-w-0 h-12 sm:h-14 pr-5 outline-none text-[1.0625rem]"
                           style={{ background: 'transparent', border: 0, color: 'var(--fg)' }}
                           placeholder="90 123 45 67"
                         />
                       </div>
                       {errors.phone
                         ? <p id="ct-phone-err" className="field-err">{errors.phone}</p>
-                        : <p id="ct-phone-hint" className="text-xs ink-3 mt-2">Natija va mos kurslar boʻyicha maslahat uchun.</p>}
+                        : <p id="ct-phone-hint" className="text-[13px] leading-snug ink-2 mt-1.5">Natija va mos kurslar boʻyicha maslahat uchun.</p>}
                     </div>
                     <div className="grid grid-cols-[minmax(0,7rem)_1fr] gap-4">
                       <div>
-                        <label htmlFor="ct-age" className="block text-sm font-medium mb-2">Yoshingiz</label>
+                        <label htmlFor="ct-age" className="block text-sm font-medium mb-1.5 sm:mb-2">Yoshingiz</label>
                         <input
                           ref={ageRef} id="ct-age" name="age" inputMode="numeric" maxLength={2}
                           value={userAge} onChange={e => setUserAge(e.target.value.replace(/\D/g, '').slice(0, 2))}
                           aria-invalid={!!errors.age} aria-describedby={errors.age ? 'ct-age-err' : undefined}
-                          className={`${fieldCls} mono`} placeholder="17"
+                          className={`${fieldCls} mono max-sm:!h-12`} placeholder="17"
                         />
                       </div>
                       <div>
-                        <span id="ct-gender-label" className="block text-sm font-medium mb-2">Jinsingiz</span>
+                        <span id="ct-gender-label" className="block text-sm font-medium mb-1.5 sm:mb-2">Jinsingiz</span>
                         <div role="radiogroup" aria-labelledby="ct-gender-label" aria-describedby={errors.gender ? 'ct-gender-err' : undefined} className="grid grid-cols-2 gap-2">
                           {([['male', 'Erkak'], ['female', 'Ayol']] as [Gender, string][]).map(([val, label], i) => (
                             <button
                               key={val} ref={i === 0 ? genderRef : undefined} type="button" role="radio"
                               aria-checked={userGender === val}
                               onClick={() => setUserGender(val)}
-                              className="seg"
+                              className="seg max-sm:!h-12"
                               data-invalid={!!errors.gender || undefined}
                             >
                               {label}
@@ -1647,7 +1649,7 @@ export default function CareerTest() {
                     )}
                   </div>
 
-                  <button type="submit" className="btn btn-primary w-full mt-8">
+                  <button type="submit" className="btn btn-primary w-full mt-5 sm:mt-8">
                     Testni boshlash <ArrowRight size={18} aria-hidden="true" />
                   </button>
                   <p className="text-xs ink-3 mt-4 leading-relaxed">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Uzbek Latin microtypography: turns ASCII/curly apostrophes after o/g into the
@@ -46,6 +46,42 @@ export function afterHeroY(fallback: number): number {
   if (!hero) return fallback;
   const top = hero.getBoundingClientRect().top + window.scrollY;
   return Math.max(fallback, top + hero.offsetHeight - window.innerHeight * 0.5);
+}
+
+/**
+ * `scrollY > afterHeroY(fallback())` holati. Chegara keshlanadi: faqat resize va sahifa o'lchami o'zgarganda
+ * (ResizeObserver — yangi sahifa/lazy kontent, hero paydo bo'lishi) qayta o'lchanadi; scroll kadrida faqat
+ * `scrollY` o'qiladi (layout o'qilmaydi). `key` o'zgarsa (masalan pathname) ham qayta o'lchanadi.
+ */
+export function useScrolledPastHero(fallback: () => number, enabled = true, key?: unknown): boolean {
+  const [past, setPast] = useState(false);
+  const fbRef = useRef(fallback);
+  fbRef.current = fallback;
+  useEffect(() => {
+    if (!enabled) return;
+    let limit = afterHeroY(fbRef.current());
+    let raf = 0;
+    let measureNext = false;
+    const check = () => {
+      raf = 0;
+      if (measureNext) { measureNext = false; limit = afterHeroY(fbRef.current()); }
+      setPast(window.scrollY > limit);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(check); };
+    const remeasure = () => { measureNext = true; onScroll(); };
+    check();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', remeasure);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(remeasure) : null;
+    ro?.observe(document.body);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', remeasure);
+      ro?.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [enabled, key]);
+  return enabled && past;
 }
 
 /** YouTube id from a full embed/watch URL or a bare id. */

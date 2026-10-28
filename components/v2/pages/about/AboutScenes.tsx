@@ -77,7 +77,7 @@ export const AboutHero: React.FC = () => {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(55% 50% at 78% 28%, rgba(0,97,255,.16), transparent 70%)' }} />
       <Star3D
         progress={starP}
-        className="ab-star absolute right-[4vw] top-[9%] w-[30vw] aspect-square pointer-events-none opacity-[.3] md:right-[3vw] md:top-[12%] md:w-[min(26vw,360px)] md:opacity-80"
+        className="ab-star absolute right-[4vw] top-[9%] w-[30vw] aspect-square pointer-events-none opacity-[.3] md:right-[max(var(--gutter),calc((100vw_-_var(--maxw))/2_+_var(--gutter)))] md:top-[16%] md:w-[min(22vw,300px)] md:opacity-80"
       />
       <motion.div className="wrap relative" style={reduced ? undefined : { y: textY, opacity: textOpacity }}>
         <p className="t-kicker mb-8">01 — Biz haqimizda</p>
@@ -364,7 +364,7 @@ export const StationScene: React.FC = () => {
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   return (
     <section ref={ref} className="relative py-[18vh]" aria-labelledby="station-title">
-      <Star3D progress={scrollYProgress} spin={70} className="ab-star absolute right-[4vw] top-[5%] w-[28vw] aspect-square pointer-events-none opacity-[.25] md:right-[3vw] md:top-[7%] md:w-[min(22vw,320px)] md:opacity-70" />
+      <Star3D progress={scrollYProgress} spin={70} className="ab-star absolute right-[4vw] top-[5%] w-[28vw] aspect-square pointer-events-none opacity-[.25] md:right-[max(var(--gutter),calc((100vw_-_var(--maxw))/2_+_var(--gutter)))] md:top-[7%] md:w-[min(22vw,300px)] md:opacity-70" />
       <div className="wrap relative">
         <p className="t-kicker mb-8">04 — Nom</p>
         <Mask>
@@ -623,7 +623,7 @@ export const AboutClosing: React.FC = () => {
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   return (
     <section ref={ref} data-hide-mcta className="relative overflow-hidden pb-[16vh] pt-[8vh]" aria-labelledby="about-cta-title">
-      <Star3D progress={scrollYProgress} spin={55} className="ab-star absolute right-[3vw] top-[8%] w-[min(26vw,360px)] aspect-square pointer-events-none opacity-[.35] hidden md:block" />
+      <Star3D progress={scrollYProgress} spin={55} className="ab-star absolute right-[max(var(--gutter),calc((100vw_-_var(--maxw))/2_+_var(--gutter)))] top-[8%] w-[min(22vw,300px)] aspect-square pointer-events-none opacity-[.35] hidden md:block" />
       <div className="wrap relative">
         <p className="t-kicker mb-6">09 — Boshlash</p>
         <Mask>

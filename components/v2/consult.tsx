@@ -12,6 +12,11 @@ export const openConsult = (course?: string) => {
   window.dispatchEvent(new CustomEvent(EVENT, { detail: { course } }));
 };
 
+// Buzuq URL (masalan kesilgan "%E0%A4%A") butun saytni qulatmasin
+const safeDecode = (s: string) => {
+  try { return decodeURIComponent(s); } catch { return s; }
+};
+
 export const ConsultHost: React.FC = () => {
   const [course, setCourse] = useState<string | null>(null);
   const { pathname } = useLocation();
@@ -21,7 +26,7 @@ export const ConsultHost: React.FC = () => {
   // /kurslar/:id sahifasida ochilsa — shu kurs nomi kontekst bo'ladi (CRM va Lead.content_name'da qaysi kursdan ekani ko'rinsin)
   const pageCourse = useRef<string | null>(null);
   const m = pathname.match(/^\/kurslar\/([^/]+)\/?$/);
-  const current = m ? courses.find((c) => c.id === decodeURIComponent(m[1])) : undefined;
+  const current = m ? courses.find((c) => c.id === safeDecode(m[1])) : undefined;
   pageCourse.current = current ? tField(current.title) : null;
 
   useEffect(() => {

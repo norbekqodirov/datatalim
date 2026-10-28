@@ -30,8 +30,11 @@ export const appendLeadToSheet = async (leadData) => {
         const payload = {
             name: safeCell(leadData.name),
             phone: leadData.phone,
-            courseId: safeCell(leadData.course_id || '-'),
-            sourceRef: safeCell(leadData.source_ref || 'Umumiy')
+            // Ustunlar soni/tartibi o'zgarmaydi: manba (utm) "Kurs" katagiga "kurs | utm" ko'rinishida qo'shiladi
+            courseId: safeCell([leadData.course_id, leadData.utm].filter(Boolean).join(' | ') || '-'),
+            sourceRef: safeCell(leadData.source_ref || 'Umumiy'),
+            // Apps Script xohlasa alohida ustun qila oladi (noma'lum maydon e'tiborsiz qoladi)
+            utm: safeCell(leadData.utm || '')
         };
 
         const response = await fetch(GOOGLE_SCRIPT_URL, {

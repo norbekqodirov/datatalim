@@ -1,28 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUp } from 'lucide-react';
 import { useTheme } from '../store/ThemeContext';
-import { afterHeroY } from './v2/utils';
+import { useScrolledPastHero } from './v2/utils';
 
 export const BackToTop: React.FC = () => {
-  const [visible, setVisible] = useState(false);
   const { isDark } = useTheme();
 
-  // bosh sahifada hero sahnasi tugagach chiqadi (pinned hikoya ustida tugma turmaydi), boshqa joyda 400px dan keyin
-  useEffect(() => {
-    let raf = 0;
-    const check = () => {
-      raf = 0;
-      setVisible(window.scrollY > afterHeroY(400));
-    };
-    const handleScroll = () => { if (!raf) raf = requestAnimationFrame(check); };
-    check();
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
+  // bosh sahifada hero sahnasi tugagach chiqadi (pinned hikoya ustida tugma turmaydi), boshqa joyda 400px dan keyin.
+  // chegara keshlanadi (useScrolledPastHero) — scroll kadrida layout o'qilmaydi
+  const visible = useScrolledPastHero(() => 400);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });

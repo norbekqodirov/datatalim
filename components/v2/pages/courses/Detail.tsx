@@ -67,7 +67,7 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
   const showBar = !ctaVisible && !closingVisible;
 
   return (
-    <div data-cat={course.category} className="cd-page pb-24 lg:pb-0">
+    <div data-cat={course.category} className="cd-page pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
       <Hero course={course} onEnroll={onEnroll} onConsult={onConsult} ctaRef={heroCtaRef} reduced={reduced} phone={phone} tel={tel} />
 
       <Outcomes course={course} reduced={reduced} />
@@ -397,7 +397,7 @@ const Outcomes: React.FC<{ course: Course; reduced: boolean }> = ({ course, redu
   if (mods.length === 0 && course.technologies.length === 0) return null;
   const n = mods.length;
   const lastLg = n % 3 === 1 ? 'lg:col-span-3' : n % 3 === 2 ? 'lg:col-span-2' : '';
-  const lastSm = n % 2 === 1 ? 'sm:col-span-2' : '';
+  const lastSm = n % 2 === 1 ? 'max-lg:col-span-2' : '';
   return (
     <section className="wrap pt-[var(--sec-y)]" aria-labelledby="out-title">
       <SectionHead kicker="01 — Natija" id="out-title">
@@ -405,7 +405,7 @@ const Outcomes: React.FC<{ course: Course; reduced: boolean }> = ({ course, redu
       </SectionHead>
       <p className="t-lead mt-4 max-w-[38rem]">Dasturdagi har bir modul alohida amaliy koʻnikmaga aylanadi.</p>
       {n > 0 && (
-        <ul className="mt-8 grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+        <ul className="mt-8 grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-3">
           {mods.map((m, i) => {
             const last = i === n - 1 && n > 1;
             return (
@@ -418,8 +418,8 @@ const Outcomes: React.FC<{ course: Course; reduced: boolean }> = ({ course, redu
                 transition={{ duration: 0.6, delay: (i % 3) * 0.07, ease: [0.22, 1, 0.36, 1] }}
               >
                 <span className="out-n mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-                <h3 className="t-h3 mt-4 text-balance" style={{ fontSize: 'clamp(1.15rem, 1.6vw, 1.45rem)' }}>{uz(tField(m.title))}</h3>
-                <p className="mono ink-3 mt-3 text-sm">{m.lessons.length} ta dars</p>
+                <h3 className="t-h3 out-title mt-4 text-balance">{uz(tField(m.title))}</h3>
+                <p className="out-meta mono ink-3 mt-3 text-sm">{m.lessons.length} ta dars</p>
               </motion.li>
             );
           })}

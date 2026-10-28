@@ -180,7 +180,7 @@ export const ContactV2: React.FC = () => {
     }
 
     // Menejerlarga Telegram xabarini server /api/leads ichida o'zi yuboradi
-    trackLead({ source: 'Contact', course: courseTitle || undefined, eventId, duplicate: !!crm.duplicate });
+    trackLead({ source: 'Contact', course: courseTitle || undefined, eventId, duplicate: !!crm.duplicate, phone: fullPhone });
     setState('sent');
     setName('');
     setPhone('');

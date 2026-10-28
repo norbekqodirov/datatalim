@@ -89,10 +89,24 @@ Hammasi `redesign-v2` branchida commit qilingan. GitHub'ga oxirgi push: `a18e3cf
   - jamoa rasmlarini qo'shing;
   - galereya rasmlarini qo'shing.
 
+### Ekspert sikllari natijasi (2026-10-28, 3 sikl yakunlandi — egasi tekshiruvida)
+Baholar 1→3-tekshiruv: mijoz 6.5→7.5, biznes 6.5→7.5, marketolog 6→8, dasturchi 7.5→8, dizayner 7→8.2.
+
+### Egasi qarori kerak (ekspertlardan; kodda o'zboshimcha qilinmagan — matn/kontent/qaror)
+- **Kontent:** haqiqiy fotolar (asoschi, jamoa, ustozlar + 1 qator bio); Boss Baby videosini almashtirish yoki bo'limni yashirish; sertifikat namunasi va haqiqiy bitiruvchi natijalari.
+- **Matn:** hero'ga "Bepul konsultatsiya"/telefon va aniqroq H1 qatori; hero kicker raqamlari ("01/02" uch ma'noda) → nuqtalar; yo'nalish va til kurslari kartalarida narx/davomiylik; FAQ'ga narx/to'lov, guruh vaqti/hajmi, sinov darsi, yosh, qaytarish; "0 so'm"→"Bepul", 250+/1600+ va ish vaqti (Har kuni vs JSON-LD Du–Sha) aniqligi.
+- **Kurs ma'lumoti:** keyingi guruh sanasi, dars kunlari, guruh hajmi (yangi admin maydonlari kerak).
+- **Karyera testi:** lead'ni test boshida yuborish yoki telefonni natijadan keyin/ixtiyoriy so'rash.
+- **Reklama:** Meta havolalarida `utm_source/utm_campaign` (ID bilan); Test Events + Pixel Helper bilan bir marta tekshirish; Ads Manager'da Lead qiymatsiz. Sheets: "Kurs" katagiga endi `kurs | utm` yoziladi, payload'da alohida `utm` ham bor — Apps Script'da alohida ustun qilish ixtiyoriy.
+- **Texnik (alohida bosqich):** Conversions API (Meta token), prerender/SSR, `/eski-dizayn` production'da kerakmi, domen pochta, Google Maps havolasi, bitta brend yulduzi uslubi (CSS Star3D yoki shisha render), 375×667 kichik telefonlarda hero stansiyasi.
+- **Deploydan oldin:** `server/data.db` zaxirasi; deploydan keyin bitta qo'lda sinov ariza (manba admin/Telegram/Sheets'da ko'rinsinmi).
+
 ### Ma'lum kichik muammolar
 - Admin'da muqovasi yo'q kurs kartalari qorong'i rejimda deyarli ko'rinmaydi.
 
 ## 6. Jurnal (eng yangisi tepada, har yozuv 1–3 qator)
+- **2026-10-28 · Sikl 3 (yakuniy)** — Buzuq `/kurslar/%` URL endi saytni qulatmaydi; Pixel: in-app/ref/igshid reklama deb aniqlanadi, skript ≤1s kechiktirib yuklanadi, `disablePushState`, Lead dedup telefon bo'yicha 10 daq, atribusiya localStorage 7 kun (`ref | fb | utm`), `CareerTestStart/Complete`; Sheets "Kurs" = `kurs | utm`; admin "Manba / UTM" + Dashboard "Reklama manbasi".
+- Hero: kicker halqadan ajraldi, chiqishdagi chok yo'q, H1 tezroq so'nadi, rail grid'da, 30Hz qurilma sekin hisoblanmaydi; Star3D 5 qatlam shisha; `-sm` srcSet; `useScrolledPastHero` keshi; MobileCtaBar `/kurslar` da yashirin. Kurs sahifasi: dars rejasi accordion, "Natija" mobil 2 ustun (mobil −1760px, desktop −1258px); til tadbirlari shisha kafel; Icon3D fallback.
 - **2026-10-28 · Sikl 2** — UTM endi `leads.utm` ustunida (additive migratsiya, Sheets o'zgarmagan, admin Leads'da ko'rinadi); Lead value'siz, eventID submitdan oldin, InitiateCheckout faqat enroll. Hero stansiya o'qiladi (kamera, bandX ≥64px H1 dan, light siyoh), perf: glow sprite, adaptiv sifat, zaif qurilma 900 zarracha, mobil FPS ~2x. MobileCtaBar/BackToTop hero'dan keyin. Kurs hero'da narx chip, primary 'Kursga yozilish', test formasi mobil 1-ekranda, `-sm.webp` rasmlar.
 - **2026-10-28 · Sikl 1 (5 ekspert → 3 ishchi + hero agent)** — Pixel: Lead (ariza/test/modal/aloqa, eventID), ViewContent, InitiateCheckout, Contact; UTM/fbclid atribusiyasi `courseId` satriga (server/Sheets o'zgarmagan). Ichki sahifalar `.t-hero` yagona H1, yulduzlar kichraydi, 3D ikonka tili (`Icon3D.tsx`). MobileCtaBar global (`MobileCtaBar.tsx`, `[data-hide-mcta]`), footer CTA takrori olib tashlandi, OS reduced-motion, bento mobil ixcham. Hero: DNK → zarrachali kosmik stansiya (`stationScene.ts`). Egasi qarorlari: scratchpad emas — §5 ga qarang.
 - **2026-10-28 · Sikl 0 (3 ishchi agent)** — /kurslar kartalari ixcham (desktop 4 ustun ~390px, mobil gorizontal ~215px), katalog/detail hero kichraydi. /jamoa: o'rta ustun ofseti olib tashlandi, kartalar ~690→300px (avatar+matn). Bosh sahifa mobil: 17 194→13 537px (ritm, bento, yo'nalishlar ikonka, stansiya qator kartalar, ScrollText oxirgi so'z xiraligi tuzatildi).

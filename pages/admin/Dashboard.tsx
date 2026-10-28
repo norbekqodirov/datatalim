@@ -19,6 +19,7 @@ interface StatsData {
     leadsByCourse: { course_id: string; count: number }[];
     topLinks: { name: string; ref_code: string; clicks: number; leads_count: number }[];
     sourceAttribution?: { source_ref: string; count: number }[];
+    utmSources?: { source: string; count: number }[];
     siteVisits: number;
     todaySiteVisits: number;
     yesterdaySiteVisits: number;
@@ -204,6 +205,8 @@ export default function Dashboard() {
     const funnelMax = Math.max(...funnel.map(f => f.value), 1);
 
     const sources = (stats?.sourceAttribution ?? []).map(s => ({ label: s.source_ref, value: s.count }));
+    // Reklama manbasi: leads.utm dagi birinchi segment (utm_source). Bo'sh bo'lsa ko'rsatilmaydi.
+    const utmSources = (stats?.utmSources ?? []).map(s => ({ label: s.source, value: s.count }));
     const courses = (stats?.leadsByCourse ?? []).slice(0, 6).map(c => ({ label: c.course_id, value: c.count }));
 
     return (
@@ -365,6 +368,12 @@ export default function Dashboard() {
                         <section className="a-card a-card-pad min-w-0">
                             <CardHead title="Manbalar" hint="Arizalar qayerdan kelgan" />
                             {sources.length ? <BarList rows={sources} color="var(--a-blue)" /> : <div className="a-empty">Manba maʼlumoti yoʻq</div>}
+                            {utmSources.length > 0 && (
+                                <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--a-line)' }}>
+                                    <div className="a-kicker mb-2">Reklama manbasi</div>
+                                    <BarList rows={utmSources} color="var(--a-green)" />
+                                </div>
+                            )}
                         </section>
                         <section className="a-card a-card-pad min-w-0">
                             <CardHead title="Top kurslar" hint="Arizalar soni boʻyicha" />

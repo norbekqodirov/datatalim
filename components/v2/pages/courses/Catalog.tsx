@@ -134,7 +134,7 @@ const Hero: React.FC<{ total: number; reduced: boolean }> = ({ total, reduced })
       >
         {String(total).padStart(2, '0')}
       </motion.span>
-      <Star3D progress={reduced ? still : starP} spin={50} className="pointer-events-none absolute right-[4%] top-[18%] hidden aspect-square w-[min(15rem,18vw)] opacity-80 lg:block" />
+      <Star3D progress={reduced ? still : starP} spin={50} className="pointer-events-none absolute right-[max(var(--gutter),calc((100vw_-_var(--maxw))/2_+_var(--gutter)))] top-[18%] hidden aspect-square w-[min(15rem,18vw)] opacity-80 lg:block" />
 
       <div className="wrap relative z-10">
         <motion.div style={reduced ? undefined : { y: copyY, opacity: copyOp }}>

@@ -10,6 +10,8 @@ import { openConsult } from './consult';
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 const ICON = (name: string) => `/images/v2/icons/${name}.webp`;
+// 3D ikonkalar 48–80px da ko'rinadi: 192px `-sm` nusxa yetarli, to'liq 320px faqat katta DPR uchun
+const ICON_SET = (name: string) => `/images/v2/icons/${name}-sm.webp 192w, /images/v2/icons/${name}.webp 320w`;
 
 // ------------------------------------------------------------------ bento: raqamlar + vaʼdalar bitta toʻrda
 // Matnlar saytda allaqachon aytilgan daʼvolardan olingan (Manifesto, Campus) — yangi raqam oʻylab topilmaydi.
@@ -20,7 +22,7 @@ type Tile =
   | { kind: 'cta'; span?: string };
 
 const TileIcon: React.FC<{ name: string; size?: string }> = ({ name, size = '' }) => (
-  <img src={ICON(name)} alt="" aria-hidden="true" loading="lazy" decoding="async" width={240} height={240}
+  <img src={ICON(name)} srcSet={ICON_SET(name)} sizes="80px" alt="" aria-hidden="true" loading="lazy" decoding="async" width={240} height={240}
     className={`bento-icon ${size} object-contain select-none pointer-events-none`} />
 );
 
@@ -154,7 +156,7 @@ export const StartSteps: React.FC = () => {
           viewport={{ once: true, margin: '-10% 0px' }}
           transition={{ duration: 0.6, delay: i * 0.1, ease: EASE }}
         >
-          <img src={ICON(s.icon)} alt="" aria-hidden="true" loading="lazy" decoding="async" width={160} height={160} className="bento-icon w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] object-contain shrink-0" />
+          <img src={ICON(s.icon)} srcSet={ICON_SET(s.icon)} sizes="72px" alt="" aria-hidden="true" loading="lazy" decoding="async" width={160} height={160} className="bento-icon w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] object-contain shrink-0" />
           <div className="min-w-0">
             <p className="mono text-[0.75rem] ink-cyan tracking-[0.12em]">{String(i + 1).padStart(2, '0')}</p>
             <p className="font-semibold text-[1.05rem] leading-snug mt-0.5">{s.title}</p>

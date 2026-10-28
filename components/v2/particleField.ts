@@ -107,8 +107,12 @@ function pct99(hist: Uint16Array, counted: number) {
   return Math.max(0.5, (b + 1) / 32);
 }
 
-// adaptive quality: this many consecutive slow frames (> SLOW_MS) step the quality down one notch
+// adaptive quality: this many consecutive slow frames step the quality down one notch.
+// A frame is slow when the interval is > SLOW_MS AND our own draw cost is heavy (> BUSY_MS), or the interval is
+// beyond HARD_MS. A steady ~33ms interval with a cheap draw is a 30Hz display / Low Power mode cap, not slowness.
 const SLOW_MS = 24;
+const BUSY_MS = 12;
+const HARD_MS = 40;
 const SLOW_RUN = 20;
 
 export class ParticleField {
@@ -122,6 +126,7 @@ export class ParticleField {
   // adaptive quality: draw every `step`-th station particle (1, 2, 3), each a touch larger to keep the density
   private step = 1;
   private slow = 0;
+  private cost = 0;
   private warm = 0;
   private lastTs = 0;
   private running = false;
@@ -226,10 +231,14 @@ export class ParticleField {
     this.running = true;
     this.warm = 0;
     this.slow = 0;
+    this.cost = 0;
     const loop = (ts: number) => {
       if (!this.running) return;
       this.watch(ts);
+      const t = performance.now();
       this.frame();
+      // smoothed CPU cost of our draw (rasterisation may land later, HARD_MS still catches that)
+      this.cost += (performance.now() - t - this.cost) * 0.2;
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
@@ -241,7 +250,7 @@ export class ParticleField {
     this.lastTs = ts;
     if (this.warm < 30) { this.warm++; return; } // start-up / tab-return frames are noisy
     if (d > 250) return; // a one-off hitch (GC, tab switch) is not a trend
-    this.slow = d > SLOW_MS ? this.slow + 1 : 0;
+    this.slow = d > HARD_MS || (d > SLOW_MS && this.cost > BUSY_MS) ? this.slow + 1 : 0;
     if (this.slow < SLOW_RUN) return;
     this.slow = 0;
     this.warm = 0;

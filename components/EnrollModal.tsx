@@ -164,6 +164,7 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
                 course: courseName,
                 eventId: leadEventId,
                 duplicate: !!crmData.duplicate,
+                phone: fullPhone,
                 onceKey: isCareer ? 'Karyera_Testi' : undefined,
             });
             toast.success('Arizangiz qabul qilindi! Tez orada siz bilan bog\'lanamiz.', v2Toast());

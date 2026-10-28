@@ -134,7 +134,7 @@ export default function ApplyForm() {
             });
 
             // Meta Pixel: server qabul qilgach; takroriy ariza shu sessiyada qayta sanalmaydi
-            trackLead({ source: 'Ariza', course: courseName, eventId, duplicate: !!res?.duplicate });
+            trackLead({ source: 'Ariza', course: courseName, eventId, duplicate: !!res?.duplicate, phone });
 
             // Menejerlarga Telegram xabarini server /api/leads ichida o'zi yuboradi (ref nomi bilan)
             setSent(true);
