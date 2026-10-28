@@ -174,9 +174,9 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
         {showBar && (
           <motion.div
             className="enroll-bar lg:hidden"
-            initial={reduced ? { opacity: 0 } : { y: '100%' }}
+            initial={reduced ? { opacity: 0 } : { y: '140%' }}
             animate={reduced ? { opacity: 1 } : { y: 0 }}
-            exit={reduced ? { opacity: 0 } : { y: '100%' }}
+            exit={reduced ? { opacity: 0 } : { y: '140%' }}
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="mx-auto flex max-w-xl items-center gap-4">

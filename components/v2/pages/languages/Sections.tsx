@@ -248,7 +248,7 @@ export const LangClosing: React.FC<{ onEnroll: () => void }> = ({ onEnroll }) =>
   const reduced = useMotionReduced();
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   return (
-    <section ref={ref} aria-labelledby="lang-close" className="relative overflow-hidden py-[16vh]">
+    <section ref={ref} data-hide-mcta aria-labelledby="lang-close" className="relative overflow-hidden py-[16vh]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(50% 55% at 50% 100%, rgba(0,97,255,.2), transparent 70%)' }} />
       {!reduced && (
         <Star3D

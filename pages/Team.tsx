@@ -121,7 +121,7 @@ export default function Team() {
       </section>
 
       {/* next step for students first, hiring second */}
-      <section className="relative overflow-hidden" style={{ paddingBlock: 'var(--sec-y)' }} aria-labelledby="join-title">
+      <section data-hide-mcta className="relative overflow-hidden" style={{ paddingBlock: 'var(--sec-y)' }} aria-labelledby="join-title">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(50% 60% at 50% 100%, rgba(0,97,255,.14), transparent 70%)' }} />
         <div className="wrap relative grid lg:grid-cols-12 gap-x-12 gap-y-10 items-center [&>*]:min-w-0">
           <div className="lg:col-span-7">

@@ -622,7 +622,7 @@ export const AboutClosing: React.FC = () => {
   const [consult, setConsult] = useState(false);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   return (
-    <section ref={ref} className="relative py-[16vh] overflow-hidden" aria-labelledby="about-cta-title">
+    <section ref={ref} data-hide-mcta className="relative py-[16vh] overflow-hidden" aria-labelledby="about-cta-title">
       <Star3D progress={scrollYProgress} spin={55} className="ab-star absolute right-[3vw] top-[8%] w-[min(26vw,360px)] aspect-square pointer-events-none opacity-[.35] hidden md:block" />
       <div className="wrap relative">
         <p className="t-kicker mb-6">09 — Boshlash</p>
