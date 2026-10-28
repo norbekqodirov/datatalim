@@ -25,7 +25,7 @@ function inline(src: string): string {
   let s = esc(src);
   s = s.replace(/`([^`]+)`/g, (_m, c) => keep(`<code>${c}</code>`));
   s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/g, (_m, alt, url) =>
-    keep(`<img src="${safeUrl(url)}" alt="${escAttr(alt)}" loading="lazy" decoding="async">`),
+    keep(`<img src="${safeUrl(url)}" alt="${escAttr(alt)}" width="1200" height="675" loading="lazy" decoding="async">`),
   );
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text, url) => {
     const u = safeUrl(url);

@@ -2,7 +2,8 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { X, Loader2, CheckCircle2, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { submitLeadToAPI } from '../utils/api';
-import { trackEvent } from '../utils/pixel';
+import { trackEvent, trackLead } from '../utils/pixel';
+import { useStore } from '../store/useStore';
 import { uz, v2Toast } from './v2/utils';
 import './v2/v2.css';
 
@@ -15,28 +16,43 @@ interface EnrollModalProps {
     sourceRef?: string; // Sheet tabini aniq belgilash (masalan, 'Karyera_Testi'); bo'lmasa type bo'yicha
     initialName?: string; // Masalan, karyera testi intro'sida allaqachon kiritilgan ism
     initialPhone?: string; // Formatlangan holatda, masalan "90 123 45 67" (+998 siz)
+    value?: number; // Kurs narxi (so'm) — ma'lum bo'lsa InitiateCheckout/Lead'ga value sifatida qo'shiladi
 }
 
-export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, courseName, type = 'enroll', extraInfo, sourceRef: sourceRefProp, initialName, initialPhone }) => {
+export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, courseName, type = 'enroll', extraInfo, sourceRef: sourceRefProp, initialName, initialPhone, value }) => {
     const [formData, setFormData] = useState({ name: initialName || '', phone: initialPhone || '' });
     const [loading, setLoading] = useState(false);
     const [sent, setSent] = useState(false);
+    const [failed, setFailed] = useState(false);
+    const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
+    const { siteContent } = useStore();
     const titleId = useId();
     const dialogRef = useRef<HTMLDivElement>(null);
     const nameRef = useRef<HTMLInputElement>(null);
     const phoneRef = useRef<HTMLInputElement>(null);
-    const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const doneRef = useRef<HTMLButtonElement>(null);
 
-    // 'Arizangiz qabul qilindi' dan keyingi avtomatik yopilish taymeri — komponent o'chsa ham qolib ketmasin
-    useEffect(() => () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); }, []);
-
-    // Qo'lda yopilsa (modal o'chmasdan qolsa ham) taymer va "qabul qilindi" holati tozalanadi —
-    // qayta ochilganda eski muvaffaqiyat ekrani va kutilmagan yopilish bo'lmasin
+    // Yopilganda "qabul qilindi" va xato holatlari tozalanadi — qayta ochilganda eski ekran qolmasin
     useEffect(() => {
         if (isOpen) return;
-        if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+        setFailed(false);
+        setErrors({});
         if (sent) { setSent(false); setFormData({ name: '', phone: '' }); }
     }, [isOpen, sent]);
+
+    // Konsultatsiya/yozilish oynasi ochilishi — Meta Pixel InitiateCheckout (har ochilishda bir marta)
+    useEffect(() => {
+        if (!isOpen) return;
+        const data: Record<string, unknown> = { content_name: courseName || 'consult', content_category: type };
+        if (value && value > 0) { data.value = value; data.currency = 'UZS'; }
+        trackEvent('InitiateCheckout', data);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen]);
+
+    // Muvaffaqiyat ekrani chiqqach fokus "Yopish" tugmasiga o'tadi (yuborish tugmasi DOM'dan ketdi)
+    useEffect(() => {
+        if (sent) doneRef.current?.focus({ preventScroll: true });
+    }, [sent]);
 
     // dialog behaviour: lock page scroll, focus the first empty field, Esc closes,
     // Tab stays inside, focus returns to the trigger on close
@@ -67,6 +83,8 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
 
     if (!isOpen) return null;
 
+    const phoneHref = siteContent.contactPhone ? `tel:${siteContent.contactPhone.replace(/[^\d+]/g, '')}` : undefined;
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
@@ -88,17 +106,19 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         const rawPhone = formData.phone.replace(/\D/g, '');
 
         const cleanName = formData.name.trim();
-        if (cleanName.length < 2) {
-            toast.error('Ismingizni kiriting (kamida 2 harf).', v2Toast());
-            return;
-        }
-
+        const next: typeof errors = {};
+        if (cleanName.length < 2) next.name = 'Ismingizni kiriting (kamida 2 harf).';
         // server bilan bir xil qoida: 9 raqam, operator kodi 2–9 dan boshlanadi
         if (!/^[2-9]\d{8}$/.test(rawPhone)) {
-            toast.error(rawPhone.length !== 9 ? "Telefon raqamni to'liq kiriting: 90 123 45 67" : "Telefon raqam noto'g'ri. Masalan: 90 123 45 67", v2Toast());
+            next.phone = rawPhone.length !== 9 ? "Telefon raqamni to'liq kiriting: 90 123 45 67" : "Telefon raqam noto'g'ri. Masalan: 90 123 45 67";
+        }
+        setErrors(next);
+        if (next.name || next.phone) {
+            (next.name ? nameRef.current : phoneRef.current)?.focus();
             return;
         }
 
+        setFailed(false);
         setLoading(true);
 
         // Determine source explicitly to divide into respective Google Sheet tabs
@@ -128,15 +148,21 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         setLoading(false);
 
         if (crmData) {
-            trackEvent('Lead', { source: type, course: courseName });
+            // takroriy ariza (server 10 daqiqa ichida bir xil telefon+kursni birlashtiradi) qayta sanalmaydi;
+            // karyera testi leadi bir sessiyada bir marta (avtomatik yuborish bilan ikkilanmasin)
+            if (!crmData.duplicate) {
+                const isCareer = sourceRefProp === 'Karyera_Testi';
+                trackLead({
+                    source: isCareer ? 'Karyera_Testi' : type,
+                    course: courseName,
+                    value,
+                    onceKey: isCareer ? 'Karyera_Testi' : undefined,
+                });
+            }
             toast.success('Arizangiz qabul qilindi! Tez orada siz bilan bog\'lanamiz.', v2Toast());
             setSent(true);
-            closeTimerRef.current = setTimeout(() => {
-                setSent(false);
-                setFormData({ name: '', phone: '' });
-                onClose();
-            }, 3000);
         } else {
+            setFailed(true);
             toast.error('Xatolik yuz berdi. Qaytadan urinib ko\'ring.', v2Toast());
         }
     };
@@ -176,6 +202,7 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
                         </span>
                         <h3 id={titleId} className="t-h3">Ariza qabul qilindi!</h3>
                         <p className="t-body mt-3">Mutaxassislarimiz tez orada siz bilan bog{'\u02BB'}lanadi.</p>
+                        <button ref={doneRef} type="button" onClick={onClose} className="btn btn-ghost mt-8">Yopish</button>
                     </div>
                 ) : (
                     <>
@@ -200,14 +227,17 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
                                     maxLength={60}
                                     value={formData.name}
                                     onChange={handleChange}
+                                    aria-invalid={!!errors.name}
+                                    aria-describedby={errors.name ? `${titleId}-name-err` : undefined}
                                     className="field"
                                     placeholder="Toʻliq ismingiz"
                                     required
                                 />
+                                {errors.name && <p id={`${titleId}-name-err`} role="alert" className="field-err">{errors.name}</p>}
                             </div>
                             <div>
                                 <label htmlFor={`${titleId}-phone`} className="block text-sm font-medium mb-2">Telefon raqamingiz</label>
-                                <div className="field-group">
+                                <div className="field-group" data-invalid={!!errors.phone || undefined}>
                                     <span className="flex items-center gap-2 pl-4 pr-2 mono ink-3 select-none" aria-hidden="true">
                                         <Phone size={16} /> +998
                                     </span>
@@ -220,12 +250,15 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
                                         autoComplete="tel-national"
                                         value={formData.phone}
                                         onChange={handlePhoneChange}
+                                        aria-invalid={!!errors.phone}
+                                        aria-describedby={errors.phone ? `${titleId}-phone-err` : undefined}
                                         className="bare-input flex-1 min-w-0 h-14 pr-5 outline-none text-[1.0625rem]"
                                         style={{ background: 'transparent', border: 0, color: 'var(--fg)' }}
                                         placeholder="90 123 45 67"
                                         required
                                     />
                                 </div>
+                                {errors.phone && <p id={`${titleId}-phone-err`} role="alert" className="field-err">{errors.phone}</p>}
                             </div>
                             <button type="submit" disabled={loading} aria-busy={loading} className="btn btn-primary w-full mt-1">
                                 {loading ? (
@@ -236,6 +269,15 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
                                     type === 'enroll' ? 'Yozilish' : 'Konsultatsiya olish'
                                 )}
                             </button>
+                            {failed && (
+                                <p role="alert" className="field-err !mt-0 text-center">
+                                    Yuborilmadi. Internetni tekshirib, qayta urinib koʻring
+                                    {phoneHref ? <> yoki qoʻngʻiroq qiling: <a href={phoneHref} className="font-semibold underline underline-offset-4 inline-flex items-center min-h-[44px]">{siteContent.contactPhone}</a></> : '.'}
+                                </p>
+                            )}
+                            <p className="text-xs ink-3 text-center -mt-2">
+                                {uz("Menejer 1 ish kuni ichida qo'ng'iroq qiladi")}. Maʼlumotlaringiz faqat siz bilan bogʻlanish uchun ishlatiladi.
+                            </p>
                         </form>
                     </>
                 )}

@@ -43,6 +43,8 @@ export const HeroSignal: React.FC = () => {
   const capBRef = useRef<HTMLDivElement>(null);
   const capCRef = useRef<HTMLDivElement>(null);
   const vRef = useRef(0);
+  // band faqat bosqich almashganda (A → B → C), resize va shrift yuklanganda qayta o'lchanadi — har scroll kadrida emas
+  const phaseRef = useRef(-1);
 
   // The formation lives in a vertical band: below the navbar, above whatever text is on screen
   // (headline on phones, captions otherwise). The field centres itself in it and shrinks to fit.
@@ -143,7 +145,11 @@ export const HeroSignal: React.FC = () => {
     const f = fieldRef.current;
     if (!f || reduced) return;
     vRef.current = v;
-    measureBand();
+    const phase = v < 0.14 ? 0 : v < 0.56 ? 1 : 2;
+    if (phase !== phaseRef.current) {
+      phaseRef.current = phase;
+      measureBand();
+    }
     f.progress = formationAt(v);
     f.anchorX = desktop && v < 0.14 ? 0.73 : 0.5;
     const phone = !desktop && window.innerHeight > window.innerWidth * 1.1;
@@ -174,7 +180,7 @@ export const HeroSignal: React.FC = () => {
   }
 
   return (
-    <section ref={sectionRef} className="relative" style={{ height: desktop ? '230vh' : '170vh' }} aria-label="DATA Taʼlim Stansiyasi">
+    <section ref={sectionRef} className="relative" style={{ height: desktop ? '230vh' : '140svh' }} aria-label="DATA Taʼlim Stansiyasi">
       <div className="sticky top-0 h-[100svh] overflow-hidden grain">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden="true" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: vignette }} />

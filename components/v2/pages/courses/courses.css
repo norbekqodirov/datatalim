@@ -31,13 +31,8 @@
   font-weight: 500;
   line-height: 0.8;
 }
-.v2 .cx-title {
-  font-size: clamp(2.5rem, 5.6vw, 5rem);
-  line-height: 0.98;
-  letter-spacing: -0.045em;
-  font-weight: 700;
-  overflow-wrap: break-word;
-}
+/* o'lcham — global .t-hero; bu yerda faqat o'rash qoidasi */
+.v2 .cat-h1 { overflow-wrap: break-word; }
 
 /* ---------- filtr ---------- */
 .v2 .chip {
@@ -153,7 +148,7 @@
 
 /* ---------- kurs sahifasi: sarlavha ---------- */
 .v2 .cd-title {
-  font-size: clamp(2rem, 4.4vw, 3.75rem);
+  font-size: clamp(2.25rem, 4.6vw, 4rem);
   line-height: 1;
   letter-spacing: -0.045em;
   font-weight: 700;
@@ -173,6 +168,7 @@
 
 .v2 .fact { background: var(--bg); padding: 1rem 1rem 1.15rem; min-width: 0; }
 @media (min-width: 768px) { .v2 .fact { padding: 1.25rem 1.5rem 1.4rem; } }
+@media (min-width: 1024px) { .v2 .fact:first-child { padding-left: 0; } }
 .v2 .fact-v { font-size: clamp(1.25rem, 2vw, 1.75rem); line-height: 1.1; letter-spacing: -0.03em; font-weight: 500; overflow-wrap: anywhere; }
 /* narx birligi (so'm) raqamdan ajralib, 'so' / 'm' bo'lib qolmasin; tor ekranda raqam sig'ishi uchun biroz kichik */
 .v2 .fact-v > span { white-space: nowrap; }
@@ -234,6 +230,19 @@
   place-items: center;
 }
 .v2 .mentor-av img { width: 100%; height: 100%; object-fit: cover; }
+/* rasm yo'q: ixcham monogramma (kategoriya rangi) */
+.v2 .mentor-av.is-mono {
+  width: 48px;
+  height: 48px;
+  background: radial-gradient(90% 80% at 85% 0%, color-mix(in srgb, var(--cat) 38%, transparent), transparent 70%), var(--bg-3);
+}
+.v2 .mentor-av.is-mono span { font-size: 1rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+
+/* bog'liq kurslar: bo'sh slotni to'ldiruvchi "Barcha kurslar" kartasi */
+.v2 .rel-all { transition: border-color 0.25s var(--ease), transform 0.4s var(--ease); }
+.v2 .rel-all:hover { border-color: var(--blue); transform: translate3d(0, -4px, 0); }
+.v2 .rel-all .rel-arr { transition: transform 0.35s var(--ease); }
+.v2 .rel-all:hover .rel-arr { transform: translateX(4px); }
 
 @media (prefers-reduced-motion: reduce) {
   .v2 .cc, .v2 .cc-arrow, .v2 .tech { transition: none; }
@@ -246,8 +255,8 @@
 @media (min-width: 768px) { .v2 .chips { flex-wrap: wrap; overflow: visible; margin-inline: 0; padding: 0; } }
 
 /* ---------- karta CTA ---------- */
-.v2 .cc-cta { display: inline-flex; align-items: center; justify-content: space-between; gap: 0.75rem; width: 100%; min-height: 44px; padding: 0 1.15rem; font-size: 0.9375rem; border-radius: 999px; background: var(--fg); color: var(--bg); font-weight: 600; letter-spacing: -0.01em; transition: background-color 0.25s var(--ease), color 0.25s var(--ease); }
-.v2 .cc:hover .cc-cta, .v2 .cc:focus-within .cc-cta { background: var(--blue); color: #fff; }
+.v2 .cc-cta { display: inline-flex; align-items: center; justify-content: space-between; gap: 0.75rem; width: 100%; min-height: 44px; padding: 0 1.15rem; font-size: 0.9375rem; border-radius: 999px; background: transparent; border: 1px solid var(--line-2); color: var(--fg); font-weight: 600; letter-spacing: -0.01em; transition: background-color 0.25s var(--ease), color 0.25s var(--ease), border-color 0.25s var(--ease); }
+.v2 .cc:hover .cc-cta, .v2 .cc:focus-within .cc-cta { background: var(--blue); border-color: var(--blue); color: #fff; }
 .v2 .cc-cta svg { transition: transform 0.3s var(--ease); }
 .v2 .cc:hover .cc-cta svg, .v2 .cc:focus-within .cc-cta svg { transform: translateX(3px); }
 

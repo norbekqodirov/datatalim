@@ -2,6 +2,7 @@ import React, { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
+import { MotionConfig } from 'framer-motion';
 import { initPixel, trackEvent } from './utils/pixel';
 import { trackSiteEventOncePerSession } from './utils/analytics';
 const Home = lazy(() => import('./pages/Home'));
@@ -29,6 +30,8 @@ import { ScrollProgress } from './components/ScrollProgress';
 import { BackToTop } from './components/BackToTop';
 import { GlobalSearch } from './components/GlobalSearch';
 import { ConsultHost } from './components/v2/consult';
+import { MobileCtaBar } from './components/v2/MobileCtaBar';
+import { useMotionReduced } from './components/v2/utils';
 
 // Admin
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -103,6 +106,7 @@ const PublicLayout = () => {
         </ErrorBoundary>
       </main>
       <Footer />
+      <MobileCtaBar />
       <ConsultHost />
     </div>
   );
@@ -132,6 +136,8 @@ const PixelTracker = () => {
 
 function App() {
   const initializeStore = useStore(state => state.initializeStore);
+  // OS "reduced motion" + footer'dagi tanlov (localStorage ustun) — framer animatsiyalari ham hurmat qiladi
+  const reducedMotion = useMotionReduced();
 
   useEffect(() => {
     initializeStore();
@@ -139,6 +145,7 @@ function App() {
 
   return (
     <HelmetProvider>
+      <MotionConfig reducedMotion={reducedMotion ? 'always' : 'never'}>
       {/* Ilova darajasidagi himoya: navbar, admin yoki /ariza xatosi oq ekran qoldirmaydi */}
       <ErrorBoundary fullScreen>
       <Router>
@@ -196,6 +203,7 @@ function App() {
         </Suspense>
       </Router>
       </ErrorBoundary>
+      </MotionConfig>
     </HelmetProvider>
   );
 }

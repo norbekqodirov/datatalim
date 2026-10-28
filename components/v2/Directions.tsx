@@ -6,7 +6,7 @@ import { openConsult } from './consult';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import type { Course } from '../../data/courses';
-import { uz, useIsDesktop, optimizedCover, useMotionReduced } from './utils';
+import { uz, useIsDesktop, optimizedCover, useMotionReduced, syncPinnedFocus } from './utils';
 
 const CATS: { id: Course['category']; title: string; blurb: string; color: string; ink: string }[] = [
   {
@@ -61,6 +61,7 @@ const PinnedTrack: React.FC = () => {
   const { courses } = useStore();
   const sectionRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
   const [geo, setGeo] = useState({ dist: 0, vw: 1440, centers: [] as number[], edges: [] as number[] });
   const [active, setActive] = useState(0);
 
@@ -110,8 +111,8 @@ const PinnedTrack: React.FC = () => {
   const cat = CATS[active];
 
   return (
-    <section ref={sectionRef} id="yonalishlar" className="relative" style={{ height: `calc(100vh + ${Math.round(geo.dist * TRAVEL)}px)` }} aria-label="Taʼlim yoʻnalishlari">
-      <div className="sticky top-0 h-screen overflow-hidden flex flex-col justify-center">
+    <section ref={sectionRef} id="yonalishlar" className="relative" style={{ height: `calc(100svh + ${Math.round(geo.dist * TRAVEL)}px)` }} aria-label="Taʼlim yoʻnalishlari">
+      <div ref={stickyRef} className="sticky top-0 h-[100svh] overflow-hidden flex flex-col justify-center">
         <div className="wrap w-full">
           <div className="grid grid-cols-12 gap-8 items-end">
             <div className="col-span-8">
@@ -123,13 +124,12 @@ const PinnedTrack: React.FC = () => {
             <div className="col-span-4 flex flex-col items-end gap-4">
               <p className="t-body text-right max-w-[20rem]">Har biri bozorda talab qilinadigan kasbga olib boradi.</p>
               {/* liniya tanlagich — metro xaritasidagi rangli belgilar */}
-              <div className="mt-legend" role="tablist" aria-label="Yoʻnalishni tanlang">
+              <div className="mt-legend" role="group" aria-label="Yoʻnalishni tanlang">
                 {CATS.map((c, i) => (
                   <button
                     key={c.id}
                     type="button"
-                    role="tab"
-                    aria-selected={i === active}
+                    aria-current={i === active ? 'true' : undefined}
                     aria-label={c.title}
                     title={c.title}
                     onClick={() => go(i)}
@@ -145,7 +145,12 @@ const PinnedTrack: React.FC = () => {
         </div>
 
         <div className="relative mt-[4vh]">
-          <motion.div ref={trackRef} className="mt-track" style={{ x }}>
+          <motion.div
+            ref={trackRef}
+            className="mt-track"
+            style={{ x }}
+            onFocus={(e) => syncPinnedFocus(e.target as HTMLElement, sectionRef.current, stickyRef.current, trackRef.current, geo.dist)}
+          >
             {CATS.map((c, i) => (
               <Chapter key={c.id} cat={c} i={i} x={x} center={geo.centers[i] ?? 0} vw={geo.vw} />
             ))}
@@ -201,7 +206,9 @@ const Chapter: React.FC<{ cat: (typeof CATS)[number]; i: number; x: MotionValue<
               width={640}
               height={640}
               decoding="async"
-              loading="lazy"
+              // gorizontal transform-trek ichida lazy rasm kech chiqadi — darhol, lekin past ustuvorlikda
+              loading="eager"
+              fetchPriority="low"
               onError={() => setBroken(true)}
               className={`mt-art ${broken ? 'is-boxed' : ''}`}
               style={{ x: artX, rotate: artRot, scale: artScale }}

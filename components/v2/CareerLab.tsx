@@ -228,9 +228,10 @@ export const CareerLab: React.FC = () => {
             </div>
 
             <div className="min-w-0" aria-live="polite">
-              <div className="flex items-center justify-between gap-4 mb-5">
-                <span className="t-kicker">Tezkor sinov · 30 soniya</span>
-                <span className="flex gap-1.5" aria-label={`${Math.min(step + 1, QUIZ.length)} / ${QUIZ.length} savol`}>
+              {/* kicker bir qatorda qoladi; joy yetmasa nuqtalar uning ostiga tushadi */}
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 mb-5">
+                <span className="t-kicker whitespace-nowrap">Tezkor sinov · 30 soniya</span>
+                <span className="flex shrink-0 gap-1.5" aria-label={`${Math.min(step + 1, QUIZ.length)} / ${QUIZ.length} savol`}>
                   {QUIZ.map((_, i) => (
                     <span key={i} className={`lab-dot ${i < step ? 'is-done' : i === step && !done ? 'is-now' : ''}`} />
                   ))}

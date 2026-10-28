@@ -1,11 +1,11 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Loader2, Check, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { submitLeadToAPI } from '../../utils/api';
-import { trackEvent } from '../../utils/pixel';
+import { trackLead, parsePriceUZS } from '../../utils/pixel';
 import { uz, v2Toast } from './utils';
 import { StartSteps } from './Sales';
 import { Mask } from './fx';
@@ -55,11 +55,14 @@ export const FaqV2: React.FC = () => {
   return (
     <section className="relative sec" aria-labelledby="faq-title">
       <div className="wrap grid lg:grid-cols-12 gap-6 sm:gap-10">
-        <div className="lg:col-span-4 lg:sticky lg:top-28 self-start">
-          <p className="t-kicker mb-6">09 — Savollar</p>
-          <Mask><h2 id="faq-title" className="t-h2">Koʻp beriladigan savollar</h2></Mask>
+        {/* mobilda `contents`: sarlavha tepada, yordam kartasi esa savollardan KEYIN (order-last); desktopda sticky ustun */}
+        <div className="contents lg:block lg:col-span-4 lg:sticky lg:top-28 self-start">
+          <div>
+            <p className="t-kicker mb-6">09 — Savollar</p>
+            <Mask><h2 id="faq-title" className="t-h2">Koʻp beriladigan savollar</h2></Mask>
+          </div>
           {/* javob topilmasa — keyingi qadam shu yerning oʻzida */}
-          <div className="faq-help panel mt-8 sm:mt-10">
+          <div className="faq-help panel mt-0 lg:mt-10 order-last lg:order-none">
             <span className="faq-bubble" aria-hidden="true">💬</span>
             <p className="font-semibold text-[1.1rem] tracking-[-0.01em]">Javobini topmadingizmi?</p>
             <p className="t-body mt-2 !text-[0.95rem]">Savolingizni yozing — maslahatchimiz tushuntirib beradi.</p>
@@ -138,6 +141,12 @@ export const ContactV2: React.FC = () => {
   const [course, setCourse] = useState('');
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [state, setState] = useState<'idle' | 'loading' | 'sent'>('idle');
+  const sentRef = useRef<HTMLParagraphElement>(null);
+
+  // yuborilgach fokus tasdiq matniga o'tadi (forma DOM'dan ketadi, fokus yo'qolmasin)
+  useEffect(() => {
+    if (state === 'sent') sentRef.current?.focus({ preventScroll: true });
+  }, [state]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,7 +179,14 @@ export const ContactV2: React.FC = () => {
     }
 
     // Menejerlarga Telegram xabarini server /api/leads ichida o'zi yuboradi
-    trackEvent('Lead', { source: 'Contact' });
+    if (!crm.duplicate) {
+      const picked = course ? courses.find((c) => c.id === course) : undefined;
+      trackLead({
+        source: 'Contact',
+        course: courseTitle || undefined,
+        value: picked ? parsePriceUZS(tField(picked.monthlyPrice)) : null,
+      });
+    }
     setState('sent');
     setName('');
     setPhone('');
@@ -199,13 +215,14 @@ export const ContactV2: React.FC = () => {
         </div>
 
         <div className="lg:col-span-6 order-1 lg:order-2">
-          <div className="panel p-5 sm:p-9 h-full">
+          {/* doimiy aria-live konteyner: forma o'rniga tasdiq chiqqanda ekran o'qish dasturi e'lon qiladi */}
+          <div className="panel p-5 sm:p-9 h-full" aria-live="polite">
             {state === 'sent' ? (
-              <div className="py-10 text-center" role="status">
+              <div className="py-10 text-center">
                 <span className="mx-auto w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'var(--green)' }}>
                   <Check size={30} color="#fff" aria-hidden="true" />
                 </span>
-                <p className="t-h3 mt-6">Arizangiz qabul qilindi</p>
+                <p ref={sentRef} tabIndex={-1} className="t-h3 mt-6 outline-none">Arizangiz qabul qilindi</p>
                 <p className="t-body mt-3">Tez orada siz bilan bogʻlanamiz.</p>
                 <button type="button" className="btn btn-ghost mt-8" onClick={() => setState('idle')}>
                   Yana ariza yuborish

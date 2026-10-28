@@ -71,6 +71,8 @@ const Blog: React.FC = () => {
   const featured = filtered[0];
   const rest = filtered.slice(1);
   const filtering = !!search.trim() || !!selectedCategory;
+  // 3 tadan kam maqolada qidiruv, toifa filtri va "1 / 1" hisoblagichi ortiqcha — yashiramiz (matn o'zgarmaydi)
+  const showFilters = !loading && posts.length >= 3;
   const clear = () => {
     setSearch('');
     setSelectedCategory('');
@@ -92,7 +94,7 @@ const Blog: React.FC = () => {
             progress={scrollYProgress}
             layers={7}
             spin={60}
-            className="pointer-events-none absolute -right-16 sm:right-[6%] top-20 w-56 h-56 sm:w-80 sm:h-80 lg:w-[26rem] lg:h-[26rem] opacity-40 sm:opacity-80"
+            className="pointer-events-none absolute right-[4vw] top-24 w-24 h-24 sm:right-[5vw] sm:w-[min(20vw,260px)] sm:h-[min(20vw,260px)] opacity-40 sm:opacity-80"
           />
         )}
         <div className="wrap relative">
@@ -101,7 +103,7 @@ const Blog: React.FC = () => {
             DATA · Jurnal
           </p>
           <Mask>
-            <h1 className="t-display">
+            <h1 className="t-hero">
               <span className="ink-grad">{t('nav.blog') || 'Blog'}</span>
             </h1>
           </Mask>
@@ -110,6 +112,7 @@ const Blog: React.FC = () => {
       </header>
 
       {/* ---------------------------------------------------------------- filters */}
+      {showFilters && (
       <section aria-label="Qidiruv va toifalar" className="wrap pb-10">
         <div className="hairline pt-8 flex flex-col lg:flex-row lg:items-center gap-5">
           <div className="search-wrap w-full lg:max-w-md">
@@ -133,13 +136,12 @@ const Blog: React.FC = () => {
               </button>
             ))}
           </div>
-          {!loading && posts.length > 0 && (
-            <p className="mono text-[0.8125rem] ink-3 lg:ml-auto" aria-live="polite">
-              {filtered.length} / {posts.length}
-            </p>
-          )}
+          <p className="mono text-[0.8125rem] ink-3 lg:ml-auto" aria-live="polite">
+            {filtered.length} / {posts.length}
+          </p>
         </div>
       </section>
+      )}
 
       <section aria-label="Maqolalar" className="wrap pb-[12vh]" aria-busy={loading}>
         {/* ---------------------------------------------------------------- loading */}

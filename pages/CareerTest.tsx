@@ -17,6 +17,7 @@ import { SEO } from '../components/SEO';
 import { EnrollModal } from '../components/EnrollModal';
 import { trackSiteEvent } from '../utils/analytics';
 import { submitLeadToAPI, submitCareerTestResult } from '../utils/api';
+import { trackLead } from '../utils/pixel';
 import { uz, useMotionReduced, v2Toast } from '../components/v2/utils';
 import { useStore } from '../store/useStore';
 import '../components/v2/v2.css';
@@ -1398,7 +1399,11 @@ export default function CareerTest() {
         phone: fullPhone,
         courseId: topCourseNames.join(', ') || 'Karyera testi',
         sourceRef: 'Karyera_Testi',
-      }).then(() => { sent.lead = true; }));
+      }).then((res) => {
+        sent.lead = true;
+        // Meta Pixel Lead: bir sessiyada bir marta (modal orqali yuborilsa ham ikkilanmaydi)
+        if (!res?.duplicate) trackLead({ source: 'Karyera_Testi', course: topCourseNames[0], onceKey: 'Karyera_Testi' });
+      }));
     }
     if (!sent.result) {
       jobs.push(submitCareerTestResult({
@@ -1564,7 +1569,7 @@ export default function CareerTest() {
             <div className="wrap relative grid gap-12 lg:grid-cols-12 lg:gap-8 items-start">
               <div className="lg:col-span-6">
                 <p className="t-kicker">Karyera laboratoriyasi · Holland RIASEC</p>
-                <h1 id="ct-title" className="t-display mt-6 max-w-[13ch]" style={{ fontSize: 'clamp(2.1rem, 7vw, 6.25rem)' }}>
+                <h1 id="ct-title" className="t-hero mt-6">
                   Kasbingizni <span className="ink-grad">maʼlumot</span> bilan aniqlang.
                 </h1>
                 <p className="t-lead mt-6 max-w-[34rem]">

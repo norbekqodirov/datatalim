@@ -1,12 +1,13 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useInView, useScroll, useSpring, useTransform, type UseInViewOptions } from 'framer-motion';
-import { ArrowRight, ArrowUpRight, Clock, Coffee, Award, Monitor, Phone, MapPin, Target, Users, Wifi, Zap, Heart, Globe, type LucideIcon } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Clock, Phone, MapPin, Target, Zap, Heart, Globe, type LucideIcon } from 'lucide-react';
 import { useStore } from '../../../../store/useStore';
 import { useLanguage } from '../../../../i18n';
 import { uz, useMotionReduced } from '../../utils';
 import { CountUp, Mask, ScrollText, Star3D } from '../../fx';
 import { EnrollModal } from '../../../EnrollModal';
+import { Icon3D } from '../Icon3D';
 import './about.css';
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -76,12 +77,12 @@ export const AboutHero: React.FC = () => {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(55% 50% at 78% 28%, rgba(0,97,255,.16), transparent 70%)' }} />
       <Star3D
         progress={starP}
-        className="ab-star absolute -right-[22vw] top-[12%] w-[78vw] aspect-square pointer-events-none opacity-[.38] md:-right-[5vw] md:top-[10%] md:w-[min(44vw,620px)] md:opacity-90"
+        className="ab-star absolute right-[4vw] top-[9%] w-[30vw] aspect-square pointer-events-none opacity-[.3] md:right-[3vw] md:top-[12%] md:w-[min(26vw,360px)] md:opacity-80"
       />
       <motion.div className="wrap relative" style={reduced ? undefined : { y: textY, opacity: textOpacity }}>
         <p className="t-kicker mb-8">01 — Biz haqimizda</p>
         <Mask>
-          <h1 id="about-title" className="t-display max-w-[16ch]">
+          <h1 id="about-title" className="t-hero max-w-[16ch]">
             {head}
             <span className="ink-grad">{tail}</span>
           </h1>
@@ -127,6 +128,7 @@ export const MissionScene: React.FC = () => {
   const founder = uz(tField(siteContent.founderName));
   const founderTitle = uz(tField(siteContent.founderTitle));
   const reduced = useMotionReduced();
+  const hasPhoto = !!siteContent.aboutImage;
   const figRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: figRef, offset: ['start end', 'end start'] });
   const imgY = useTransform(scrollYProgress, [0, 1], ['-6%', '6%']);
@@ -140,6 +142,17 @@ export const MissionScene: React.FC = () => {
             <ScrollText text={quote} />
           </p>
         )}
+        {!hasPhoto && founder && (
+          <figure ref={figRef} className="m-0 mt-8 flex items-center gap-4">
+            <span aria-hidden="true" className="ab-mono" style={{ ['--tm-fill' as string]: '#0061ff' }}>
+              <span className="ab-mono-i">{initials(founder)}</span>
+            </span>
+            <figcaption className="min-w-0">
+              <span className="block t-h3" style={{ fontSize: '1.0625rem', lineHeight: 1.25 }}>{founder}</span>
+              {founderTitle && <span className="block mt-0.5 text-sm" style={{ color: 'var(--fg-2)' }}>{founderTitle}</span>}
+            </figcaption>
+          </figure>
+        )}
         <Reveal>
           <p className="t-lead mt-10 max-w-[44rem]">
             {uz("Biz nafaqat kasb o'rgatamiz, balki o'quvchilarimizning dunyoqarashini kengaytirib, ularni kelajak muammolariga yechim topa oladigan mutaxassislar qilib tayyorlaymiz.")}
@@ -147,7 +160,7 @@ export const MissionScene: React.FC = () => {
         </Reveal>
 
         <div className="mt-[12vh] grid lg:grid-cols-12 gap-x-12 gap-y-14 [&>*]:min-w-0">
-          <ol className="lg:col-span-7 hairline flex flex-col">
+          <ol className={`${hasPhoto ? 'lg:col-span-7' : 'lg:col-span-12'} hairline flex flex-col`}>
             {GOALS.map((g, i) => (
               <motion.li
                 key={g}
@@ -164,9 +177,9 @@ export const MissionScene: React.FC = () => {
             ))}
           </ol>
 
-          <figure ref={figRef} className="lg:col-span-5 lg:col-start-8 m-0">
-            <div className="panel relative overflow-hidden aspect-[4/5] max-w-[26rem] lg:max-w-none">
-              {siteContent.aboutImage ? (
+          {hasPhoto && (
+            <figure ref={figRef} className="lg:col-span-5 lg:col-start-8 m-0">
+              <div className="panel relative overflow-hidden aspect-[4/5] max-w-[26rem] lg:max-w-none">
                 <motion.img
                   src={siteContent.aboutImage}
                   alt={founder}
@@ -175,20 +188,14 @@ export const MissionScene: React.FC = () => {
                   className="absolute inset-0 w-full h-[112%] object-cover"
                   style={reduced ? undefined : { y: imgY, top: '-6%' }}
                 />
-              ) : (
-                <>
-                  <div aria-hidden="true" className="absolute inset-0" style={{ background: 'radial-gradient(90% 70% at 85% 0%, rgba(0,97,255,.38), transparent 70%), radial-gradient(70% 60% at 0% 100%, rgba(96,239,255,.14), transparent 70%)' }} />
-                  <StarGlyph size="64%" color="var(--blue)" className="absolute -right-[14%] -top-[8%] opacity-30" />
-                  <span aria-hidden="true" className="absolute left-7 top-7 t-h2 ink-grad">{initials(founder)}</span>
-                </>
-              )}
-              {siteContent.aboutImage && <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/2" style={{ background: 'linear-gradient(to top, rgba(0,0,0,.78), transparent)' }} />}
-              <figcaption className="absolute left-7 right-7 bottom-7" style={{ color: siteContent.aboutImage ? '#fff' : 'var(--fg)' }}>
-                <span className="block t-h3">{founder}</span>
-                <span className="block mt-1 text-sm" style={{ color: siteContent.aboutImage ? 'rgba(255,255,255,.82)' : 'var(--fg-2)' }}>{founderTitle}</span>
-              </figcaption>
-            </div>
-          </figure>
+                <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/2" style={{ background: 'linear-gradient(to top, rgba(0,0,0,.78), transparent)' }} />
+                <figcaption className="absolute left-7 right-7 bottom-7" style={{ color: '#fff' }}>
+                  <span className="block t-h3">{founder}</span>
+                  <span className="block mt-1 text-sm" style={{ color: 'rgba(255,255,255,.82)' }}>{founderTitle}</span>
+                </figcaption>
+              </div>
+            </figure>
+          )}
         </div>
       </div>
     </section>
@@ -357,7 +364,7 @@ export const StationScene: React.FC = () => {
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   return (
     <section ref={ref} className="relative py-[18vh]" aria-labelledby="station-title">
-      <Star3D progress={scrollYProgress} spin={70} className="ab-star absolute -right-[16vw] top-[10%] w-[60vw] aspect-square pointer-events-none opacity-[.3] md:-right-[4vw] md:w-[min(38vw,520px)] md:opacity-90" />
+      <Star3D progress={scrollYProgress} spin={70} className="ab-star absolute right-[4vw] top-[5%] w-[28vw] aspect-square pointer-events-none opacity-[.25] md:right-[3vw] md:top-[7%] md:w-[min(22vw,320px)] md:opacity-70" />
       <div className="wrap relative">
         <p className="t-kicker mb-8">04 — Nom</p>
         <Mask>
@@ -365,7 +372,7 @@ export const StationScene: React.FC = () => {
             Nega aynan <span className="ink-grad">«Stansiya»</span>?
           </h2>
         </Mask>
-        <p className="ab-statement mt-12" style={{ fontWeight: 500 }}>
+        <p className="ab-statement ab-station mt-12" style={{ fontWeight: 500 }}>
           <ScrollText
             text={uz(
               "Stansiya — bu to'xtash joyi emas, balki yangi kuch to'plash va yo'nalishni aniqlab olish maskanidir. O'quvchilarimiz bu yerda bilim bilan \"to'yinadilar\" va katta hayot yo'liga ishonch bilan qadam qo'yadilar. Bu yerda turli taqdirlar kesishadi va yangi muvaffaqiyat hikoyalari boshlanadi.",
@@ -431,13 +438,13 @@ export const ValuesScene: React.FC = () => {
 };
 
 // ------------------------------------------------------------------ 07 facilities
-const FACILITIES: { icon: LucideIcon; title: string; desc: string }[] = [
-  { icon: Monitor, title: 'Zamonaviy texnikalar', desc: "O'quv xonalarimiz so'nggi rusumdagi iMac va kuchli Windows kompyuterlari bilan jihozlangan. Bu esa dasturlash va dizayn dasturlarida qotishlarsiz, tezkor ishlash imkonini beradi." },
-  { icon: Coffee, title: 'Coworking hududi', desc: "Darsdan tashqari vaqtlarda o'quvchilarimiz bemalol kelib, o'z ustilarida ishlashlari, jamoaviy loyihalar qilishlari uchun maxsus shinam coworking zonalarimiz mavjud." },
-  { icon: Wifi, title: 'Yuqori tezlikdagi internet', desc: "Markazimizning barcha hududlarida uzluksiz va yuqori tezlikdagi Wi-Fi tarmog'i ishlab turadi. Kerakli ma'lumotlarni yuklab olish va videodarslarni ko'rishda muammo bo'lmaydi." },
-  { icon: Target, title: 'Amaliyot va real loyihalar', desc: "Bizda faqat quruq nazariya emas, balki real loyihalar ustida ishlash imkoniyati mavjud. O'quvchilar o'qish davomidayoq o'z portfoliolarini yig'ishni boshlaydilar." },
-  { icon: Award, title: "Sertifikat va ishga yo'naltirish", desc: "Kursni muvaffaqiyatli tamomlagan o'quvchilarga maxsus sertifikat beriladi va eng yaxshi bitiruvchilarni ishga joylashishlarida amaliy yordam ko'rsatiladi." },
-  { icon: Users, title: 'Kuchli ustozlar jamoasi', desc: "Darslar o'z sohasining yetuk mutaxassislari, katta tajribaga ega bo'lgan amaliyotchi dasturchi va dizaynerlar tomonidan olib boriladi." },
+const FACILITIES: { art: string; title: string; desc: string }[] = [
+  { art: 'campus-texnika', title: 'Zamonaviy texnikalar', desc: "O'quv xonalarimiz so'nggi rusumdagi iMac va kuchli Windows kompyuterlari bilan jihozlangan. Bu esa dasturlash va dizayn dasturlarida qotishlarsiz, tezkor ishlash imkonini beradi." },
+  { art: 'campus-cowork', title: 'Coworking hududi', desc: "Darsdan tashqari vaqtlarda o'quvchilarimiz bemalol kelib, o'z ustilarida ishlashlari, jamoaviy loyihalar qilishlari uchun maxsus shinam coworking zonalarimiz mavjud." },
+  { art: 'campus-wifi', title: 'Yuqori tezlikdagi internet', desc: "Markazimizning barcha hududlarida uzluksiz va yuqori tezlikdagi Wi-Fi tarmog'i ishlab turadi. Kerakli ma'lumotlarni yuklab olish va videodarslarni ko'rishda muammo bo'lmaydi." },
+  { art: 'why-loyiha', title: 'Amaliyot va real loyihalar', desc: "Bizda faqat quruq nazariya emas, balki real loyihalar ustida ishlash imkoniyati mavjud. O'quvchilar o'qish davomidayoq o'z portfoliolarini yig'ishni boshlaydilar." },
+  { art: 'why-sertifikat', title: "Sertifikat va ishga yo'naltirish", desc: "Kursni muvaffaqiyatli tamomlagan o'quvchilarga maxsus sertifikat beriladi va eng yaxshi bitiruvchilarni ishga joylashishlarida amaliy yordam ko'rsatiladi." },
+  { art: 'why-ustoz', title: 'Kuchli ustozlar jamoasi', desc: "Darslar o'z sohasining yetuk mutaxassislari, katta tajribaga ega bo'lgan amaliyotchi dasturchi va dizaynerlar tomonidan olib boriladi." },
 ];
 
 export const FacilitiesScene: React.FC = () => {
@@ -454,7 +461,6 @@ export const FacilitiesScene: React.FC = () => {
         </div>
         <ul className="grid md:grid-cols-2 lg:grid-cols-3 gap-px rounded-[var(--radius)] overflow-hidden" style={{ background: 'var(--line)' }}>
           {FACILITIES.map((f, i) => {
-            const Icon = f.icon;
             return (
               <motion.li
                 key={f.title}
@@ -464,10 +470,8 @@ export const FacilitiesScene: React.FC = () => {
                 viewport={{ once: true, margin: '0px 0px -6% 0px' }}
                 transition={{ duration: 0.7, delay: (i % 3) * 0.07, ease: EASE }}
               >
-                <span className="ico inline-flex w-12 h-12 items-center justify-center rounded-2xl ink-2" style={{ background: 'var(--bg-3)' }}>
-                  <Icon size={24} strokeWidth={1.75} aria-hidden="true" />
-                </span>
-                <h3 className="t-h3 mt-8">{uz(f.title)}</h3>
+                <Icon3D name={f.art} size={64} className="ico w-14 h-14 sm:w-16 sm:h-16" />
+                <h3 className="t-h3 mt-6">{uz(f.title)}</h3>
                 <p className="t-body mt-4 text-[0.98rem]">{uz(f.desc)}</p>
               </motion.li>
             );
@@ -480,10 +484,10 @@ export const FacilitiesScene: React.FC = () => {
 
 // ------------------------------------------------------------------ 08 directions
 const DIRECTIONS = [
-  { title: 'Dasturlash va maʼlumotlar', blurb: 'Python, frontend, Telegram botlar va BI tahlil. Noldan birinchi real loyihagacha.', color: '#00b26b', ink: 'ink-green' },
-  { title: 'Media, dizayn va AI', blurb: 'Grafik dizayn, SMM, mobilografiya va sunʼiy intellekt bilan kontent yaratish.', color: '#60efff', ink: 'ink-cyan' },
-  { title: 'Moliya va raqamli ofis', blurb: 'Buxgalteriya va 1C, Excel Pro, HR menejment: biznesni yurgizadigan vositalar.', color: '#0061ff', ink: 'ink-blue' },
-  { title: 'Bolalar uchun texnologiya', blurb: 'Robototexnika va web dasturlash. 7 yoshdan muhandislarcha fikrlashni oʻrganamiz.', color: '#60efff', ink: 'ink-cyan' },
+  { art: 'dirs/dir-programming', title: 'Dasturlash va maʼlumotlar', blurb: 'Python, frontend, Telegram botlar va BI tahlil. Noldan birinchi real loyihagacha.', color: '#00b26b', ink: 'ink-green' },
+  { art: 'dirs/dir-media', title: 'Media, dizayn va AI', blurb: 'Grafik dizayn, SMM, mobilografiya va sunʼiy intellekt bilan kontent yaratish.', color: '#60efff', ink: 'ink-cyan' },
+  { art: 'dirs/dir-finance', title: 'Moliya va raqamli ofis', blurb: 'Buxgalteriya va 1C, Excel Pro, HR menejment: biznesni yurgizadigan vositalar.', color: '#0061ff', ink: 'ink-blue' },
+  { art: 'dirs/dir-kids', title: 'Bolalar uchun texnologiya', blurb: 'Robototexnika va web dasturlash. 7 yoshdan muhandislarcha fikrlashni oʻrganamiz.', color: '#60efff', ink: 'ink-cyan' },
 ];
 
 export const DirectionsScene: React.FC = () => {
@@ -509,14 +513,15 @@ export const DirectionsScene: React.FC = () => {
             >
               <Link
                 to="/kurslar"
-                className="dir-card panel relative flex flex-col justify-between gap-12 p-7 sm:p-9 min-h-[15rem] overflow-hidden h-full"
+                className="dir-card panel relative flex flex-col justify-between gap-8 p-7 sm:p-9 min-h-[15rem] overflow-hidden h-full"
               >
                 <span aria-hidden="true" className="absolute -top-16 -right-16 w-52 h-52 rounded-full opacity-25 blur-3xl" style={{ background: d.color }} />
                 <span className="relative flex items-start justify-between">
                   <span className={`mono text-sm ${d.ink}`}>{String(i + 1).padStart(2, '0')}</span>
-                  <ArrowUpRight size={22} aria-hidden="true" className="arr ink-3" />
+                  <Icon3D name={d.art} size={96} className="dir-art w-[72px] h-[72px] sm:w-24 sm:h-24 -mt-2 -mr-1" />
                 </span>
-                <span className="relative block">
+                <ArrowUpRight size={22} aria-hidden="true" className="arr ink-3 absolute right-7 bottom-7 sm:right-9 sm:bottom-9" />
+                <span className="relative block pr-10">
                   <span className="block t-h3">{d.title}</span>
                   <span className="block t-body mt-3 max-w-[26rem]">{d.blurb}</span>
                 </span>
@@ -618,7 +623,7 @@ export const AboutClosing: React.FC = () => {
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   return (
     <section ref={ref} className="relative py-[16vh] overflow-hidden" aria-labelledby="about-cta-title">
-      <Star3D progress={scrollYProgress} spin={55} className="ab-star absolute -right-[14vw] top-[6%] w-[44vw] max-w-[560px] aspect-square pointer-events-none opacity-[.35] hidden md:block" />
+      <Star3D progress={scrollYProgress} spin={55} className="ab-star absolute right-[3vw] top-[8%] w-[min(26vw,360px)] aspect-square pointer-events-none opacity-[.35] hidden md:block" />
       <div className="wrap relative">
         <p className="t-kicker mb-6">09 — Boshlash</p>
         <Mask>

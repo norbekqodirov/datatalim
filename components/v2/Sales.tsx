@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, Phone } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowRight } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { CountUp } from './fx';
@@ -19,10 +19,18 @@ type Tile =
   | { kind: 'claim'; title: string; text: string; icon: string; span?: string }
   | { kind: 'cta'; span?: string };
 
-const TileIcon: React.FC<{ name: string; size?: string }> = ({ name, size = 'w-24 h-24' }) => (
+const TileIcon: React.FC<{ name: string; size?: string }> = ({ name, size = '' }) => (
   <img src={ICON(name)} alt="" aria-hidden="true" loading="lazy" decoding="async" width={240} height={240}
     className={`bento-icon ${size} object-contain select-none pointer-events-none`} />
 );
+
+// Telefonda (<640): raqamlar 2×2 ixcham kafel, vaʼda va CTA kartalari toʻliq kenglikda.
+// sm+ dagi joylashuv (span) oʻzgarmaydi.
+const spanCls = (t: Tile) => {
+  if (t.kind === 'stat') return t.span ? 'col-span-1 sm:col-span-2' : '';
+  if (t.kind === 'claim') return t.span ? 'col-span-2' : 'col-span-2 sm:col-span-1';
+  return 'col-span-2';
+};
 
 export const ProofBento: React.FC = () => {
   const { courses } = useStore();
@@ -49,28 +57,27 @@ export const ProofBento: React.FC = () => {
           {tiles.map((t, i) => (
             <motion.li
               key={i}
-              className={`bento-tile panel ${t.kind === 'cta' ? 'bento-cta' : ''} ${t.span || ''}`}
+              className={`bento-tile panel is-${t.kind} ${t.kind === 'cta' ? 'bento-cta' : ''} ${spanCls(t)}`}
               initial={reduced ? undefined : { opacity: 0, y: 28, scale: 0.98 }}
               whileInView={reduced ? undefined : { opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: '-8% 0px' }}
               transition={{ duration: 0.7, delay: (i % 4) * 0.06, ease: EASE }}
             >
               {t.kind === 'stat' && (
-                <div className="flex h-full flex-col justify-between gap-3 sm:gap-6">
+                <div className="bento-stat flex h-full flex-col justify-between gap-3 sm:gap-6">
                   <div className="flex items-start justify-between gap-4">
-                    <CountUp to={t.n} from={t.from} suffix={t.suffix || ''} className={`block mono ${t.ink}`}
-                      style={{ fontSize: 'clamp(2rem, 4.2vw, 4rem)', lineHeight: 1, letterSpacing: '-0.04em', fontWeight: 500 }} />
-                    {t.icon && <TileIcon name={t.icon} size={`${t.span ? 'w-12 h-12' : 'hidden sm:block w-16 h-16'} sm:w-20 sm:h-20 -mt-1 -mr-1 sm:-mt-2 sm:-mr-2`} />}
+                    <CountUp to={t.n} from={t.from} suffix={t.suffix || ''} className={`bento-num block mono ${t.ink}`} />
+                    {t.icon && <TileIcon name={t.icon} size="hidden sm:block sm:w-20 sm:h-20 sm:-mt-2 sm:-mr-2" />}
                   </div>
                   <p className="t-body max-w-[18rem]">{t.label}</p>
                 </div>
               )}
               {t.kind === 'claim' && (
-                <div className={`flex h-full gap-3 sm:gap-5 ${t.span ? 'flex-row items-end' : 'flex-col'}`}>
-                  <TileIcon name={t.icon} size={t.span ? 'w-16 h-16 sm:w-28 sm:h-28 shrink-0 -ml-1 sm:-ml-2' : 'w-11 h-11 sm:w-20 sm:h-20 -ml-1 sm:-ml-2'} />
-                  <div className="mt-auto">
+                <div className="bento-claim">
+                  <TileIcon name={t.icon} />
+                  <div className="min-w-0">
                     <h3 className="bento-title">{t.title}</h3>
-                    <p className="t-body mt-2 !text-[0.95rem]">{t.text}</p>
+                    <p className="t-body bento-text mt-2">{t.text}</p>
                   </div>
                 </div>
               )}
@@ -159,53 +166,4 @@ export const StartSteps: React.FC = () => {
   );
 };
 
-// ------------------------------------------------------------------ mobil: pastki CTA paneli
-// Hero'dan oʻtgach chiqadi; aloqa formasi yoki footer koʻrinsa yashirinadi (ular oʻzi CTA)
-export const MobileCtaBar: React.FC = () => {
-  const { siteContent } = useStore();
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    let raf = 0;
-    const check = () => {
-      raf = 0;
-      const past = window.scrollY > window.innerHeight * 1.2;
-      const end = document.getElementById('contact')?.getBoundingClientRect().top ?? Infinity;
-      setShow(past && end > window.innerHeight * 0.9);
-    };
-    const on = () => { if (!raf) raf = requestAnimationFrame(check); };
-    check();
-    window.addEventListener('scroll', on, { passive: true });
-    window.addEventListener('resize', on);
-    return () => {
-      window.removeEventListener('scroll', on);
-      window.removeEventListener('resize', on);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
-
-  const tel = (siteContent.contactPhone || '').replace(/[^\d+]/g, '');
-
-  return (
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          className="mobile-cta lg:hidden"
-          initial={{ y: '110%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '110%' }}
-          transition={{ duration: 0.35, ease: EASE }}
-        >
-          {tel && (
-            <a href={`tel:${tel}`} className="mobile-cta-call" aria-label={`Qoʻngʻiroq qilish: ${siteContent.contactPhone}`}>
-              <Phone size={20} aria-hidden="true" />
-            </a>
-          )}
-          <button type="button" onClick={() => openConsult()} className="btn btn-primary flex-1 !min-h-[48px]">
-            Bepul konsultatsiya
-          </button>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-};
+// mobil pastki CTA paneli endi alohida: ./MobileCtaBar (App.tsx › PublicLayout)

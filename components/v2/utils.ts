@@ -52,17 +52,16 @@ export function optimizedCover(src: string | undefined): string {
 
 /**
  * Motion preference for the v2 storytelling scenes.
- * Full motion is the default (scroll-linked scenes are driven by the visitor's own
- * scrolling). Visitors can opt out with the footer toggle or `?motion=off`, which is
- * remembered; `?motion=on` clears the opt-out.
+ * Default follows the OS setting (`prefers-reduced-motion`). An explicit choice — the footer
+ * toggle or `?motion=off|on` — is remembered in localStorage and wins over the OS setting.
  */
 const MOTION_KEY = 'v2-motion';
 const MOTION_EVENT = 'v2-motion-change';
+const REDUCE_QUERY = '(prefers-reduced-motion: reduce)';
 
 export function setMotionReduced(reduced: boolean) {
   try {
-    if (reduced) localStorage.setItem(MOTION_KEY, 'off');
-    else localStorage.removeItem(MOTION_KEY);
+    localStorage.setItem(MOTION_KEY, reduced ? 'off' : 'on');
   } catch {
     /* storage unavailable — the choice just won't persist */
   }
@@ -70,24 +69,62 @@ export function setMotionReduced(reduced: boolean) {
 }
 
 function readMotionReduced(): boolean {
+  if (typeof window === 'undefined') return false;
+  let stored: string | null = null;
   try {
     const q = new URLSearchParams(window.location.search).get('motion');
-    if (q === 'off') localStorage.setItem(MOTION_KEY, 'off');
-    if (q === 'on') localStorage.removeItem(MOTION_KEY);
-    return localStorage.getItem(MOTION_KEY) === 'off';
+    if (q === 'off' || q === 'on') localStorage.setItem(MOTION_KEY, q);
+    stored = localStorage.getItem(MOTION_KEY);
   } catch {
-    return false;
+    /* storage unavailable — fall back to the OS setting */
   }
+  if (stored === 'off') return true;
+  if (stored === 'on') return false;
+  return !!window.matchMedia?.(REDUCE_QUERY).matches;
 }
 
 export function useMotionReduced(): boolean {
   const [reduced, setReduced] = useState(readMotionReduced);
   useEffect(() => {
     const on = () => setReduced(readMotionReduced());
+    const mq = window.matchMedia?.(REDUCE_QUERY);
     window.addEventListener(MOTION_EVENT, on);
-    return () => window.removeEventListener(MOTION_EVENT, on);
+    mq?.addEventListener?.('change', on);
+    return () => {
+      window.removeEventListener(MOTION_EVENT, on);
+      mq?.removeEventListener?.('change', on);
+    };
   }, []);
   return reduced;
+}
+
+/**
+ * Pinned horizontal scenes (Directions, Campus, Gallery) move their track with a transform inside an
+ * `overflow:hidden` sticky box. When Tab lands on an off-screen item the browser scrolls that box
+ * sideways (scrollLeft), which fights the transform. This undoes that and scrolls the page to the
+ * point where the focused item sits in view, so keyboard focus and the scroll story stay in sync.
+ * `dist` = how far the track travels (px) over the section's scroll range.
+ */
+export function syncPinnedFocus(
+  target: HTMLElement,
+  section: HTMLElement | null,
+  viewport: HTMLElement | null,
+  track: HTMLElement | null,
+  dist: number,
+) {
+  const reset = () => {
+    if (viewport) { viewport.scrollLeft = 0; viewport.scrollTop = 0; }
+  };
+  reset();
+  requestAnimationFrame(reset);
+  if (!section || !track || dist <= 0) return;
+  const r = target.getBoundingClientRect();
+  // already fully on screen (e.g. a mouse click) — leave the page where it is
+  if (r.left >= 0 && r.right <= window.innerWidth) return;
+  const center = r.left - track.getBoundingClientRect().left + r.width / 2;
+  const want = Math.min(1, Math.max(0, (center - window.innerWidth / 2) / dist));
+  const top = section.getBoundingClientRect().top + window.scrollY;
+  window.scrollTo({ top: top + want * (section.offsetHeight - window.innerHeight), behavior: 'instant' as ScrollBehavior });
 }
 
 /**

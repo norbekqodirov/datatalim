@@ -7,6 +7,7 @@ import { uz, useIsDesktop, useMotionReduced } from '../../utils';
 import { Mask, ScrollText, Star3D } from '../../fx';
 import { Reveal } from '../blog/Reveal';
 import { Star4 } from '../blog/Star';
+import { Icon3D } from '../Icon3D';
 import { LANGUAGE_COURSES, MOCK_TESTS, SUNDAY_EVENTS, type LangCourse } from './data';
 import './languages.css';
 
@@ -41,7 +42,7 @@ export const LangHero: React.FC<{ onEnroll: () => void }> = ({ onEnroll }) => {
             <Star4 className="w-3.5 h-3.5 ink-cyan" /> DATA Languages Academy
           </p>
           <Mask>
-            <h1 className="lang-h1">
+            <h1 className="t-hero lang-h1">
               Barcha dunyo tillari <span className="ink-grad">bitta joyda</span>
             </h1>
           </Mask>
@@ -62,7 +63,7 @@ export const LangHero: React.FC<{ onEnroll: () => void }> = ({ onEnroll }) => {
               progress={scrollYProgress}
               layers={7}
               spin={50}
-              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] max-w-[30rem] aspect-square opacity-60"
+              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[64%] max-w-[18rem] aspect-square opacity-50 lg:w-[min(26vw,360px)] lg:max-w-none lg:opacity-60"
             />
           )}
           <ul className="relative grid grid-cols-2 gap-3 sm:gap-4">
@@ -173,7 +174,11 @@ export const MockTests: React.FC = () => {
           {MOCK_TESTS.map((t, i) => (
             <Reveal as="li" key={i} delay={i * 0.06}>
               <article className="panel row-card flex flex-col sm:flex-row gap-6 p-6 sm:p-8">
-                <span className="icon-tile" aria-hidden="true"><t.icon size={28} /></span>
+                {t.art ? (
+                  <Icon3D name={t.art} size={56} className="w-14 h-14" />
+                ) : (
+                  <span className="icon-tile" aria-hidden="true"><t.icon size={28} /></span>
+                )}
                 <div className="min-w-0">
                   <p className="mono text-[0.8125rem] ink-3">{pad(i)}</p>
                   <h3 className="t-h3 mt-2 break-words">{uz(tField(t.title))}</h3>
@@ -250,7 +255,7 @@ export const LangClosing: React.FC<{ onEnroll: () => void }> = ({ onEnroll }) =>
           progress={scrollYProgress}
           layers={7}
           spin={70}
-          className="pointer-events-none absolute right-[-5rem] top-[8%] sm:top-1/2 sm:-translate-y-1/2 w-60 h-60 sm:w-[26rem] sm:h-[26rem] opacity-40 sm:opacity-50"
+          className="pointer-events-none absolute right-[4vw] top-[8%] hidden sm:block sm:top-1/2 sm:-translate-y-1/2 sm:w-[min(26vw,360px)] sm:h-[min(26vw,360px)] opacity-40 sm:opacity-50"
         />
       )}
       <div className="wrap relative">

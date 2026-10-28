@@ -4,7 +4,7 @@ import { Monitor, Layers, GraduationCap, Armchair, Award, Wifi, ArrowUpRight, Ar
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { YouTubeFacade } from './YouTubeFacade';
-import { youtubeId, useMotionReduced, useIsDesktop, uz } from './utils';
+import { youtubeId, useMotionReduced, useIsDesktop, uz, syncPinnedFocus } from './utils';
 import { Mask } from './fx';
 import { openConsult } from './consult';
 
@@ -120,6 +120,7 @@ const Tour: React.FC<{ vid: string }> = ({ vid }) => {
   const sectionRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const stopsRef = useRef<HTMLOListElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
   const [geo, setGeo] = useState({ dist: 0, vw: 1440, offsets: [] as number[] });
 
   // measure how far the track has to travel and where each stop sits on it
@@ -152,11 +153,16 @@ const Tour: React.FC<{ vid: string }> = ({ vid }) => {
   const videoTilt = useTransform(scrollYProgress, [0, 0.12], [0, -10]);
 
   return (
-    <section ref={sectionRef} className="relative" style={{ height: `calc(100vh + ${Math.round(geo.dist * TRAVEL)}px)` }} aria-labelledby="campus-title">
-      <div className="sticky top-0 h-screen overflow-hidden flex flex-col justify-center">
+    <section ref={sectionRef} className="relative" style={{ height: `calc(100svh + ${Math.round(geo.dist * TRAVEL)}px)` }} aria-labelledby="campus-title">
+      <div ref={stickyRef} className="sticky top-0 h-[100svh] overflow-hidden flex flex-col justify-center">
         <motion.span className="ct-ghost" aria-hidden="true" style={{ x: ghostX }}>STANSIYA · STANSIYA</motion.span>
 
-        <motion.div ref={trackRef} className="ct-track" style={{ x }}>
+        <motion.div
+          ref={trackRef}
+          className="ct-track"
+          style={{ x }}
+          onFocus={(e) => syncPinnedFocus(e.target as HTMLElement, sectionRef.current, stickyRef.current, trackRef.current, geo.dist)}
+        >
           {/* 1 — kirish: sarlavha + video */}
           <div className="ct-intro">
             <div className="ct-intro-copy">

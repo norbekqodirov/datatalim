@@ -1,6 +1,16 @@
 User-agent: *
 Allow: /
 Disallow: /paneladmindata
+# Reklama landing sahifalari (Meta/Instagram havolalari) — qidiruvdan chiqariladi (SEO komponenti ham noindex beradi)
+Disallow: /ariza
+Disallow: /apply
+
+# Meta reklama/havola tekshiruvchisi landingni o'qiy olishi shart (aks holda reklama rad etilishi mumkin)
+User-agent: facebookexternalhit
+User-agent: Facebot
+User-agent: meta-externalagent
+Allow: /
+Disallow: /paneladmindata
 # /api/ ataylab yopilmagan: Googlebot sahifani JS bilan chizganda kurslar/jamoa ma'lumotini /api'dan oladi.
 
 Sitemap: https://datatalim.uz/sitemap.xml

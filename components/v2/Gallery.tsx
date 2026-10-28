@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useScroll, useSpring, useTransform, type MotionValue } from 'framer-motion';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useStore } from '../../store/useStore';
-import { useMotionReduced } from './utils';
+import { useMotionReduced, syncPinnedFocus } from './utils';
 import { Mask } from './fx';
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -132,6 +132,7 @@ export const Gallery: React.FC = () => {
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches);
   const trackRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
   const [shift, setShift] = useState(0);
 
   useEffect(() => {
@@ -173,11 +174,13 @@ export const Gallery: React.FC = () => {
 
   return (
     <section ref={sectionRef} aria-labelledby="gallery-title" className="relative"
-      style={pinned ? { height: `calc(100vh + ${Math.round(shift * 1.1)}px)` } : undefined}>
+      style={pinned ? { height: `calc(100svh + ${Math.round(shift * 1.1)}px)` } : undefined}>
       {pinned ? (
-        <div className="sticky top-0 h-screen flex flex-col justify-center gap-10 overflow-hidden pt-20">
+        <div ref={stickyRef} className="sticky top-0 h-[100svh] flex flex-col justify-center gap-10 overflow-hidden pt-20">
           {heading}
-          <motion.div ref={trackRef} style={{ x, perspective: 1200 }} className="flex items-stretch gap-12 pl-[var(--gutter)] h-[min(62vh,560px)]">
+          <motion.div ref={trackRef} style={{ x, perspective: 1200 }}
+            onFocus={(e) => syncPinnedFocus(e.target as HTMLElement, sectionRef.current, stickyRef.current, trackRef.current, shift)}
+            className="flex items-stretch gap-12 pl-[var(--gutter)] h-[min(62vh,560px)]">
             {images.map((src, i) => (
               <Frame key={src + i} src={src} i={i} total={images.length} p={p} onOpen={() => setOpen(i)} />
             ))}

@@ -19,13 +19,19 @@ const Heading: React.FC<{ children: React.ReactNode; id?: string }> = ({ childre
   </p>
 );
 
+const OWN_CTA = ['/', '/karyera-testi', '/biz-haqimizda', '/til-kurslari', '/jamoa'];
+const hasOwnClosingCta = (path: string) => {
+  const p = path.length > 1 ? path.replace(/\/+$/, '') : path;
+  return OWN_CTA.includes(p) || /^\/kurslar\/[^/]+$/.test(p);
+};
+
 export const FooterV2: React.FC = () => {
   const { siteContent, courses } = useStore();
   const { t, tField } = useLanguage();
   const year = new Date().getFullYear();
   const reduced = useMotionReduced();
-  // bosh sahifada yakuniy CTA — aloqa boʻlimi; footer bandi takrorlanmasin
-  const showCta = useLocation().pathname !== '/';
+  // oʻz yakuniy CTA'si bor sahifalarda footer bandi takrorlanmasin (bitta sahifa — bitta yakuniy CTA)
+  const showCta = !hasOwnClosingCta(useLocation().pathname);
 
   const pages = [
     { to: '/kurslar', name: t('nav.courses') },

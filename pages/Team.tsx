@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Users, Award, Star, ArrowRight, type LucideIcon } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { EnrollModal } from '../components/EnrollModal';
 import { useStore } from '../store/useStore';
@@ -9,12 +9,13 @@ import { Mask, Star3D, StarSeam } from '../components/v2/fx';
 import { uz, useMotionReduced } from '../components/v2/utils';
 import { Reveal, StarGlyph } from '../components/v2/pages/about/AboutScenes';
 import { TeamCard } from '../components/v2/pages/about/TeamCard';
+import { Icon3D } from '../components/v2/pages/Icon3D';
 import '../components/v2/v2.css';
 
-const values: { icon: LucideIcon; title: string; desc: string }[] = [
-  { icon: Star, title: 'Tajriba va Malaka', desc: "Jamoamiz a'zolari o'z sohasining yetuk mutaxassislari hisoblanadi." },
-  { icon: Users, title: "Do'stona Muhit", desc: "Bizda ustoz va shogird o'rtasida erkin va do'stona munosabat o'rnatilgan." },
-  { icon: Award, title: 'Doimiy Rivojlanish', desc: "Ustozlarimiz ham doimiy ravishda o'z ustilarida ishlab, yangi bilimlarni o'zlashtiradilar." },
+const values: { art: string; title: string; desc: string }[] = [
+  { art: 'why-ustoz', title: 'Tajriba va Malaka', desc: "Jamoamiz a'zolari o'z sohasining yetuk mutaxassislari hisoblanadi." },
+  { art: 'why-guruh', title: "Do'stona Muhit", desc: "Bizda ustoz va shogird o'rtasida erkin va do'stona munosabat o'rnatilgan." },
+  { art: 'why-sertifikat', title: 'Doimiy Rivojlanish', desc: "Ustozlarimiz ham doimiy ravishda o'z ustilarida ishlab, yangi bilimlarni o'zlashtiradilar." },
 ];
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -54,12 +55,12 @@ export default function Team() {
         <Star3D
           progress={starP}
           spin={60}
-          className="ab-star absolute -right-[22vw] top-[10%] w-[52vw] aspect-square pointer-events-none opacity-[.3] md:right-[2vw] md:top-[14%] md:w-[min(24vw,340px)] md:opacity-80"
+          className="ab-star absolute right-[4vw] top-[8%] w-[26vw] aspect-square pointer-events-none opacity-[.3] md:right-[3vw] md:top-[14%] md:w-[min(24vw,340px)] md:opacity-80"
         />
         <motion.div className="wrap relative" style={reduced ? undefined : { y: textY, opacity: textOpacity }}>
           <p className="t-kicker mb-5">01 — Bizning jamoa</p>
           <Mask>
-            <h1 id="team-page-title" className="t-display" style={{ fontSize: 'clamp(1.75rem, 7.4vw, 3.75rem)' }}>
+            <h1 id="team-page-title" className="t-hero team-h1">
               <span className="block">Muvaffaqiyatimiz</span>
               <span className="block ink-grad">siri</span>
             </h1>
@@ -77,7 +78,6 @@ export default function Team() {
         <div className="wrap">
           <ul className="grid md:grid-cols-3 hairline">
             {values.map((v, i) => {
-              const Icon = v.icon;
               return (
                 <motion.li
                   key={v.title}
@@ -88,7 +88,7 @@ export default function Team() {
                   viewport={{ once: true, margin: '-8% 0px' }}
                   transition={{ duration: 0.7, delay: i * 0.07, ease: EASE }}
                 >
-                  <Icon size={22} aria-hidden="true" className="ink-cyan" />
+                  <Icon3D name={v.art} size={56} className="w-14 h-14" />
                   <h2 className="t-h3 mt-4">{uz(v.title)}</h2>
                   <p className="t-body mt-2 max-w-[22rem]">{uz(v.desc)}</p>
                 </motion.li>

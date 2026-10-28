@@ -36,6 +36,12 @@ export const CoursesCatalog: React.FC = () => {
   const bandAfter = cols === 4 ? 8 : cols === 1 ? 4 : 6; // shu sondagi kartadan keyin
 
   const list = cat === 'all' ? courses : courses.filter((c) => c.category === cat);
+  // oxirgi qatorda bo'sh slot qolsa, band shu slotlarni to'ldiradi (14 karta + 2 slot = 4x4); aks holda to'liq qator o'rtada
+  const rem = cols > 1 ? list.length % cols : 0;
+  const fillEnd = rem !== 0;
+  const bandSpan = fillEnd ? cols - rem : cols;
+  const bandAt = fillEnd ? list.length - 1 : Math.min(bandAfter, list.length) - 1;
+  const bandCls = !fillEnd ? 'col-span-full py-1.5 sm:py-3' : (['', 'col-span-1', 'col-span-2', 'col-span-3'][bandSpan] || 'col-span-1');
   const count = (id: Filter) => (id === 'all' ? courses.length : courses.filter((c) => c.category === id).length);
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: 'Barcha kurslar' },
@@ -87,9 +93,9 @@ export const CoursesCatalog: React.FC = () => {
                   >
                     <CourseCard course={c} index={i} />
                   </motion.li>
-                  {i === Math.min(bandAfter, list.length) - 1 && (
-                    <li className="col-span-full min-w-0 py-1.5 sm:py-3">
-                      <UndecidedBand reduced={reduced} />
+                  {i === bandAt && (
+                    <li className={`min-w-0 ${bandCls}`}>
+                      <UndecidedBand reduced={reduced} stacked={fillEnd && bandSpan < 3} />
                     </li>
                   )}
                 </React.Fragment>
@@ -134,7 +140,7 @@ const Hero: React.FC<{ total: number; reduced: boolean }> = ({ total, reduced })
         <motion.div style={reduced ? undefined : { y: copyY, opacity: copyOp }}>
           <p className="t-kicker mb-4 sm:mb-5">Katalog — {total} ta kurs</p>
           <Mask>
-            <h1 id="kurslar-title" className="cx-title">
+            <h1 id="kurslar-title" className="t-hero cat-h1">
               Barcha <span className="ink-grad">kurslar</span>
             </h1>
           </Mask>
@@ -156,19 +162,22 @@ const Hero: React.FC<{ total: number; reduced: boolean }> = ({ total, reduced })
 };
 
 // ---------------------------------------------------------------- "qaror qilmaganlar" bandi (grid o'rtasida)
-const UndecidedBand: React.FC<{ reduced: boolean }> = ({ reduced }) => {
+const UndecidedBand: React.FC<{ reduced: boolean; stacked?: boolean }> = ({ reduced, stacked }) => {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   const rotate = useTransform(scrollYProgress, [0, 1], [-160, 160]);
   const scale = useTransform(scrollYProgress, [0, 0.5, 1], [0.6, 1.2, 0.7]);
   return (
-    <div ref={ref} className="panel relative flex flex-col items-start gap-6 overflow-hidden p-5 sm:p-8 md:flex-row md:items-center md:justify-between">
+    <div
+      ref={ref}
+      className={`panel relative flex flex-col items-start gap-6 overflow-hidden p-5 sm:p-8 ${stacked ? 'h-full justify-between' : 'md:flex-row md:items-center md:justify-between'}`}
+    >
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
         style={{ background: 'radial-gradient(60% 120% at 0% 50%, rgba(0,97,255,.18), transparent 70%)' }}
       />
-      <div className="relative flex items-start gap-5 md:items-center">
+      <div className={`relative flex items-start gap-5 ${stacked ? '' : 'md:items-center'}`}>
         <motion.span className="ink-cyan mt-1 shrink-0 md:mt-0" style={reduced ? undefined : { rotate, scale }} aria-hidden="true">
           <StarMark size={36} />
         </motion.span>

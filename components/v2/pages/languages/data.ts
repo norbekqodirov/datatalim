@@ -2,7 +2,7 @@ import { FileWarning, MonitorPlay, ShieldCheck, Mic, Ticket, IceCream2, Citrus, 
 import type { LucideIcon } from 'lucide-react';
 
 type L3 = { uz: string; ru: string; en: string };
-export interface Mock { title: L3; desc: L3; icon: LucideIcon }
+export interface Mock { title: L3; desc: L3; icon: LucideIcon; art?: string }
 export interface LangCourse { id: string; title: L3; desc: L3; level: L3 }
 
 // Mock test data matching screenshot
@@ -11,16 +11,19 @@ export const MOCK_TESTS: Mock[] = [
         title: { uz: "Paper-Based Mock Testlar", ru: "Paper-Based Mock Тесты", en: "Paper-Based Mock Tests" },
         desc: { uz: "IELTS kursi mobaynida darajalarini kuzatib borishda va imtihonga tayyorgarliklarini yanada oshirishda eng kerakli testlar", ru: "Необходимые тесты для отслеживания уровня во время курса IELTS и улучшения подготовки к экзамену", en: "Essential tests to track level during the IELTS course and further improve exam preparation" },
         icon: FileWarning,
+        art: 'why-portfolio',
     },
     {
         title: { uz: "CD Mock Test", ru: "CD Mock Тест", en: "CD Mock Test" },
         desc: { uz: "Viloyatimizda yagona bo'lgan CD testda o'quvchilarimiz haqiqiy imtihon muhitida yuqori sharoitda imtihonga qatnashishadi", ru: "На единственном в нашей области CD-тесте наши ученики участвуют в экзамене в реальных условиях и превосходной обстановке", en: "In the only CD test in our region, our students participate in the exam in a real exam environment with top conditions" },
         icon: MonitorPlay,
+        art: 'campus-texnika',
     },
     {
         title: { uz: "Multilevel Mock Test", ru: "Multilevel Mock Тест", en: "Multilevel Mock Test" },
         desc: { uz: "Multilevel (CEFR) imtihoniga tayyorgarlik ko'rayotgan o'quvchilarimiz ham o'z ko'nikmalarini muntazam ravishda kuzatib borishadi", ru: "Наши ученики, готовящиеся к экзамену Multilevel (CEFR), также регулярно отслеживают свои навыки", en: "Our students preparing for the Multilevel (CEFR) exam also track their skills regularly" },
         icon: ShieldCheck,
+        art: 'why-sertifikat',
     }
 ];
 

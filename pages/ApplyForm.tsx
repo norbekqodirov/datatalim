@@ -3,6 +3,8 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { submitLeadToAPI } from '../utils/api';
 import { trackSiteEventOncePerSession } from '../utils/analytics';
+import { trackLead } from '../utils/pixel';
+import { SEO } from '../components/SEO';
 import toast from 'react-hot-toast';
 import { Loader2, ArrowRight, Check, ChevronDown, Phone } from 'lucide-react';
 import { Logo } from '../components/BrandElements';
@@ -122,12 +124,15 @@ export default function ApplyForm() {
         const courseName = selectedCourse ? getTitle(selectedCourse) : 'Boshqa';
 
         try {
-            await submitLeadToAPI({
+            const res = await submitLeadToAPI({
                 name: formData.name,
                 phone,
                 courseId: courseName,
                 sourceRef: refCode,
             });
+
+            // Meta Pixel: faqat server qabul qilgach (takroriy ariza qayta sanalmaydi)
+            if (!res?.duplicate) trackLead({ source: 'Ariza', course: courseName });
 
             // Menejerlarga Telegram xabarini server /api/leads ichida o'zi yuboradi (ref nomi bilan)
             setSent(true);
@@ -144,6 +149,7 @@ export default function ApplyForm() {
 
     return (
         <div className="v2 relative min-h-[100svh] flex flex-col overflow-hidden" onPointerMove={onPointerMove}>
+            <SEO title="Oʻqishga yozilish — ariza" noindex />
             <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(55% 50% at 82% 30%, rgba(0,97,255,.17), transparent 70%), radial-gradient(40% 40% at 8% 90%, rgba(96,239,255,.07), transparent 70%)' }} />
             <Star3D progress={starP} spin={55} className="ab-star absolute -left-[16vw] bottom-[-10%] w-[56vw] max-w-[640px] aspect-square pointer-events-none opacity-[.22] hidden md:block" />
 

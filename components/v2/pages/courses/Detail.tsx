@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useScroll, useTransform } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Phone, Users, Layers, Award } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Phone } from 'lucide-react';
 import type { Course } from '../../../../data/courses';
 import { useStore } from '../../../../store/useStore';
 import { useLanguage } from '../../../../i18n';
@@ -10,6 +10,9 @@ import { uz, useMotionReduced } from '../../utils';
 import { CAT_LABEL, Cover, SectionHead, StarMark, countLessons, splitDuration, splitPrice } from './shared';
 import { Timeline } from './Timeline';
 import { CourseCard } from './CourseCard';
+import { Icon3D } from '../Icon3D';
+
+const monogram = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 
 /** Elementning ko'rinish holati (IntersectionObserver). */
 function useVisible<T extends Element>(ref: React.RefObject<T | null>, initial = true, countAbove = false): boolean {
@@ -76,41 +79,6 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
                 </div>
               </section>
             )}
-
-            {course.mentors.length > 0 && (
-              <section aria-labelledby="mentors-title">
-                <SectionHead kicker="03 — Ustozlar" id="mentors-title">Kurs ustozlari</SectionHead>
-                <ul className="mt-8 grid gap-4 sm:grid-cols-2">
-                  {course.mentors.map((m, i) => {
-                    const name = uz(tField(m.name));
-                    const bio = m.bio ? uz(tField(m.bio)) : '';
-                    return (
-                      <motion.li
-                        key={i}
-                        className="panel flex items-start gap-5 p-5 sm:p-6"
-                        initial={reduced ? false : { opacity: 0, y: 28 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true, margin: '0px 0px -8% 0px' }}
-                        transition={{ duration: 0.7, delay: (i % 2) * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                      >
-                        <div className="mentor-av">
-                          {m.image ? (
-                            <img src={m.image} alt={name} loading="lazy" decoding="async" width={72} height={72} />
-                          ) : (
-                            <span className="cat-ink text-xl font-semibold" aria-hidden="true">{name.charAt(0)}</span>
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="text-[1.15rem] font-semibold leading-snug tracking-[-0.02em]">{name}</h3>
-                          <p className="cat-ink mt-1 text-[0.95rem] font-medium">{uz(tField(m.role))}</p>
-                          {bio && <p className="t-body mt-3 text-[0.95rem]">{bio}</p>}
-                        </div>
-                      </motion.li>
-                    );
-                  })}
-                </ul>
-              </section>
-            )}
           </div>
 
           {/* desktop: yopishqoq yozilish kartasi */}
@@ -163,7 +131,7 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
         </div>
       </div>
 
-      <Format />
+      <MentorsFormat course={course} reduced={reduced} />
 
       {related.length > 0 && (
         <section className="relative pb-[var(--sec-y)]" aria-labelledby="related-title">
@@ -183,6 +151,17 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
                   <CourseCard course={c} index={i} />
                 </li>
               ))}
+              {related.length < 3 && (
+                <li className={`min-w-0 ${related.length === 1 ? 'lg:col-span-2' : 'hidden lg:block'}`}>
+                  <Link to="/kurslar" className="rel-all panel group relative flex h-full min-h-[11rem] flex-col justify-between gap-8 overflow-hidden p-6 sm:p-8">
+                    <StarMark size={36} className="ink-cyan" />
+                    <span className="flex items-end justify-between gap-4">
+                      <span className="t-h3">Barcha kurslar</span>
+                      <ArrowRight size={22} aria-hidden="true" className="rel-arr shrink-0" />
+                    </span>
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
         </section>
@@ -275,7 +254,7 @@ const Hero: React.FC<{
             </p>
           </motion.div>
 
-          <div className="relative mx-auto w-full max-w-[19rem] sm:max-w-[22rem] lg:col-span-5 lg:max-w-[24rem] lg:justify-self-center" style={{ perspective: '1400px' }}>
+          <div className="relative mx-auto w-full max-w-[19rem] sm:max-w-[22rem] lg:col-span-5 lg:mx-0 lg:max-w-[24rem] lg:justify-self-end" style={{ perspective: '1400px' }}>
             <motion.div
               className="relative"
               initial={reduced ? false : { opacity: 0, y: 40, rotateY: 14 }}
@@ -438,23 +417,69 @@ const Outcomes: React.FC<{ course: Course; reduced: boolean }> = ({ course, redu
   );
 };
 
-// ---------------------------------------------------------------- format (saytda allaqachon aytilgan umumiy tasdiqlar)
+// ---------------------------------------------------------------- ustozlar + format (bitta bo'lim: ustoz ~5 ustun, format ~7 ustun)
 const FORMAT = [
-  { Icon: Users, t: 'Kichik guruhlar', d: 'Darslar oflayn, kichik guruhlarda oʻtadi: ustoz har bir oʻquvchiga eʼtibor bera oladi.' },
-  { Icon: Layers, t: 'Real loyiha', d: 'Har bir kurs amaliy loyiha bilan tugaydi, portfolio oʻqish davomida yigʻiladi.' },
-  { Icon: Award, t: 'Sertifikat', d: 'Yakuniy imtihondan oʻtgan oʻquvchilarga DATA Taʼlim Stansiyasi sertifikati beriladi.' },
+  { art: 'why-guruh', t: 'Kichik guruhlar', d: 'Darslar oflayn, kichik guruhlarda oʻtadi: ustoz har bir oʻquvchiga eʼtibor bera oladi.' },
+  { art: 'why-loyiha', t: 'Real loyiha', d: 'Har bir kurs amaliy loyiha bilan tugaydi, portfolio oʻqish davomida yigʻiladi.' },
+  { art: 'why-sertifikat', t: 'Sertifikat', d: 'Yakuniy imtihondan oʻtgan oʻquvchilarga DATA Taʼlim Stansiyasi sertifikati beriladi.' },
 ];
-const Format: React.FC = () => (
-  <section className="wrap pb-[var(--sec-y)]" aria-labelledby="fmt-title">
-    <SectionHead kicker="04 — Format" id="fmt-title">Qanday <span className="ink-grad">oʻqiladi</span></SectionHead>
-    <ul className="mt-8 grid gap-3 sm:gap-4 md:grid-cols-3">
-      {FORMAT.map(({ Icon, t, d }) => (
-        <li key={t} className="out-card min-w-0">
-          <span className="out-ico" aria-hidden="true"><Icon size={22} /></span>
-          <h3 className="t-h3 mt-4" style={{ fontSize: 'clamp(1.15rem, 1.6vw, 1.45rem)' }}>{t}</h3>
-          <p className="t-body mt-3 text-[0.975rem]">{d}</p>
-        </li>
-      ))}
-    </ul>
-  </section>
-);
+
+const MentorsFormat: React.FC<{ course: Course; reduced: boolean }> = ({ course, reduced }) => {
+  const { tField } = useLanguage();
+  const hasMentors = course.mentors.length > 0;
+  return (
+    <section className="wrap pb-[var(--sec-y)]" aria-label="Ustozlar va format">
+      <div className="grid gap-12 lg:grid-cols-12 lg:gap-x-12 [&>*]:min-w-0">
+        {hasMentors && (
+          <div className="lg:col-span-5" aria-labelledby="mentors-title" role="group">
+            <SectionHead kicker="03 — Ustozlar" id="mentors-title">Kurs ustozlari</SectionHead>
+            <ul className="mt-8 grid gap-3 sm:gap-4">
+              {course.mentors.map((m, i) => {
+                const name = uz(tField(m.name));
+                const bio = m.bio ? uz(tField(m.bio)) : '';
+                return (
+                  <motion.li
+                    key={i}
+                    className={`panel flex gap-4 sm:gap-5 ${m.image ? 'items-start p-5 sm:p-6' : 'items-center p-4 sm:p-5'}`}
+                    initial={reduced ? false : { opacity: 0, y: 28 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '0px 0px -8% 0px' }}
+                    transition={{ duration: 0.7, delay: (i % 2) * 0.08, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <div className={`mentor-av ${m.image ? '' : 'is-mono'}`}>
+                      {m.image ? (
+                        <img src={m.image} alt={name} loading="lazy" decoding="async" width={72} height={72} />
+                      ) : (
+                        <span className="cat-ink" aria-hidden="true">{monogram(name)}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-[1.0625rem] font-semibold leading-snug tracking-[-0.02em] sm:text-[1.15rem]">{name}</h3>
+                      <p className="cat-ink mt-0.5 text-[0.95rem] font-medium">{uz(tField(m.role))}</p>
+                      {bio && <p className="t-body mt-3 text-[0.95rem]">{bio}</p>}
+                    </div>
+                  </motion.li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        <div className={hasMentors ? 'lg:col-span-7' : 'lg:col-span-12'} aria-labelledby="fmt-title" role="group">
+          <SectionHead kicker="04 — Format" id="fmt-title">Qanday <span className="ink-grad">oʻqiladi</span></SectionHead>
+          <ul className={`mt-8 grid gap-3 sm:gap-4 ${hasMentors ? '' : 'md:grid-cols-3'}`}>
+            {FORMAT.map(({ art, t, d }) => (
+              <li key={t} className={`out-card min-w-0 flex gap-4 sm:gap-5 ${hasMentors ? 'items-center' : 'flex-col'}`}>
+                <Icon3D name={art} size={56} className="w-14 h-14" />
+                <div className="min-w-0">
+                  <h3 className="t-h3" style={{ fontSize: 'clamp(1.15rem, 1.6vw, 1.45rem)' }}>{t}</h3>
+                  <p className="t-body mt-2 text-[0.975rem]">{d}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+};

@@ -2,14 +2,8 @@
    v2 Til kurslari. Scoped under .v2, tokens from v2.css. Transform/opacity motion only.
    ========================================================================== */
 
-.v2 .lang-h1 {
-  font-size: clamp(2.5rem, 7.4vw, 6.4rem);
-  line-height: 0.98;
-  letter-spacing: -0.05em;
-  font-weight: 700;
-  overflow-wrap: break-word;
-  text-wrap: balance;
-}
+/* o'lcham — global .t-hero; bu yerda faqat o'rash qoidasi */
+.v2 .lang-h1 { overflow-wrap: break-word; }
 
 /* hero tiles: the four languages as typographic cards */
 .v2 .lang-tile {

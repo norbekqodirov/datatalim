@@ -1,4 +1,6 @@
 // frontend API utility
+import { getAttributionTag } from './pixel';
+
 const API_BASE = '/api';
 
 // Helper to get auth headers with JWT token
@@ -125,14 +127,28 @@ export const uploadImageToAPIWithStats = async (base64OrFile: string | File): Pr
     }
 };
 
+/**
+ * Atribusiya (utm_* / fbclid / marketing_ref) ni `courseId` oxiriga qisqa satr qilib qo'shadi.
+ * `sourceRef` ga qo'shilmaydi: server uni faqat [A-Za-z0-9_-] (<=40) qabul qiladi va u Sheets tabini belgilaydi.
+ * Server courseId ni 300 belgigacha saqlaydi — kurs nomi kesilmasligi uchun tag sig'adigan joy qoldiriladi.
+ */
+const withAttribution = (courseId: string | undefined, sourceRef?: string): string | undefined => {
+    const tag = getAttributionTag(sourceRef);
+    if (!tag) return courseId;
+    const base = (courseId || '').trim();
+    if (!base) return tag;
+    return `${base.slice(0, 296 - tag.length)} | ${tag}`;
+};
+
 export const submitLeadToAPI = async (leadData: { name: string; phone: string; courseId?: string; sourceRef?: string }) => {
     try {
+        const payload = { ...leadData, courseId: withAttribution(leadData.courseId, leadData.sourceRef) };
         const response = await fetch(`${API_BASE}/leads`, {
             method: 'POST',
             headers: getAuthHeaders({
                 'Content-Type': 'application/json',
             }),
-            body: JSON.stringify(leadData),
+            body: JSON.stringify(payload),
         });
         if (!response.ok) throw new Error('Network response was not ok');
         return await response.json();

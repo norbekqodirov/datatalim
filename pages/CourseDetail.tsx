@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { EnrollModal } from '../components/EnrollModal';
 import { useStore } from '../store/useStore';
 import { useLanguage } from '../i18n';
 import { SEO, SITE_URL, courseSchema, breadcrumbSchema } from '../components/SEO';
+import { trackEvent, parsePriceUZS } from '../utils/pixel';
 import { CourseDetailView } from '../components/v2/pages/courses/Detail';
 import '../components/v2/v2.css';
 
@@ -21,6 +22,22 @@ export default function CourseDetail() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
+
+  // Meta Pixel ViewContent: kurs ma'lumoti yuklangach (store async) bir marta, kurs almashganda qayta
+  const viewedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!course || viewedRef.current === course.id) return; // StrictMode / qayta chizishda ikkilanmasin
+    viewedRef.current = course.id;
+    const monthly = parsePriceUZS(tField(course.monthlyPrice));
+    trackEvent('ViewContent', {
+      content_ids: [course.id],
+      content_type: 'product',
+      content_name: tField(course.title),
+      content_category: course.category,
+      ...(monthly ? { value: monthly, currency: 'UZS' } : {}),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [course?.id]);
 
   if (!course) {
     return (
@@ -44,6 +61,12 @@ export default function CourseDetail() {
   const courseDesc = String(tField(course.description) || '').replace(/\s+/g, ' ').trim();
   const seoDesc = courseDesc.length > 158 ? `${courseDesc.slice(0, 155).trimEnd()}...` : courseDesc;
   const courseUrl = `${SITE_URL}/kurslar/${course.id}`;
+  // Narx: chegirmali bo'lsa o'sha, bo'lmasa jami kurs narxi, u ham bo'lmasa oylik (faqat mavjud maydonlar)
+  const monthlyPrice = parsePriceUZS(tField(course.monthlyPrice));
+  const offerPrice =
+    parsePriceUZS(course.discountPrice ? tField(course.discountPrice) : null) ??
+    parsePriceUZS(tField(course.totalPrice)) ??
+    monthlyPrice;
   const courseCover = course.coverImage ? (course.coverImage.startsWith('http') ? course.coverImage : `${SITE_URL}${course.coverImage}`) : undefined;
 
   return (
@@ -57,7 +80,7 @@ export default function CourseDetail() {
         jsonLd={{
           '@context': 'https://schema.org',
           '@graph': [
-            courseSchema({ name: courseTitle, description: seoDesc || courseTitle, url: courseUrl, image: courseCover }),
+            courseSchema({ name: courseTitle, description: seoDesc || courseTitle, url: courseUrl, image: courseCover, ...(offerPrice ? { price: offerPrice, currency: 'UZS' } : {}) }),
             breadcrumbSchema([
               { name: 'Bosh sahifa', url: `${SITE_URL}/` },
               { name: 'Kurslar', url: `${SITE_URL}/kurslar` },
@@ -74,6 +97,7 @@ export default function CourseDetail() {
         onClose={() => setModalOpen(false)}
         courseName={tField(course.title)}
         type={modalType}
+        value={monthlyPrice ?? undefined}
       />
     </div>
   );

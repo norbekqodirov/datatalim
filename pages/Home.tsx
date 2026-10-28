@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { SEO } from '../components/SEO';
 import { HeroSignal } from '../components/v2/HeroSignal';
 import { Manifesto } from '../components/v2/Manifesto';
-import { ProofBento, CourseMarquee, MobileCtaBar } from '../components/v2/Sales';
+import { ProofBento, CourseMarquee } from '../components/v2/Sales';
 import { Directions } from '../components/v2/Directions';
 import { CareerLab } from '../components/v2/CareerLab';
 import { Campus } from '../components/v2/Campus';
@@ -40,7 +40,6 @@ export default function Home() {
       {v.team && <TeamStrip />}
       {v.faq && <FaqV2 />}
       {v.contact && <ContactV2 />}
-      <MobileCtaBar />
     </div>
   );
 }

@@ -39,6 +39,32 @@
 .v2 .ab-cell:hover { background: var(--bg-2); }
 .v2 .ab-cell .ico { transition: transform 0.5s var(--ease), color 0.3s var(--ease); }
 .v2 .ab-cell:hover .ico { transform: translate3d(0, -4px, 0) rotate(-6deg); color: var(--cyan-ink); }
+.v2 .dir-card .dir-art { transition: transform 0.5s var(--ease); }
+.v2 .dir-card:hover .dir-art { transform: translate3d(0, -4px, 0) scale(1.05); }
+
+/* founder attribution row (no photo): 48px monogram + name + role */
+.v2 .ab-mono {
+  position: relative; overflow: hidden; isolation: isolate; flex: none;
+  width: 48px; height: 48px; border-radius: 50%;
+  border: 1px solid var(--line-2); background: var(--bg-3);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.v2 .ab-mono::before {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  background: radial-gradient(90% 80% at 85% 0%, color-mix(in srgb, var(--tm-fill, #0061ff) 40%, transparent) 0%, transparent 70%);
+}
+.v2 .ab-mono-i { position: relative; z-index: 1; font-weight: 700; font-size: 1rem; letter-spacing: -0.04em; line-height: 1; color: var(--fg); }
+
+/* "Nega aynan Stansiya" statement: calmer measure on phones */
+@media (max-width: 639.98px) {
+  .v2 .ab-statement.ab-station { font-size: 1.25rem; line-height: 1.4; max-width: 32ch; letter-spacing: -0.02em; }
+}
+
+/* Jamoa H1: "Muvaffaqiyatimiz" must fit one line on phones */
+.v2 .team-h1 { overflow-wrap: break-word; }
+@media (max-width: 479.98px) {
+  .v2 .team-h1 { font-size: clamp(1.75rem, 8.4vw, 2.5rem); }
+}
 
 .v2 .dir-card { transition: transform 0.4s var(--ease), border-color 0.25s var(--ease); }
 .v2 .dir-card:hover { transform: translate3d(0, -6px, 0); border-color: var(--line-2); }

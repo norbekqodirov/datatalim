@@ -185,7 +185,7 @@ const BlogPost: React.FC = () => {
           <p className="t-kicker flex items-center gap-3">
             <Star4 className="w-3.5 h-3.5 ink-cyan" /> Xato 404
           </p>
-          <h1 className="t-display mt-6 max-w-[14ch]">
+          <h1 className="t-hero mt-6 max-w-[14ch]">
             Maqola <span className="ink-grad">topilmadi</span>.
           </h1>
           <div className="mt-10 flex flex-wrap gap-3">
