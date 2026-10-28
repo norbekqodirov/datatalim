@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useScroll, useTransform } from 'framer-motion';
 import { Mask } from './fx';
-import { useMotionReduced } from './utils';
+import { useIsDesktop, useMotionReduced } from './utils';
 import { ArrowRight, RotateCcw } from 'lucide-react';
 
 // Holland RIASEC — the six axes the career test actually measures (pages/CareerTest.tsx)
@@ -109,7 +109,9 @@ export const CareerLab: React.FC = () => {
 
   // the radar rises out of the page: tilted flat at first, standing up as it reaches the centre
   const stageRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: stageRef, offset: ['start end', 'center 0.55'] });
+  // telefonda radar ekranning pastki qismidayoq tik turib boʻladi — yarim xira holatda qolmaydi
+  const desktop = useIsDesktop();
+  const { scrollYProgress } = useScroll({ target: stageRef, offset: desktop ? ['start end', 'center 0.55'] : ['start 0.98', 'start 0.6'] });
   const tilt = useTransform(scrollYProgress, [0, 1], [62, 0]);
   const rise = useTransform(scrollYProgress, [0, 1], [0.78, 1]);
   const fade = useTransform(scrollYProgress, [0, 0.5], [0.15, 1]);
@@ -117,7 +119,7 @@ export const CareerLab: React.FC = () => {
 
   return (
     <section className="relative sec overflow-hidden" aria-labelledby="lab-title">
-      <div className="wrap grid lg:grid-cols-12 gap-12 lg:gap-10 items-center">
+      <div className="wrap grid lg:grid-cols-12 gap-8 sm:gap-12 lg:gap-10 items-center">
         <div className="lg:col-span-5 relative z-10">
           <p className="t-kicker mb-6">05 — Karyera laboratoriyasi</p>
           <Mask>
@@ -125,22 +127,22 @@ export const CareerLab: React.FC = () => {
               Qaysi kasb sizga mos — <span className="ink-grad">maʼlumot</span> aytib beradi.
             </h2>
           </Mask>
-          <p className="t-lead mt-6 max-w-md">
+          <p className="t-lead mt-4 sm:mt-6 max-w-md">
             Holland RIASEC metodikasi asosidagi test qiziqishlaringizni olti oʻlchovda baholaydi va sizga mos yoʻnalishni koʻrsatadi.
           </p>
-          <ul className="mt-8 grid grid-cols-3 gap-px rounded-2xl overflow-hidden" style={{ background: 'var(--line)' }}>
+          <ul className="mt-6 sm:mt-8 grid grid-cols-3 gap-px rounded-2xl overflow-hidden" style={{ background: 'var(--line)' }}>
             {[
               ['≈12', 'daqiqa'],
               ['6', 'oʻlchov'],
               ['0', 'soʻm'],
             ].map(([n, l]) => (
-              <li key={l} className="p-4" style={{ background: 'var(--bg)' }}>
-                <span className="block mono text-2xl" style={{ fontWeight: 500 }}>{n}</span>
+              <li key={l} className="p-3 sm:p-4" style={{ background: 'var(--bg)' }}>
+                <span className="block mono text-xl sm:text-2xl" style={{ fontWeight: 500 }}>{n}</span>
                 <span className="block text-sm ink-3 mt-1">{l}</span>
               </li>
             ))}
           </ul>
-          <Link to="/karyera-testi" className="btn btn-primary mt-10">
+          <Link to="/karyera-testi" className="btn btn-primary mt-6 sm:mt-10">
             Testni boshlash <ArrowRight size={18} aria-hidden="true" />
           </Link>
         </div>
@@ -153,7 +155,7 @@ export const CareerLab: React.FC = () => {
         >
           <div className="grid sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-6 sm:gap-8 items-center">
             <div className="flex flex-col items-center">
-              <div ref={stageRef} className="w-full max-w-[22rem]" style={{ perspective: '1100px' }}>
+              <div ref={stageRef} className="w-full max-w-[15.5rem] sm:max-w-[22rem]" style={{ perspective: '1100px' }}>
                 <motion.svg
                   viewBox={`0 0 ${SIZE} ${SIZE}`}
                   className="w-full h-auto overflow-visible"
@@ -222,7 +224,7 @@ export const CareerLab: React.FC = () => {
                   })}
                 </motion.svg>
               </div>
-              <p className="t-kicker mt-4 text-center">{started ? 'Sizning profilingiz' : `Namuna: ${prof.label}`}</p>
+              <p className="t-kicker mt-2 sm:mt-4 text-center">{started ? 'Sizning profilingiz' : `Namuna: ${prof.label}`}</p>
             </div>
 
             <div className="min-w-0" aria-live="polite">

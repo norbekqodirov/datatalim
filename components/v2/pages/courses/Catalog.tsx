@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useMotionValue } from 'framer-motion';
 import { ArrowRight, ArrowDown } from 'lucide-react';
@@ -10,10 +10,30 @@ import { CourseCard } from './CourseCard';
 
 type Filter = 'all' | CatId;
 
+/** Grid ustunlari soni (Tailwind sm/lg/xl bilan mos) — "qaror qilmadingizmi" bandi to'liq qatordan keyin turishi uchun. */
+function useCols(): number {
+  const get = () => {
+    if (typeof window === 'undefined' || !window.matchMedia) return 1;
+    if (window.matchMedia('(min-width: 1280px)').matches) return 4;
+    if (window.matchMedia('(min-width: 1024px)').matches) return 3;
+    if (window.matchMedia('(min-width: 640px)').matches) return 2;
+    return 1;
+  };
+  const [cols, setCols] = useState(get);
+  useEffect(() => {
+    const on = () => setCols(get());
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  return cols;
+}
+
 export const CoursesCatalog: React.FC = () => {
   const { courses } = useStore();
   const reduced = useMotionReduced();
   const [cat, setCat] = useState<Filter>('all');
+  const cols = useCols();
+  const bandAfter = cols === 4 ? 8 : cols === 1 ? 4 : 6; // shu sondagi kartadan keyin
 
   const list = cat === 'all' ? courses : courses.filter((c) => c.category === cat);
   const count = (id: Filter) => (id === 'all' ? courses.length : courses.filter((c) => c.category === id).length);
@@ -26,7 +46,7 @@ export const CoursesCatalog: React.FC = () => {
     <>
       <Hero total={courses.length} reduced={reduced} />
 
-      <section id="katalog" className="relative pb-[10vh] scroll-mt-20" aria-label="Kurslar katalogi">
+      <section id="katalog" className="relative pb-[var(--sec-y)] scroll-mt-20" aria-label="Kurslar katalogi">
         <div className="wrap">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div role="group" aria-label="Yoʻnalish boʻyicha filtr" className="chips">
@@ -56,7 +76,7 @@ export const CoursesCatalog: React.FC = () => {
           {list.length === 0 ? (
             <p className="t-lead mt-16">Bu yoʻnalishda hozircha kurs yoʻq.</p>
           ) : (
-            <ul key={cat} className="mt-10 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            <ul key={cat} className="mt-8 grid gap-3.5 sm:mt-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
               {list.map((c, i) => (
                 <React.Fragment key={c.id}>
                   <motion.li
@@ -67,8 +87,8 @@ export const CoursesCatalog: React.FC = () => {
                   >
                     <CourseCard course={c} index={i} />
                   </motion.li>
-                  {i === Math.min(5, list.length - 1) && (
-                    <li className="sm:col-span-2 xl:col-span-3">
+                  {i === Math.min(bandAfter, list.length) - 1 && (
+                    <li className="col-span-full min-w-0 py-1.5 sm:py-3">
                       <UndecidedBand reduced={reduced} />
                     </li>
                   )}
@@ -95,7 +115,7 @@ const Hero: React.FC<{ total: number; reduced: boolean }> = ({ total, reduced })
   const still = useMotionValue(0.5);
 
   return (
-    <section ref={ref} className="relative flex min-h-[68svh] items-center overflow-hidden pb-16 pt-28 lg:pb-24" aria-labelledby="kurslar-title">
+    <section ref={ref} className="relative flex items-center overflow-hidden pb-12 pt-24 sm:pt-28 lg:pb-16" aria-labelledby="kurslar-title">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
@@ -108,20 +128,20 @@ const Hero: React.FC<{ total: number; reduced: boolean }> = ({ total, reduced })
       >
         {String(total).padStart(2, '0')}
       </motion.span>
-      <Star3D progress={reduced ? still : starP} spin={50} className="pointer-events-none absolute -right-[2%] top-[14%] hidden aspect-square w-[min(26rem,30vw)] opacity-80 lg:block" />
+      <Star3D progress={reduced ? still : starP} spin={50} className="pointer-events-none absolute right-[4%] top-[18%] hidden aspect-square w-[min(15rem,18vw)] opacity-80 lg:block" />
 
       <div className="wrap relative z-10">
         <motion.div style={reduced ? undefined : { y: copyY, opacity: copyOp }}>
-          <p className="t-kicker mb-6">Katalog — {total} ta kurs</p>
+          <p className="t-kicker mb-4 sm:mb-5">Katalog — {total} ta kurs</p>
           <Mask>
-            <h1 id="kurslar-title" className="cx-title max-w-[11ch]">
+            <h1 id="kurslar-title" className="cx-title">
               Barcha <span className="ink-grad">kurslar</span>
             </h1>
           </Mask>
-          <p className="t-lead mt-8 max-w-[34rem]">
+          <p className="t-lead mt-5 max-w-[34rem] sm:mt-6">
             {uz("O'zingizga mos yo'nalishni tanlang va kelajak kasbini biz bilan o'rganing. Amaliyotga asoslangan ta'lim va kuchli mutaxassislar sizni kutmoqda.")}
           </p>
-          <div className="hero-cta mt-10 flex flex-col gap-3 sm:flex-row">
+          <div className="hero-cta mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row">
             <a href="#katalog" className="btn btn-primary">
               Kurslarni koʻrish <ArrowDown size={18} aria-hidden="true" />
             </a>
@@ -142,7 +162,7 @@ const UndecidedBand: React.FC<{ reduced: boolean }> = ({ reduced }) => {
   const rotate = useTransform(scrollYProgress, [0, 1], [-160, 160]);
   const scale = useTransform(scrollYProgress, [0, 0.5, 1], [0.6, 1.2, 0.7]);
   return (
-    <div ref={ref} className="panel relative flex flex-col items-start gap-6 overflow-hidden p-7 sm:p-10 md:flex-row md:items-center md:justify-between">
+    <div ref={ref} className="panel relative flex flex-col items-start gap-6 overflow-hidden p-5 sm:p-8 md:flex-row md:items-center md:justify-between">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
@@ -150,7 +170,7 @@ const UndecidedBand: React.FC<{ reduced: boolean }> = ({ reduced }) => {
       />
       <div className="relative flex items-start gap-5 md:items-center">
         <motion.span className="ink-cyan mt-1 shrink-0 md:mt-0" style={reduced ? undefined : { rotate, scale }} aria-hidden="true">
-          <StarMark size={44} />
+          <StarMark size={36} />
         </motion.span>
         <div>
           <h2 className="t-h3">Hali qaror qilmadingizmi?</h2>

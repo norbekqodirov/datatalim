@@ -174,7 +174,7 @@ export const HeroSignal: React.FC = () => {
   }
 
   return (
-    <section ref={sectionRef} className="relative" style={{ height: desktop ? '230vh' : '200vh' }} aria-label="DATA Taʼlim Stansiyasi">
+    <section ref={sectionRef} className="relative" style={{ height: desktop ? '230vh' : '170vh' }} aria-label="DATA Taʼlim Stansiyasi">
       <div className="sticky top-0 h-[100svh] overflow-hidden grain">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden="true" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: vignette }} />
@@ -280,7 +280,7 @@ const HeroCopy: React.FC<{ title: string; subtitle: string; description: string;
       {title} <span className="ink-grad">{subtitle}</span>
     </motion.h1>
     <motion.p
-      className="t-lead mt-7 max-w-[34rem]"
+      className="t-lead mt-5 lg:mt-7 max-w-[34rem]"
       initial={{ opacity: 0, y: 16 }}
       animate={go({ opacity: 1, y: 0 })}
       transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
@@ -288,7 +288,7 @@ const HeroCopy: React.FC<{ title: string; subtitle: string; description: string;
       {description}
     </motion.p>
     <motion.div
-      className="hero-cta mt-10 flex flex-col sm:flex-row gap-3"
+      className="hero-cta mt-8 lg:mt-10 flex flex-col sm:flex-row gap-3"
       initial={{ opacity: 0, y: 16 }}
       animate={go({ opacity: 1, y: 0 })}
       transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}

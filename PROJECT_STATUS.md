@@ -93,6 +93,7 @@ Hammasi `redesign-v2` branchida commit qilingan. GitHub'ga oxirgi push: `a18e3cf
 - Admin'da muqovasi yo'q kurs kartalari qorong'i rejimda deyarli ko'rinmaydi.
 
 ## 6. Jurnal (eng yangisi tepada, har yozuv 1–3 qator)
+- **2026-10-28 · Sikl 0 (3 ishchi agent)** — /kurslar kartalari ixcham (desktop 4 ustun ~390px, mobil gorizontal ~215px), katalog/detail hero kichraydi. /jamoa: o'rta ustun ofseti olib tashlandi, kartalar ~690→300px (avatar+matn). Bosh sahifa mobil: 17 194→13 537px (ritm, bento, yo'nalishlar ikonka, stansiya qator kartalar, ScrollText oxirgi so'z xiraligi tuzatildi).
 - **2026-10-27 · Footer** — Ustun sarlavhalari ustidagi chiziqlar va Aloqa bo'limi ostidagi takroriy 4 ustunli ma'lumot qatori olib tashlandi (Mo'ljal footer manziliga ko'chdi). Katta «DATA» wordmark (va scroll animatsiyasi) olib tashlandi, havola ritmi desktopda 34px, bo'shliqlar qisqardi: footer ~950 → 565 px (1568 px ekran).
 - **2026-10-27 · 3-bosqich yakuni** — Mobil qorong'i rejim tekshirildi (390 px, muammo yo'q). Campus/Directions stacked sarlavhalari `.sec-head` ga o'tdi (Directions: `t-display` → `t-h2`). BackToTop mobilda yashirildi (`hidden lg:flex`). `ParticleStar.tsx` o'chirildi.
 - **2026-10-27** — Status fayli va `scripts/qa/` yaratildi. Dev server :3002 da, chunki :3000 ni boshqa loyiha band qilgan.

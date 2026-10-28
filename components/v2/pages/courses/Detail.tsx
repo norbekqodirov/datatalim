@@ -62,16 +62,16 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
 
       <Outcomes course={course} reduced={reduced} />
 
-      <div className="wrap pb-[8vh] pt-[10vh] lg:pt-[10vh]">
-        <div className="grid gap-12 lg:grid-cols-12 lg:gap-14">
-          <div className="min-w-0 space-y-[12vh] lg:col-span-8">
+      <div className="wrap pb-[var(--sec-y)] pt-[var(--sec-y)]">
+        <div className="grid gap-10 lg:grid-cols-12 lg:gap-12">
+          <div className="min-w-0 space-y-16 lg:col-span-8 lg:space-y-24">
             {course.modules.length > 0 && (
               <section aria-labelledby="plan-title">
                 <SectionHead kicker="02 — Dastur" id="plan-title">Dars rejasi</SectionHead>
                 <p className="mono ink-3 mt-4 text-sm">
                   {course.modules.length} modul · {countLessons(course)} ta dars
                 </p>
-                <div className="mt-10">
+                <div className="mt-8">
                   <Timeline modules={course.modules} />
                 </div>
               </section>
@@ -116,7 +116,7 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
           {/* desktop: yopishqoq yozilish kartasi */}
           <aside className="hidden lg:col-span-4 lg:block" aria-label="Kursga yozilish">
             <div className="sticky top-24">
-              <div className="panel relative overflow-hidden p-7">
+              <div className="panel relative overflow-hidden p-6">
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0"
@@ -126,13 +126,13 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
                   <p className="t-kicker">Jami kurs narxi</p>
                   {discount ? (
                     <>
-                      <p className="mono mt-3 text-[2.2rem] leading-none" style={{ fontWeight: 500 }}>
+                      <p className="mono mt-3 text-[1.9rem] leading-none" style={{ fontWeight: 500 }}>
                         <PriceFig raw={discount} />
                       </p>
                       <p className="mono ink-3 mt-2 text-sm line-through">{uz(total)}</p>
                     </>
                   ) : (
-                    <p className="mono mt-3 text-[2.2rem] leading-none" style={{ fontWeight: 500 }}>
+                    <p className="mono mt-3 text-[1.9rem] leading-none" style={{ fontWeight: 500 }}>
                       <PriceFig raw={total} />
                     </p>
                   )}
@@ -166,9 +166,9 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
       <Format />
 
       {related.length > 0 && (
-        <section className="relative pb-[12vh]" aria-labelledby="related-title">
+        <section className="relative pb-[var(--sec-y)]" aria-labelledby="related-title">
           <div className="hairline" aria-hidden="true" />
-          <div className="wrap pt-[10vh]">
+          <div className="wrap pt-[var(--sec-y)]">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
               <SectionHead kicker={`${uz(CAT_LABEL[course.category])} — davomi`} id="related-title">
                 Shu yoʻnalishdagi <span className="ink-grad">boshqa kurslar</span>
@@ -177,7 +177,7 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
                 Barcha kurslar <ArrowRight size={18} aria-hidden="true" />
               </Link>
             </div>
-            <ul className="mt-12 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="mt-8 grid gap-3.5 sm:mt-10 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
               {related.map((c, i) => (
                 <li key={c.id} className="min-w-0">
                   <CourseCard course={c} index={i} />
@@ -231,7 +231,7 @@ const Hero: React.FC<{
   const { scrollYProgress: hp } = useScroll({ target: ref, offset: ['start start', 'end start'] });
   const textY = useTransform(hp, [0, 1], [0, -70]);
   const textOp = useTransform(hp, [0, 0.65], [1, 0.2]);
-  const coverY = useTransform(hp, [0, 1], [0, 110]);
+  const coverY = useTransform(hp, [0, 1], [0, 48]);
   const coverScale = useTransform(hp, [0, 1], [1, 0.88]);
   const coverRot = useTransform(hp, [0, 1], [0, -9]);
   const starSpin = useTransform(hp, [0, 1], [0, 220]);
@@ -254,14 +254,14 @@ const Hero: React.FC<{
           <ArrowLeft size={16} aria-hidden="true" /> Barcha kurslarga qaytish
         </Link>
 
-        <div className="mt-6 grid items-center gap-12 lg:grid-cols-12 lg:gap-10">
+        <div className="mt-4 grid items-center gap-8 lg:grid-cols-12 lg:gap-10">
           <motion.div className="min-w-0 lg:col-span-7" style={reduced ? undefined : { y: textY, opacity: textOp }}>
-            <p className="t-kicker cat-ink mb-6">{uz(CAT_LABEL[course.category])}</p>
+            <p className="t-kicker cat-ink mb-4">{uz(CAT_LABEL[course.category])}</p>
             <Mask>
-              <h1 id="course-title" className="cd-title max-w-[14ch]">{uz(tField(course.title))}</h1>
+              <h1 id="course-title" className="cd-title max-w-[16ch]">{uz(tField(course.title))}</h1>
             </Mask>
-            <p className="t-lead mt-7 max-w-[36rem]">{uz(tField(course.description))}</p>
-            <div ref={ctaRef} className="hero-cta mt-9 flex flex-col gap-3 sm:flex-row">
+            <p className="t-lead mt-5 max-w-[36rem]">{uz(tField(course.description))}</p>
+            <div ref={ctaRef} className="hero-cta mt-7 flex flex-col gap-3 sm:flex-row">
               <button type="button" onClick={onEnroll} className="btn btn-primary">
                 Kursga yozilish <ArrowRight size={18} aria-hidden="true" />
               </button>
@@ -275,7 +275,7 @@ const Hero: React.FC<{
             </p>
           </motion.div>
 
-          <div className="relative mx-auto w-full max-w-[28rem] lg:col-span-5 lg:max-w-[30rem] lg:justify-self-center" style={{ perspective: '1400px' }}>
+          <div className="relative mx-auto w-full max-w-[19rem] sm:max-w-[22rem] lg:col-span-5 lg:max-w-[24rem] lg:justify-self-center" style={{ perspective: '1400px' }}>
             <motion.div
               className="relative"
               initial={reduced ? false : { opacity: 0, y: 40, rotateY: 14 }}
@@ -299,7 +299,7 @@ const Hero: React.FC<{
         </div>
 
         {/* asosiy ko'rsatkichlar */}
-        <dl className="mt-14 grid grid-cols-2 gap-px overflow-hidden rounded-3xl lg:mt-20 lg:grid-cols-4" style={{ background: 'var(--line-2)' }}>
+        <dl className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-3xl lg:mt-14 lg:grid-cols-4" style={{ background: 'var(--line-2)' }}>
           <div className="fact">
             <dt className="t-kicker" style={{ fontSize: '0.6875rem' }}>Davomiyligi</dt>
             <dd className="mt-3">
@@ -349,7 +349,7 @@ const Closing = React.forwardRef<
   HTMLElement,
   { course: Course; title: string; onEnroll: () => void; onConsult: () => void; phone: string; tel: string; reduced: boolean }
 >(({ title, onEnroll, onConsult, phone, tel }, ref) => (
-  <section ref={ref} className="relative overflow-hidden py-[12vh]" aria-labelledby="close-title">
+  <section ref={ref} className="relative overflow-hidden py-[var(--sec-y)]" aria-labelledby="close-title">
     <div className="hairline absolute inset-x-0 top-0" aria-hidden="true" />
     <div
       aria-hidden="true"
@@ -357,14 +357,14 @@ const Closing = React.forwardRef<
       style={{ background: 'radial-gradient(60% 70% at 50% 100%, color-mix(in srgb, var(--cat) 20%, transparent), transparent 70%)' }}
     />
     <div className="wrap relative z-10 text-center">
-      <p className="t-kicker mb-6">Keyingi qadam</p>
+      <p className="t-kicker mb-4">Keyingi qadam</p>
       <Mask>
         <h2 id="close-title" className="t-h2 mx-auto max-w-[18ch] text-balance">
           {title} — <span className="ink-grad">kursga yoziling.</span>
         </h2>
       </Mask>
       <p className="t-lead mx-auto mt-6 max-w-[34rem]">Joy band qilish yoki savol berish uchun ariza qoldiring, administrator siz bilan bogʻlanadi.</p>
-      <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+      <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <button type="button" onClick={onEnroll} className="btn btn-primary">
           Kursga yozilish <ArrowRight size={18} aria-hidden="true" />
         </button>
@@ -395,13 +395,13 @@ const Outcomes: React.FC<{ course: Course; reduced: boolean }> = ({ course, redu
   const lastLg = n % 3 === 1 ? 'lg:col-span-3' : n % 3 === 2 ? 'lg:col-span-2' : '';
   const lastSm = n % 2 === 1 ? 'sm:col-span-2' : '';
   return (
-    <section className="wrap pt-[8vh]" aria-labelledby="out-title">
+    <section className="wrap pt-[var(--sec-y)]" aria-labelledby="out-title">
       <SectionHead kicker="01 — Natija" id="out-title">
         Kurs oxirida <span className="ink-grad">nima qila olasiz</span>
       </SectionHead>
-      <p className="t-lead mt-5 max-w-[38rem]">Dasturdagi har bir modul alohida amaliy koʻnikmaga aylanadi.</p>
+      <p className="t-lead mt-4 max-w-[38rem]">Dasturdagi har bir modul alohida amaliy koʻnikmaga aylanadi.</p>
       {n > 0 && (
-        <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-8 grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           {mods.map((m, i) => {
             const last = i === n - 1 && n > 1;
             return (
@@ -414,7 +414,7 @@ const Outcomes: React.FC<{ course: Course; reduced: boolean }> = ({ course, redu
                 transition={{ duration: 0.6, delay: (i % 3) * 0.07, ease: [0.22, 1, 0.36, 1] }}
               >
                 <span className="out-n mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-                <h3 className="t-h3 mt-6 text-balance" style={{ fontSize: 'clamp(1.15rem, 1.6vw, 1.45rem)' }}>{uz(tField(m.title))}</h3>
+                <h3 className="t-h3 mt-4 text-balance" style={{ fontSize: 'clamp(1.15rem, 1.6vw, 1.45rem)' }}>{uz(tField(m.title))}</h3>
                 <p className="mono ink-3 mt-3 text-sm">{m.lessons.length} ta dars</p>
               </motion.li>
             );
@@ -422,7 +422,7 @@ const Outcomes: React.FC<{ course: Course; reduced: boolean }> = ({ course, redu
         </ul>
       )}
       {course.technologies.length > 0 && (
-        <div className="mt-10">
+        <div className="mt-8">
           <p className="t-kicker mb-4">Ishlatiladigan asboblar</p>
           <ul className="flex flex-wrap gap-3">
             {course.technologies.map((tech, i) => (
@@ -445,13 +445,13 @@ const FORMAT = [
   { Icon: Award, t: 'Sertifikat', d: 'Yakuniy imtihondan oʻtgan oʻquvchilarga DATA Taʼlim Stansiyasi sertifikati beriladi.' },
 ];
 const Format: React.FC = () => (
-  <section className="wrap pb-[10vh]" aria-labelledby="fmt-title">
+  <section className="wrap pb-[var(--sec-y)]" aria-labelledby="fmt-title">
     <SectionHead kicker="04 — Format" id="fmt-title">Qanday <span className="ink-grad">oʻqiladi</span></SectionHead>
-    <ul className="mt-10 grid gap-4 md:grid-cols-3">
+    <ul className="mt-8 grid gap-3 sm:gap-4 md:grid-cols-3">
       {FORMAT.map(({ Icon, t, d }) => (
         <li key={t} className="out-card min-w-0">
           <span className="out-ico" aria-hidden="true"><Icon size={22} /></span>
-          <h3 className="t-h3 mt-6" style={{ fontSize: 'clamp(1.15rem, 1.6vw, 1.45rem)' }}>{t}</h3>
+          <h3 className="t-h3 mt-4" style={{ fontSize: 'clamp(1.15rem, 1.6vw, 1.45rem)' }}>{t}</h3>
           <p className="t-body mt-3 text-[0.975rem]">{d}</p>
         </li>
       ))}

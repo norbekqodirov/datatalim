@@ -46,7 +46,7 @@ export const FooterV2: React.FC = () => {
         className="pointer-events-none absolute inset-x-0 bottom-0 h-[70%]"
         style={{ background: 'radial-gradient(60% 80% at 50% 100%, color-mix(in srgb, var(--blue) 16%, transparent), transparent 70%)' }}
       />
-      <div className="wrap relative pt-14 sm:pt-16 pb-8">
+      <div className="wrap relative pt-10 sm:pt-16 pb-6 sm:pb-8">
         {/* 1 — the one action that matters */}
         {showCta && (
           <div className="foot-cta grid gap-6 lg:gap-10 lg:grid-cols-12 lg:items-center mb-14 sm:mb-16">
@@ -71,15 +71,15 @@ export const FooterV2: React.FC = () => {
         )}
 
         {/* 2 — directory */}
-        <div className="grid gap-x-10 gap-y-10 grid-cols-2 lg:grid-cols-12">
+        <div className="grid gap-x-6 sm:gap-x-10 gap-y-8 sm:gap-y-10 grid-cols-2 lg:grid-cols-12">
           <div className="col-span-2 lg:col-span-4">
             <Link to="/" aria-label="DATA Taʼlim Stansiyasi — bosh sahifa" className="inline-flex items-center min-h-[44px]" style={{ color: 'var(--fg)' }}>
               <Logo width={150} />
             </Link>
-            <p className="t-body mt-5 max-w-sm">
+            <p className="t-body mt-3 sm:mt-5 max-w-sm">
               Dasturlash, sunʼiy intellekt, media, dizayn va moliya boʻyicha zamonaviy oʻquv markazi. Urganch, 2019-yildan beri.
             </p>
-            <ul className="mt-6 flex flex-wrap gap-2">
+            <ul className="mt-4 sm:mt-6 flex flex-wrap gap-2">
               {SOCIAL.map(({ icon: Icon, href, label }) => (
                 <li key={label}>
                   <a
@@ -152,7 +152,7 @@ export const FooterV2: React.FC = () => {
         </div>
 
         {/* 3 — fine print */}
-        <div className="mt-12 sm:mt-14 pt-5 flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-sm ink-3" style={{ borderTop: '1px solid var(--line)' }}>
+        <div className="mt-8 sm:mt-14 pt-5 flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-sm ink-3" style={{ borderTop: '1px solid var(--line)' }}>
           <span>© {year} DATA Taʼlim Stansiyasi. {t('footer.rights')}</span>
           <span className="flex flex-wrap items-center gap-x-5 gap-y-1">
             <button

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, useInView, useScroll, useTransform, animate, MotionValue } from 'framer-motion';
-import { useMotionReduced } from './utils';
+import { useIsDesktop, useMotionReduced } from './utils';
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -28,14 +28,16 @@ export const Mask: React.FC<{ children: React.ReactNode; className?: string; del
 export const ScrollText: React.FC<{ text: string; className?: string; style?: React.CSSProperties; id?: string }> = ({ text, className, style, id }) => {
   const reduced = useMotionReduced();
   const ref = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start 0.85', 'end 0.45'] });
+  // telefonda blok ekranning yuqori yarmiga yetguncha toʻliq yonadi — oʻqilayotgan matn xira qolmaydi
+  const desktop = useIsDesktop();
+  const { scrollYProgress } = useScroll({ target: ref, offset: desktop ? ['start 0.85', 'end 0.45'] : ['start 0.9', 'end 0.62'] });
   const words = text.split(' ');
   return (
     <span ref={ref} id={id} className={className} style={style}>
       {reduced
         ? text
         : words.map((w, i) => (
-            <ScrollWord key={i} trail={i < words.length - 1} p={scrollYProgress} start={i / words.length} end={(i + 1.5) / words.length}>
+            <ScrollWord key={i} trail={i < words.length - 1} p={scrollYProgress} start={i / words.length} end={Math.min(1, (i + 1.5) / words.length)}>
               {w}
             </ScrollWord>
           ))}

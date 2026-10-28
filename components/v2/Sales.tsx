@@ -56,18 +56,18 @@ export const ProofBento: React.FC = () => {
               transition={{ duration: 0.7, delay: (i % 4) * 0.06, ease: EASE }}
             >
               {t.kind === 'stat' && (
-                <div className="flex h-full flex-col justify-between gap-6">
+                <div className="flex h-full flex-col justify-between gap-3 sm:gap-6">
                   <div className="flex items-start justify-between gap-4">
                     <CountUp to={t.n} from={t.from} suffix={t.suffix || ''} className={`block mono ${t.ink}`}
-                      style={{ fontSize: 'clamp(2.4rem, 4.2vw, 4rem)', lineHeight: 1, letterSpacing: '-0.04em', fontWeight: 500 }} />
-                    {t.icon && <TileIcon name={t.icon} size={`${t.span ? 'w-16 h-16' : 'hidden sm:block w-16 h-16'} sm:w-20 sm:h-20 -mt-2 -mr-2`} />}
+                      style={{ fontSize: 'clamp(2rem, 4.2vw, 4rem)', lineHeight: 1, letterSpacing: '-0.04em', fontWeight: 500 }} />
+                    {t.icon && <TileIcon name={t.icon} size={`${t.span ? 'w-12 h-12' : 'hidden sm:block w-16 h-16'} sm:w-20 sm:h-20 -mt-1 -mr-1 sm:-mt-2 sm:-mr-2`} />}
                   </div>
                   <p className="t-body max-w-[18rem]">{t.label}</p>
                 </div>
               )}
               {t.kind === 'claim' && (
-                <div className={`flex h-full gap-5 ${t.span ? 'flex-col sm:flex-row sm:items-end' : 'flex-col'}`}>
-                  <TileIcon name={t.icon} size={t.span ? 'w-20 h-20 sm:w-28 sm:h-28 shrink-0 -ml-2' : 'w-14 h-14 sm:w-20 sm:h-20 -ml-2'} />
+                <div className={`flex h-full gap-3 sm:gap-5 ${t.span ? 'flex-row items-end' : 'flex-col'}`}>
+                  <TileIcon name={t.icon} size={t.span ? 'w-16 h-16 sm:w-28 sm:h-28 shrink-0 -ml-1 sm:-ml-2' : 'w-11 h-11 sm:w-20 sm:h-20 -ml-1 sm:-ml-2'} />
                   <div className="mt-auto">
                     <h3 className="bento-title">{t.title}</h3>
                     <p className="t-body mt-2 !text-[0.95rem]">{t.text}</p>
@@ -75,7 +75,7 @@ export const ProofBento: React.FC = () => {
                 </div>
               )}
               {t.kind === 'cta' && (
-                <div className="relative flex h-full flex-col sm:flex-row sm:items-end justify-between gap-6">
+                <div className="relative flex h-full flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6">
                   <div>
                     <p className="t-kicker !text-white/70 mb-3">Bepul</p>
                     <h3 className="bento-title !text-white max-w-[20ch]">Qaysi kurs mos — hali bilmayapsizmi?</h3>
@@ -107,7 +107,7 @@ export const CourseMarquee: React.FC = () => {
   const rows = [items.slice(0, half), items.slice(half)];
 
   return (
-    <Link to="/kurslar" className="marquee-band block py-10 sm:py-14 overflow-hidden" aria-label="Barcha kurslarni koʻrish">
+    <Link to="/kurslar" className="marquee-band block py-6 sm:py-14 overflow-hidden" aria-label="Barcha kurslarni koʻrish">
       {rows.map((row, r) => (
         <div key={r} className={`marquee-row ${r ? 'is-rev' : ''} ${reduced ? 'is-still' : ''}`} aria-hidden="true">
           {[0, 1].map((dup) => (
@@ -147,7 +147,7 @@ export const StartSteps: React.FC = () => {
           viewport={{ once: true, margin: '-10% 0px' }}
           transition={{ duration: 0.6, delay: i * 0.1, ease: EASE }}
         >
-          <img src={ICON(s.icon)} alt="" aria-hidden="true" loading="lazy" decoding="async" width={160} height={160} className="bento-icon w-16 h-16 sm:w-[4.5rem] sm:h-[4.5rem] object-contain shrink-0" />
+          <img src={ICON(s.icon)} alt="" aria-hidden="true" loading="lazy" decoding="async" width={160} height={160} className="bento-icon w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] object-contain shrink-0" />
           <div className="min-w-0">
             <p className="mono text-[0.75rem] ink-cyan tracking-[0.12em]">{String(i + 1).padStart(2, '0')}</p>
             <p className="font-semibold text-[1.05rem] leading-snug mt-0.5">{s.title}</p>

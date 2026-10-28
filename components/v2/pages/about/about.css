@@ -46,36 +46,28 @@
 .v2 .dir-card:hover .arr { transform: translate3d(4px, -4px, 0); }
 
 /* ------------------------------------------------------------------ team cards */
-.v2 .tm-card { transition: transform 0.5s var(--ease), border-color 0.3s var(--ease); }
+.v2 .tm-card { transition: transform 0.4s var(--ease), border-color 0.3s var(--ease); }
 .v2 .tm-card:hover,
-.v2 .tm-card:focus-within { transform: translate3d(0, -8px, 0); border-color: var(--line-2); }
-.v2 .tm-visual { position: relative; overflow: hidden; isolation: isolate; }
-.v2 .tm-glow { position: absolute; inset: 0; z-index: 0; }
-.v2 .tm-grid {
-  position: absolute; inset: 0; z-index: 0; opacity: 0.55;
-  background-image:
-    linear-gradient(var(--line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line) 1px, transparent 1px);
-  background-size: 44px 44px;
-  -webkit-mask-image: radial-gradient(75% 75% at 50% 45%, #000 20%, transparent 100%);
-          mask-image: radial-gradient(75% 75% at 50% 45%, #000 20%, transparent 100%);
+.v2 .tm-card:focus-within { transform: translate3d(0, -3px, 0); border-color: var(--line-2); }
+.v2 .tm-avatar {
+  position: relative; overflow: hidden; isolation: isolate; flex: none;
+  width: 88px; height: 88px; border-radius: 50%;
+  border: 1px solid var(--line-2);
+  display: flex; align-items: center; justify-content: center;
 }
+.v2 .tm-glow { position: absolute; inset: 0; z-index: 0; }
 .v2 .tm-star {
-  position: absolute; z-index: 0; width: 78%; aspect-ratio: 1;
-  right: -22%; top: -14%;
-  transition: transform 1.1s var(--ease), opacity 0.5s var(--ease);
-  transform: rotate(0deg) scale(1);
+  position: absolute; z-index: 0; width: 70%; aspect-ratio: 1;
+  right: -18%; top: -18%;
+  transition: transform 0.9s var(--ease);
 }
 .v2 .tm-card:hover .tm-star,
 .v2 .tm-card:focus-within .tm-star { transform: rotate(90deg) scale(1.08); }
 .v2 .tm-initials {
   position: relative; z-index: 1;
-  font-weight: 700; letter-spacing: -0.06em; line-height: 0.8;
-  font-size: clamp(5.5rem, 14vw, 9rem);
-  transition: transform 0.7s var(--ease);
+  font-weight: 700; letter-spacing: -0.05em; line-height: 1;
+  font-size: 1.875rem; padding: 0.1em 0.06em;
 }
-.v2 .tm-card:hover .tm-initials,
-.v2 .tm-card:focus-within .tm-initials { transform: translate3d(0, -6px, 0) scale(1.04); }
 .v2 .tm-chip {
   display: inline-flex; align-items: center; min-height: 28px; padding: 0 0.75rem;
   border-radius: 999px; border: 1px solid var(--line-2); color: var(--fg-2);
@@ -96,6 +88,10 @@
   font-size: 0.8125rem; color: var(--cyan-ink); letter-spacing: 0.1em;
 }
 
+@media (max-width: 639.98px) {
+  .v2 .tm-avatar { width: 72px; height: 72px; }
+  .v2 .tm-initials { font-size: 1.5rem; }
+}
 @media (max-width: 380px) {
   .v2 .ab-statement { font-size: 1.55rem; }
 }

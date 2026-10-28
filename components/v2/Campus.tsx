@@ -215,14 +215,14 @@ const Stacked: React.FC<{ vid: string; reduced: boolean }> = ({ vid, reduced }) 
         )}
         <VisitCard className={vid ? 'lg:col-span-4' : 'lg:col-span-12'} />
       </div>
-      <ol className="cx-grid mt-16">
+      <ol className="cx-grid mt-6 sm:mt-16">
         {FEATURES.map((f, i) => (
           <motion.li
             key={f.n}
             className="cx-tile panel"
             initial={reduced ? false : { opacity: 0, y: 28 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-12% 0px' }}
+            viewport={{ once: true, margin: '0px 0px -6% 0px' }}
             transition={{ duration: 0.6, ease: EASE, delay: (i % 2) * 0.08 }}
           >
             <span className="cx-art" aria-hidden="true"><Art i={i} /></span>

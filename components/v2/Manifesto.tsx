@@ -37,7 +37,7 @@ export const Manifesto: React.FC = () => {
 
   return (
     <section ref={secRef} className="relative sec overflow-hidden" aria-labelledby="manifesto-k">
-      <div className="wrap grid lg:grid-cols-12 gap-14 lg:gap-16 items-center">
+      <div className="wrap grid lg:grid-cols-12 gap-8 sm:gap-14 lg:gap-16 items-center">
         <div className="lg:col-span-7">
           <p id="manifesto-k" className="t-kicker mb-8">04 — Yondashuv</p>
           <p className="manifesto-text">

@@ -16,8 +16,8 @@ export const CourseCard: React.FC<{ course: Course; index: number }> = ({ course
   const reduced = useMotionReduced();
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
-  const y = useTransform(scrollYProgress, [0, 0.26], [80, 0]);
-  const scale = useTransform(scrollYProgress, [0, 0.26], [0.9, 1]);
+  const y = useTransform(scrollYProgress, [0, 0.26], [48, 0]);
+  const scale = useTransform(scrollYProgress, [0, 0.26], [0.95, 1]);
   const opacity = useTransform(scrollYProgress, [0, 0.14], [0, 1]);
   const imgY = useTransform(scrollYProgress, [0, 1], ['-6%', '6%']);
 
@@ -39,45 +39,47 @@ export const CourseCard: React.FC<{ course: Course; index: number }> = ({ course
             className="absolute inset-0"
             motionStyle={reduced ? undefined : { y: imgY, scale: 1.14 }}
           />
-          <span className="cc-pill mono absolute left-4 top-4 z-[2]" aria-hidden="true">
+          <span className="cc-pill cc-idx mono absolute left-3 top-3 z-[2]" aria-hidden="true">
             {String(index + 1).padStart(2, '0')}
           </span>
-          <span className="cc-pill absolute right-4 top-4 z-[2]">
+          <span className="cc-pill cc-pill-cat absolute right-3 top-3 z-[2]">
             <span className="inline-block h-2 w-2 rounded-full" style={{ background: 'var(--cat)' }} aria-hidden="true" />
             {uz(CAT_LABEL[course.category])}
           </span>
         </div>
 
-        <div className="flex flex-1 flex-col p-6 sm:p-7">
-          <h3 className="t-h3 text-balance">
+        <div className="cc-main">
+          <p className="cc-cat t-kicker" aria-hidden="true">
+            <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: 'var(--cat)' }} />
+            {uz(CAT_LABEL[course.category])}
+          </p>
+          <h3 className="cc-title text-balance">
             <Link to={`/kurslar/${course.id}`} className="cc-link">
               {title}
             </Link>
           </h3>
-          <p className="t-body mt-3 line-clamp-3" style={{ fontSize: '0.975rem' }}>
-            {uz(tField(course.description))}
-          </p>
+          <p className="cc-desc">{uz(tField(course.description))}</p>
+        </div>
 
-          <dl className="mt-auto grid grid-cols-2 gap-4 pt-6">
-            <div className="min-w-0">
-              <dt className="t-kicker" style={{ fontSize: '0.6875rem' }}>Davomiyligi</dt>
-              <dd className="mono mt-1.5 text-[1.05rem]" style={{ color: 'var(--fg)' }}>{dur.main}</dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="t-kicker" style={{ fontSize: '0.6875rem' }}>Oylik toʻlov</dt>
-              <dd className="mono mt-1.5 text-[1.05rem]" style={{ color: 'var(--fg)' }}>
-                {price.num}
-                {price.unit && <span className="ink-3 ml-1 text-[0.8rem]">{price.unit}</span>}
-              </dd>
-            </div>
-          </dl>
-
-          <div className="hairline mt-6 pt-5">
-            <span className="cc-cta">
-              Batafsil va yozilish
-              <ArrowRight size={18} aria-hidden="true" />
-            </span>
+        <dl className="cc-meta">
+          <div className="min-w-0">
+            <dt className="t-kicker">Davomiyligi</dt>
+            <dd className="mono">{dur.main}</dd>
           </div>
+          <div className="min-w-0">
+            <dt className="t-kicker">Oylik toʻlov</dt>
+            <dd className="mono">
+              {price.num}
+              {price.unit && <span className="ink-3 ml-1 text-[0.75rem]">{price.unit}</span>}
+            </dd>
+          </div>
+        </dl>
+
+        <div className="cc-foot">
+          <span className="cc-cta">
+            Batafsil va yozilish
+            <ArrowRight size={18} aria-hidden="true" />
+          </span>
         </div>
       </div>
     </motion.article>

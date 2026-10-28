@@ -43,7 +43,7 @@ export const Voices: React.FC = () => {
   return (
     <section className="relative sec" aria-labelledby="voices-title">
       {/* 2 ustun: chapda asoschi so'zi + keyingi qadam, o'ngda o'quvchi videolari — vazn teng */}
-      <div className={`wrap grid grid-cols-1 gap-12 lg:gap-8 [&>*]:min-w-0 ${videos.length ? 'lg:grid-cols-12 lg:items-center' : ''}`}>
+      <div className={`wrap grid grid-cols-1 gap-9 sm:gap-12 lg:gap-8 [&>*]:min-w-0 ${videos.length ? 'lg:grid-cols-12 lg:items-center' : ''}`}>
         <div className={videos.length ? 'lg:col-span-5' : 'max-w-4xl mx-auto text-center'}>
           <p className="t-kicker mb-8">07 — Ovozlar</p>
           {quote && (
@@ -55,7 +55,7 @@ export const Voices: React.FC = () => {
                   <span className="ink-grad" aria-hidden="true">»</span>
                 </p>
               </blockquote>
-              <figcaption className={`mt-7 flex items-center gap-4 text-left ${videos.length ? '' : 'justify-center'}`}>
+              <figcaption className={`mt-5 sm:mt-7 flex items-center gap-4 text-left ${videos.length ? '' : 'justify-center'}`}>
                 {siteContent.aboutImage ? (
                   <img src={siteContent.aboutImage} alt={founder} className="w-12 h-12 rounded-full object-cover" loading="lazy" width={48} height={48} />
                 ) : (
@@ -82,12 +82,12 @@ export const Voices: React.FC = () => {
 
         {videos.length > 0 && (
           <div className="lg:col-span-7">
-            <h3 className="t-kicker mb-5">Oʻquvchilarimiz oʻz tajribasi haqida</h3>
+            <h3 className="t-kicker mb-4 sm:mb-5">Oʻquvchilarimiz oʻz tajribasi haqida</h3>
             <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-px-[var(--gutter)] pb-4 -mx-[var(--gutter)] px-[var(--gutter)] lg:grid lg:grid-cols-3 lg:overflow-visible lg:mx-0 lg:px-0 lg:pb-0">
               {videos.map((id, i) => (
                 <motion.div
                   key={id}
-                  className="snap-start shrink-0 w-[62vw] sm:w-[40vw] lg:w-auto"
+                  className="snap-start shrink-0 w-[44vw] sm:w-[40vw] lg:w-auto"
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -146,7 +146,7 @@ export const TeamStrip: React.FC = () => {
                     <span className="mono tk-code">DTS · {String(i + 1).padStart(2, '0')}</span>
                     <span className="tk-emoji" aria-hidden="true">{roleEmoji(role)}</span>
                   </span>
-                  <span className="block font-semibold leading-snug mt-3 text-[1.05rem]">{name}</span>
+                  <span className="tk-name block font-semibold leading-snug mt-3 text-[1.05rem]">{name}</span>
                   <span className="block text-sm ink-3 mt-1">{role}</span>
                 </div>
               </motion.li>

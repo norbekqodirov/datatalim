@@ -228,6 +228,19 @@ const Chapter: React.FC<{ cat: (typeof CATS)[number]; i: number; x: MotionValue<
 };
 
 // ---------------------------------------------------------------- mobile / reduced motion: vertical
+const DirArt: React.FC<{ id: string; cover?: string; className: string }> = ({ id, cover, className }) => (
+  <img
+    src={dirArt(id)}
+    alt=""
+    loading="lazy"
+    decoding="async"
+    width={400}
+    height={400}
+    className={className}
+    onError={(e) => { if (cover) { e.currentTarget.onerror = null; e.currentTarget.src = optimizedCover(cover); } }}
+  />
+);
+
 const StackedList: React.FC = () => {
   const { courses } = useStore();
   const { tField } = useLanguage();
@@ -242,7 +255,7 @@ const StackedList: React.FC = () => {
             </h2>
           </div>
         </div>
-        <div className="grid md:grid-cols-2 gap-5">
+        <div className="grid md:grid-cols-2 gap-3 md:gap-5">
           {CATS.map((cat, index) => {
             const list = courses.filter((c) => c.category === cat.id);
             const cover = list.find((c) => c.coverImage);
@@ -255,34 +268,34 @@ const StackedList: React.FC = () => {
                 viewport={{ once: true, margin: '-8% 0px' }}
                 transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
               >
-                <div className="relative aspect-[16/10] flex items-center justify-center overflow-hidden" aria-hidden="true"
+                {/* planshet/desktop: keng 3D sahna; telefonda u sarlavha yonidagi kichik ikonka */}
+                <div className="relative aspect-[16/10] hidden md:flex items-center justify-center overflow-hidden" aria-hidden="true"
                   style={{ background: `radial-gradient(60% 70% at 50% 60%, ${cat.color}33, transparent 70%)` }}>
-                  <img
-                    src={dirArt(cat.id)}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    width={400}
-                    height={400}
-                    className="h-[92%] w-auto object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.45)]"
-                    onError={(e) => { if (cover?.coverImage) { e.currentTarget.onerror = null; e.currentTarget.src = optimizedCover(cover.coverImage); } }}
-                  />
+                  <DirArt id={cat.id} cover={cover?.coverImage} className="h-[92%] w-auto object-contain drop-shadow-[0_24px_30px_rgba(0,0,0,.45)]" />
                 </div>
-                <div className="p-6">
-                  <span className={`mono ${cat.ink} text-sm`}>{String(index + 1).padStart(2, '0')} / 04</span>
-                  <h3 className="t-h3 mt-3">{cat.title}</h3>
-                  <p className="t-body mt-2">{cat.blurb}</p>
-                  <ul className="mt-5">
+                <div className="p-5 md:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <span className={`mono ${cat.ink} text-sm`}>{String(index + 1).padStart(2, '0')} / 04</span>
+                      <h3 className="t-h3 mt-2 md:mt-3">{cat.title}</h3>
+                    </div>
+                    <span className="md:hidden shrink-0 w-[4.75rem] h-[4.75rem] -mt-1 -mr-1 grid place-items-center rounded-2xl" aria-hidden="true"
+                      style={{ background: `radial-gradient(closest-side, ${cat.color}38, transparent)` }}>
+                      <DirArt id={cat.id} cover={cover?.coverImage} className="w-full h-full object-contain drop-shadow-[0_12px_16px_rgba(0,0,0,.4)]" />
+                    </span>
+                  </div>
+                  <p className="t-body mt-2 max-md:!text-[0.94rem] max-md:!leading-[1.5]">{cat.blurb}</p>
+                  <ul className="mt-3 md:mt-5">
                     {list.map((c) => (
                       <li key={c.id} className="hairline">
-                        <Link to={`/kurslar/${c.id}`} className="flex items-center gap-3 py-3 min-h-[44px]">
-                          <span className="flex-1 font-semibold">{uz(tField(c.title))}</span>
+                        <Link to={`/kurslar/${c.id}`} className="flex items-center gap-3 py-2.5 md:py-3 min-h-[44px]">
+                          <span className="flex-1 font-semibold max-md:text-[0.95rem]">{uz(tField(c.title))}</span>
                           <ArrowUpRight size={18} className="ink-3" aria-hidden="true" />
                         </Link>
                       </li>
                     ))}
                   </ul>
-                  <button type="button" onClick={() => openConsult(cat.title)} className="btn btn-ghost w-full mt-5">
+                  <button type="button" onClick={() => openConsult(cat.title)} className="btn btn-ghost w-full mt-3 md:mt-5">
                     Mos kursni tanlashda yordam <ArrowRight size={18} aria-hidden="true" />
                   </button>
                 </div>

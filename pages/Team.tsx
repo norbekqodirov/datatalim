@@ -49,23 +49,23 @@ export default function Team() {
       <SEO title="Jamoa" description="DATA Ta'lim Stansiyasining professional jamoasi va tajribali ustozlari bilan tanishing." />
 
       {/* hero */}
-      <section ref={heroRef} className="relative min-h-[88svh] flex items-center pt-28 pb-[10vh]" aria-labelledby="team-page-title">
+      <section ref={heroRef} className="relative flex items-center pt-28 pb-10 md:pt-36 md:pb-14" aria-labelledby="team-page-title">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(55% 50% at 80% 25%, rgba(0,97,255,.15), transparent 70%)' }} />
         <Star3D
           progress={starP}
           spin={60}
-          className="ab-star absolute -right-[22vw] top-[10%] w-[76vw] aspect-square pointer-events-none opacity-[.36] md:-right-[4vw] md:w-[min(40vw,560px)] md:opacity-90"
+          className="ab-star absolute -right-[22vw] top-[10%] w-[52vw] aspect-square pointer-events-none opacity-[.3] md:right-[2vw] md:top-[14%] md:w-[min(24vw,340px)] md:opacity-80"
         />
         <motion.div className="wrap relative" style={reduced ? undefined : { y: textY, opacity: textOpacity }}>
-          <p className="t-kicker mb-8">01 — Bizning jamoa</p>
+          <p className="t-kicker mb-5">01 — Bizning jamoa</p>
           <Mask>
-            <h1 id="team-page-title" className="t-display" style={{ fontSize: 'clamp(1.75rem, 8.6vw, 5rem)' }}>
+            <h1 id="team-page-title" className="t-display" style={{ fontSize: 'clamp(1.75rem, 7.4vw, 3.75rem)' }}>
               <span className="block">Muvaffaqiyatimiz</span>
               <span className="block ink-grad">siri</span>
             </h1>
           </Mask>
           <Reveal delay={0.25}>
-            <p className="t-lead mt-8 max-w-[40rem]">
+            <p className="t-lead mt-6 max-w-[38rem]">
               {uz("DATA Ta'lim Stansiyasining eng katta boyligi — bu uning jamoasi. Biz o'z ishining ustalari, yoshlarga bilim berishdan zavq oladigan professionallarni bir joyga jamlaganmiz.")}
             </p>
           </Reveal>
@@ -73,7 +73,7 @@ export default function Team() {
       </section>
 
       {/* values */}
-      <section className="relative pb-[10vh]" aria-label="Jamoa tamoyillari">
+      <section className="relative pb-10 md:pb-14" aria-label="Jamoa tamoyillari">
         <div className="wrap">
           <ul className="grid md:grid-cols-3 hairline">
             {values.map((v, i) => {
@@ -81,7 +81,7 @@ export default function Team() {
               return (
                 <motion.li
                   key={v.title}
-                  className="pt-8 pb-4 md:pr-8 md:border-l md:pl-8 first:md:border-l-0 first:md:pl-0"
+                  className="pt-6 pb-2 md:pr-8 md:border-l md:pl-8 first:md:border-l-0 first:md:pl-0"
                   style={{ borderColor: 'var(--line)' }}
                   initial={reduced ? false : { opacity: 0, y: 24 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -89,8 +89,8 @@ export default function Team() {
                   transition={{ duration: 0.7, delay: i * 0.07, ease: EASE }}
                 >
                   <Icon size={22} aria-hidden="true" className="ink-cyan" />
-                  <h2 className="t-h3 mt-5">{uz(v.title)}</h2>
-                  <p className="t-body mt-3 max-w-[22rem]">{uz(v.desc)}</p>
+                  <h2 className="t-h3 mt-4">{uz(v.title)}</h2>
+                  <p className="t-body mt-2 max-w-[22rem]">{uz(v.desc)}</p>
                 </motion.li>
               );
             })}
@@ -101,18 +101,18 @@ export default function Team() {
       <StarSeam />
 
       {/* members */}
-      <section className="relative py-[10vh]" aria-labelledby="members-title">
+      <section className="relative" style={{ paddingBlock: 'var(--sec-y)' }} aria-labelledby="members-title">
         <div className="wrap">
-          <div className="mb-14 lg:mb-20">
-            <p className="t-kicker mb-6">02 — Ustozlar</p>
+          <div style={{ marginBottom: 'var(--head-gap)' }}>
+            <p className="t-kicker mb-5">02 — Ustozlar</p>
             <Mask>
               <h2 id="members-title" className="t-h2 max-w-[16ch]">
                 Rahbariyat va <span className="ink-grad">ustozlar</span>
               </h2>
             </Mask>
-            <p className="t-lead mt-6 max-w-xl">{uz("Sizning kelajagingiz uchun qayg'uradigan va doim yordamga tayyor insonlar")}</p>
+            <p className="t-lead mt-5 max-w-xl">{uz("Sizning kelajagingiz uchun qayg'uradigan va doim yordamga tayyor insonlar")}</p>
           </div>
-          <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
+          <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 items-stretch">
             {team.map((m, i) => (
               <TeamCard key={m.id} member={m} index={i} />
             ))}
@@ -121,18 +121,18 @@ export default function Team() {
       </section>
 
       {/* next step for students first, hiring second */}
-      <section className="relative py-[14vh] overflow-hidden" aria-labelledby="join-title">
+      <section className="relative overflow-hidden" style={{ paddingBlock: 'var(--sec-y)' }} aria-labelledby="join-title">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(50% 60% at 50% 100%, rgba(0,97,255,.14), transparent 70%)' }} />
-        <div className="wrap relative grid lg:grid-cols-12 gap-x-14 gap-y-12 items-end [&>*]:min-w-0">
+        <div className="wrap relative grid lg:grid-cols-12 gap-x-12 gap-y-10 items-center [&>*]:min-w-0">
           <div className="lg:col-span-7">
-            <p className="t-kicker mb-6">03 — Boshlash</p>
+            <p className="t-kicker mb-5">03 — Boshlash</p>
             <Mask>
-              <h2 id="join-title" className="t-display max-w-[14ch]">
+              <h2 id="join-title" className="t-h2 max-w-[16ch]">
                 Ustozlar bilan <span className="ink-grad">tanishing</span>
               </h2>
             </Mask>
-            <p className="t-lead mt-6 max-w-xl">{uz("Qaysi yo'nalish sizga mosligini birga aniqlaymiz: bepul konsultatsiyada savollaringizga javob beramiz.")}</p>
-            <div className="mt-10 flex flex-wrap gap-3">
+            <p className="t-lead mt-5 max-w-xl">{uz("Qaysi yo'nalish sizga mosligini birga aniqlaymiz: bepul konsultatsiyada savollaringizga javob beramiz.")}</p>
+            <div className="mt-8 flex flex-wrap gap-3">
               <button type="button" className="btn btn-primary" onClick={() => setConsult(true)}>
                 Bepul konsultatsiya <ArrowRight size={18} aria-hidden="true" />
               </button>

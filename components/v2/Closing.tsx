@@ -54,12 +54,12 @@ export const FaqV2: React.FC = () => {
 
   return (
     <section className="relative sec" aria-labelledby="faq-title">
-      <div className="wrap grid lg:grid-cols-12 gap-10">
+      <div className="wrap grid lg:grid-cols-12 gap-6 sm:gap-10">
         <div className="lg:col-span-4 lg:sticky lg:top-28 self-start">
           <p className="t-kicker mb-6">09 — Savollar</p>
           <Mask><h2 id="faq-title" className="t-h2">Koʻp beriladigan savollar</h2></Mask>
           {/* javob topilmasa — keyingi qadam shu yerning oʻzida */}
-          <div className="faq-help panel mt-10">
+          <div className="faq-help panel mt-8 sm:mt-10">
             <span className="faq-bubble" aria-hidden="true">💬</span>
             <p className="font-semibold text-[1.1rem] tracking-[-0.01em]">Javobini topmadingizmi?</p>
             <p className="t-body mt-2 !text-[0.95rem]">Savolingizni yozing — maslahatchimiz tushuntirib beradi.</p>
@@ -87,9 +87,9 @@ export const FaqV2: React.FC = () => {
                     aria-expanded={isOpen}
                     aria-controls={pid}
                     onClick={() => setOpen(isOpen ? null : i)}
-                    className="w-full flex items-center gap-6 py-6 text-left cursor-pointer min-h-[44px]"
+                    className="w-full flex items-center gap-4 sm:gap-6 py-4 sm:py-6 text-left cursor-pointer min-h-[44px]"
                   >
-                    <span className="flex-1 min-w-0 break-words text-[1.15rem] font-semibold tracking-[-0.015em]">{q(f)}</span>
+                    <span className="flex-1 min-w-0 break-words text-[1.02rem] sm:text-[1.15rem] font-semibold tracking-[-0.015em]">{q(f)}</span>
                     <Plus
                       size={22}
                       aria-hidden="true"
@@ -110,7 +110,7 @@ export const FaqV2: React.FC = () => {
                       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                       className="overflow-hidden"
                     >
-                      <p className="t-body pb-7 pr-12 max-w-[62ch]">{a(f)}</p>
+                      <p className="t-body pb-5 pr-8 sm:pb-7 sm:pr-12 max-w-[62ch]">{a(f)}</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -181,7 +181,7 @@ export const ContactV2: React.FC = () => {
   return (
     <section id="contact" className="relative sec overflow-hidden" aria-labelledby="contact-title">
       {/* sarlavha qatori: chapda sarlavha, oʻngda izoh — ikki tomon teng ogʻirlikda */}
-      <div className="wrap grid lg:grid-cols-12 gap-6 lg:gap-8 lg:items-end relative z-10 mb-10 lg:mb-12">
+      <div className="wrap grid lg:grid-cols-12 gap-6 lg:gap-8 lg:items-end relative z-10 mb-7 sm:mb-10 lg:mb-12">
         <div className="lg:col-span-7">
           <p className="t-kicker mb-6">10 — Boshlash</p>
           <Mask>
@@ -199,7 +199,7 @@ export const ContactV2: React.FC = () => {
         </div>
 
         <div className="lg:col-span-6 order-1 lg:order-2">
-          <div className="panel p-7 sm:p-9 h-full">
+          <div className="panel p-5 sm:p-9 h-full">
             {state === 'sent' ? (
               <div className="py-10 text-center" role="status">
                 <span className="mx-auto w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'var(--green)' }}>
@@ -212,7 +212,7 @@ export const ContactV2: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <form onSubmit={submit} noValidate className="grid gap-5">
+              <form onSubmit={submit} noValidate className="grid gap-4 sm:gap-5">
                 <div>
                   <label htmlFor="v2-name" className="block text-sm font-medium mb-2">Ismingiz</label>
                   <input
