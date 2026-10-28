@@ -7,7 +7,8 @@ import { useLanguage } from '../../i18n';
 import { ParticleField } from './particleField';
 import { uz, useFontReady, useHtmlDark, useIsDesktop, useMotionReduced } from './utils';
 
-// scroll progress (0..1 over the pinned section) → formation progress (0 helix, .5 galaxy, 1 star)
+// scroll progress (0..1 over the pinned section) → station story progress
+// (0 far-away station, .5 approach — data pulses, 1 arrival — the brand star faces us)
 function formationAt(v: number) {
   if (v < 0.12) return 0;
   if (v < 0.42) return ((v - 0.12) / 0.3) * 0.5;
@@ -85,8 +86,8 @@ export const HeroSignal: React.FC = () => {
     fieldRef.current = field;
     if (!reduced) requestAnimationFrame(measureBand);
     const portrait = () => window.innerHeight > window.innerWidth * 1.1;
-    field.anchorX = desktop ? 0.73 : 0.5;
-    // phones: the world floats above the headline instead of hiding behind it
+    field.anchorX = desktop ? 0.75 : 0.5;
+    // phones: the station floats above the headline instead of hiding behind it
     field.anchorY = !desktop && portrait() ? 0.21 : 0.5;
     field.sizeMul = desktop ? 1 : 0.7;
     field.dim = desktop || portrait() ? 1 : 0.3;
@@ -99,7 +100,11 @@ export const HeroSignal: React.FC = () => {
     window.addEventListener('resize', onResize);
 
     if (reduced) {
-      field.anchorX = desktop ? 0.72 : 0.5;
+      // no band in the static layout: keep the station clear of the headline
+      field.anchorX = desktop ? 0.76 : 0.5;
+      field.zoom = desktop ? 0.66 : 0.72;
+      // phones: the copy fills the screen, so the station becomes a quiet backdrop behind it
+      if (!desktop) { field.anchorY = 0.42; field.dim = 0.3; }
       field.renderStatic(1);
       return () => window.removeEventListener('resize', onResize);
     }
@@ -151,23 +156,24 @@ export const HeroSignal: React.FC = () => {
       measureBand();
     }
     f.progress = formationAt(v);
-    f.anchorX = desktop && v < 0.14 ? 0.73 : 0.5;
+    f.anchorX = desktop && v < 0.14 ? 0.75 : 0.5;
     const phone = !desktop && window.innerHeight > window.innerWidth * 1.1;
     f.anchorY = phone && v < 0.14 ? 0.21 : 0.5;
-    // short landscape screens: the cloud sits behind the headline, keep it quiet until the text leaves
+    // short landscape screens: the station sits behind the headline, keep it quiet until the text leaves
     f.dim = !desktop && !phone && v < 0.14 ? 0.3 : 1;
   });
 
   const hintOpacity = useTransform(scrollYProgress, [0, 0.06], [1, 0]);
+  // soft edge only: the starfield and planets should reach the corners of the frame
   const vignette = dark
-    ? 'radial-gradient(120% 80% at 50% 50%, transparent 40%, rgba(0,0,0,.85) 100%)'
-    : 'radial-gradient(120% 80% at 50% 50%, transparent 45%, rgba(251,252,254,.9) 100%)';
+    ? 'radial-gradient(135% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.6) 100%)'
+    : 'radial-gradient(135% 100% at 50% 50%, transparent 58%, rgba(251,252,254,.7) 100%)';
 
   const title = uz(tField(siteContent.heroTitle));
   const subtitle = uz(tField(siteContent.heroSubtitle));
   const description = uz(tField(siteContent.heroDescription));
 
-  // Reduced motion: one static, un-pinned screen with the finished star.
+  // Reduced motion: one static, un-pinned screen with the arrived station (brand star facing us).
   if (reduced) {
     return (
       <section ref={sectionRef} className="relative min-h-[100svh] flex items-center overflow-hidden">
@@ -185,14 +191,14 @@ export const HeroSignal: React.FC = () => {
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden="true" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: vignette }} />
 
-        {/* Stage A — headline + CTAs (left), chaos cloud (right) */}
+        {/* Stage A — headline + CTAs (left), the space station far away (right) */}
         <Stage p={scrollYProgress} range={[-1, 0, 0.08, 0.16]} className="absolute inset-0 flex items-end pb-[13svh] lg:items-center lg:pb-0">
           <div className="wrap pt-24" style={copyHide}>
             <HeroCopy title={title} subtitle={subtitle} description={description} copyRef={copyRef} fontReady={fontReady} />
           </div>
         </Stage>
 
-        {/* Stage B — data galaxy */}
+        {/* Stage B — approach: data races round the station */}
         <Stage p={scrollYProgress} range={[0.2, 0.3, 0.42, 0.5]} innerRef={capBRef} className="cap-stage absolute inset-x-0 text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">01 — Maʼlumot</p>
@@ -200,7 +206,7 @@ export const HeroSignal: React.FC = () => {
           </div>
         </Stage>
 
-        {/* Stage C — the brand star */}
+        {/* Stage C — arrival: the brand star in the station's hub */}
         <Stage p={scrollYProgress} range={[0.62, 0.72, 0.9, 1.05]} innerRef={capCRef} className="cap-stage absolute inset-x-0 text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">02 — Bilim</p>
