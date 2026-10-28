@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useScroll, useTransform } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Phone } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Clock, Phone } from 'lucide-react';
 import type { Course } from '../../../../data/courses';
 import { useStore } from '../../../../store/useStore';
 import { useLanguage } from '../../../../i18n';
@@ -11,6 +11,13 @@ import { CAT_LABEL, Cover, SectionHead, StarMark, countLessons, splitDuration, s
 import { Timeline } from './Timeline';
 import { CourseCard } from './CourseCard';
 import { Icon3D } from '../Icon3D';
+
+/** Sarlavha oxiri va " —" bir qatorda qolsin ("Python BI —" bo'linmasin): faqat bo'shliq turi o'zgaradi, matn bir xil. */
+const glueTail = (t: string) => {
+  const m = t.match(/^(.*?)(\S+(?:\s*\/\s*\S+)*(?:\s+\S+)?)$/);
+  if (!m) return t;
+  return m[1] + m[2].replace(/\s+/g, '\u00A0');
+};
 
 const monogram = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 
@@ -117,7 +124,7 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
                   <button type="button" onClick={onEnroll} className="btn btn-primary mt-7 w-full">
                     Kursga yozilish <ArrowRight size={18} aria-hidden="true" />
                   </button>
-                  <button type="button" onClick={onConsult} className="btn btn-ghost mt-3 w-full">
+                  <button type="button" onClick={onConsult} className="btn-quiet mx-auto mt-2 flex">
                     Bepul konsultatsiya
                   </button>
                   <p className="mt-4 text-center text-[0.9rem]" style={{ color: 'var(--fg-2)' }}>
@@ -131,7 +138,7 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
         </div>
       </div>
 
-      <MentorsFormat course={course} reduced={reduced} />
+      <MentorsFormat course={course} reduced={reduced} onConsult={onConsult} />
 
       {related.length > 0 && (
         <section className="relative pb-[var(--sec-y)]" aria-labelledby="related-title">
@@ -179,12 +186,17 @@ export const CourseDetailView: React.FC<{ course: Course; onOpen: OpenModal }> =
             exit={reduced ? { opacity: 0 } : { y: '140%' }}
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="mx-auto flex max-w-xl items-center gap-4">
+            <div className="mx-auto flex max-w-xl items-center gap-2.5">
+              <a href={tel} className="mobile-cta-call" aria-label={`Qoʻngʻiroq qilish: ${phone}`}>
+                <Phone size={20} aria-hidden="true" />
+              </a>
               <div className="min-w-0 flex-1">
                 <p className="t-kicker truncate" style={{ fontSize: '0.6875rem' }}>Oylik toʻlov</p>
-                <p className="mono truncate text-[1.1rem]" style={{ fontWeight: 500 }}>{uz(monthly)}</p>
+                <p className="mono truncate text-[1rem] leading-tight" style={{ fontWeight: 500 }}>
+                  <PriceFig raw={monthly} className="whitespace-nowrap" />
+                </p>
               </div>
-              <button type="button" onClick={onEnroll} className="btn btn-primary !min-h-[48px] shrink-0">
+              <button type="button" onClick={onEnroll} className="btn btn-primary !min-h-[48px] shrink-0 !px-4">
                 Kursga yozilish
               </button>
             </div>
@@ -239,12 +251,25 @@ const Hero: React.FC<{
             <Mask>
               <h1 id="course-title" className="cd-title max-w-[16ch]">{uz(tField(course.title))}</h1>
             </Mask>
+            <ul className="cd-chips mt-4 flex flex-wrap gap-2 lg:hidden">
+              <li className="cd-chip">
+                <Clock size={14} aria-hidden="true" className="cat-ink" />
+                <span className="mono">{dur.main}</span>
+              </li>
+              <li className="cd-chip">
+                <span className="cd-chip-k">Oylik toʻlov</span>
+                <span className="mono">
+                  {monthly.num}
+                  {monthly.unit && <span className="ink-3 ml-1 text-[0.8em]">{monthly.unit}</span>}
+                </span>
+              </li>
+            </ul>
             <p className="t-lead mt-5 max-w-[36rem]">{uz(tField(course.description))}</p>
-            <div ref={ctaRef} className="hero-cta mt-7 flex flex-col gap-3 sm:flex-row">
+            <div ref={ctaRef} className="hero-cta mt-7 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
               <button type="button" onClick={onEnroll} className="btn btn-primary">
                 Kursga yozilish <ArrowRight size={18} aria-hidden="true" />
               </button>
-              <button type="button" onClick={onConsult} className="btn btn-ghost">
+              <button type="button" onClick={onConsult} className="btn-quiet">
                 Bepul konsultatsiya
               </button>
             </div>
@@ -338,16 +363,16 @@ const Closing = React.forwardRef<
     <div className="wrap relative z-10 text-center">
       <p className="t-kicker mb-4">Keyingi qadam</p>
       <Mask>
-        <h2 id="close-title" className="t-h2 mx-auto max-w-[18ch] text-balance">
-          {title} — <span className="ink-grad">kursga yoziling.</span>
+        <h2 id="close-title" className="t-h2 mx-auto max-w-[28ch] text-balance">
+          {glueTail(title)}{'\u00A0'}— <span className="ink-grad">kursga yoziling.</span>
         </h2>
       </Mask>
       <p className="t-lead mx-auto mt-6 max-w-[34rem]">Joy band qilish yoki savol berish uchun ariza qoldiring, administrator siz bilan bogʻlanadi.</p>
-      <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+      <div className="mt-8 flex flex-col items-center justify-center gap-1 sm:flex-row sm:gap-4">
         <button type="button" onClick={onEnroll} className="btn btn-primary">
           Kursga yozilish <ArrowRight size={18} aria-hidden="true" />
         </button>
-        <button type="button" onClick={onConsult} className="btn btn-ghost">
+        <button type="button" onClick={onConsult} className="btn-quiet">
           Bepul konsultatsiya
         </button>
       </div>
@@ -424,16 +449,18 @@ const FORMAT = [
   { art: 'why-sertifikat', t: 'Sertifikat', d: 'Yakuniy imtihondan oʻtgan oʻquvchilarga DATA Taʼlim Stansiyasi sertifikati beriladi.' },
 ];
 
-const MentorsFormat: React.FC<{ course: Course; reduced: boolean }> = ({ course, reduced }) => {
+const MentorsFormat: React.FC<{ course: Course; reduced: boolean; onConsult: () => void }> = ({ course, reduced, onConsult }) => {
   const { tField } = useLanguage();
   const hasMentors = course.mentors.length > 0;
+  // 1 ustoz: desktopda vertikal karta (katta avatar), ustun yopishqoq; ko'p ustoz: ixcham qator
+  const vertical = course.mentors.length === 1;
   return (
     <section className="wrap pb-[var(--sec-y)]" aria-label="Ustozlar va format">
       <div className="grid gap-12 lg:grid-cols-12 lg:gap-x-12 [&>*]:min-w-0">
         {hasMentors && (
-          <div className="lg:col-span-5" aria-labelledby="mentors-title" role="group">
+          <div className="lg:sticky lg:top-24 lg:col-span-5 lg:self-start" aria-labelledby="mentors-title" role="group">
             <SectionHead kicker="03 — Ustozlar" id="mentors-title">Kurs ustozlari</SectionHead>
-            <ul className="mt-8 grid gap-3 sm:gap-4">
+            <ul className={`mt-8 grid gap-3 sm:gap-4 ${vertical ? 'mentor-v' : ''}`}>
               {course.mentors.map((m, i) => {
                 const name = uz(tField(m.name));
                 const bio = m.bio ? uz(tField(m.bio)) : '';
@@ -457,6 +484,11 @@ const MentorsFormat: React.FC<{ course: Course; reduced: boolean }> = ({ course,
                       <h3 className="text-[1.0625rem] font-semibold leading-snug tracking-[-0.02em] sm:text-[1.15rem]">{name}</h3>
                       <p className="cat-ink mt-0.5 text-[0.95rem] font-medium">{uz(tField(m.role))}</p>
                       {bio && <p className="t-body mt-3 text-[0.95rem]">{bio}</p>}
+                      {vertical && (
+                        <button type="button" onClick={onConsult} className="link-arrow mt-4 hidden min-h-[44px] lg:inline-flex">
+                          Bepul konsultatsiya <ArrowRight size={18} aria-hidden="true" />
+                        </button>
+                      )}
                     </div>
                   </motion.li>
                 );

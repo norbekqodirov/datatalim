@@ -2,7 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { X, Loader2, CheckCircle2, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { submitLeadToAPI } from '../utils/api';
-import { trackEvent, trackLead } from '../utils/pixel';
+import { trackEvent, trackLead, newEventId } from '../utils/pixel';
 import { useStore } from '../store/useStore';
 import { uz, v2Toast } from './v2/utils';
 import './v2/v2.css';
@@ -16,7 +16,7 @@ interface EnrollModalProps {
     sourceRef?: string; // Sheet tabini aniq belgilash (masalan, 'Karyera_Testi'); bo'lmasa type bo'yicha
     initialName?: string; // Masalan, karyera testi intro'sida allaqachon kiritilgan ism
     initialPhone?: string; // Formatlangan holatda, masalan "90 123 45 67" (+998 siz)
-    value?: number; // Kurs narxi (so'm) — ma'lum bo'lsa InitiateCheckout/Lead'ga value sifatida qo'shiladi
+    value?: number; // Kurs narxi (so'm) — ma'lum bo'lsa faqat InitiateCheckout'ga value sifatida qo'shiladi (Lead value'siz)
 }
 
 export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, courseName, type = 'enroll', extraInfo, sourceRef: sourceRefProp, initialName, initialPhone, value }) => {
@@ -25,7 +25,7 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
     const [sent, setSent] = useState(false);
     const [failed, setFailed] = useState(false);
     const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
-    const { siteContent } = useStore();
+    const contactPhone = useStore((s) => s.siteContent.contactPhone);
     const titleId = useId();
     const dialogRef = useRef<HTMLDivElement>(null);
     const nameRef = useRef<HTMLInputElement>(null);
@@ -40,9 +40,10 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         if (sent) { setSent(false); setFormData({ name: '', phone: '' }); }
     }, [isOpen, sent]);
 
-    // Konsultatsiya/yozilish oynasi ochilishi — Meta Pixel InitiateCheckout (har ochilishda bir marta)
+    // Faqat "Kursga yozilish" (type='enroll') oynasi ochilishi — Meta Pixel InitiateCheckout (har ochilishda bir marta).
+    // Bepul konsultatsiya "checkout" emas: voronka va retargeting ro'yxati aralashmasin.
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || type !== 'enroll') return;
         const data: Record<string, unknown> = { content_name: courseName || 'consult', content_category: type };
         if (value && value > 0) { data.value = value; data.currency = 'UZS'; }
         trackEvent('InitiateCheckout', data);
@@ -83,10 +84,13 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
 
     if (!isOpen) return null;
 
-    const phoneHref = siteContent.contactPhone ? `tel:${siteContent.contactPhone.replace(/[^\d+]/g, '')}` : undefined;
+    const phoneHref = contactPhone ? `tel:${contactPhone.replace(/[^\d+]/g, '')}` : undefined;
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+        const { name, value: v } = e.target;
+        setFormData(prev => ({ ...prev, [name]: v }));
+        // shu maydonning xatosi yozishni boshlashi bilan tozalanadi
+        setErrors(prev => (prev[name as 'name' | 'phone'] ? { ...prev, [name]: undefined } : prev));
     };
 
     const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,7 +101,8 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         if (val.length > 2) formatted += ' ' + val.substring(2, 5);
         if (val.length > 5) formatted += ' ' + val.substring(5, 7);
         if (val.length > 7) formatted += ' ' + val.substring(7, 9);
-        setFormData({ ...formData, phone: formatted });
+        setFormData(prev => ({ ...prev, phone: formatted }));
+        setErrors(prev => (prev.phone ? { ...prev, phone: undefined } : prev));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -126,6 +131,8 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         let crmData: any = null;
 
         const fullPhone = '+998' + rawPhone;
+        // Lead eventID submit OLDIN yaratiladi (Meta dedup / kelajakdagi CAPI uchun)
+        const leadEventId = newEventId();
 
         try {
             // Include extraInfo in the CRM record so Admins can see Test Results
@@ -148,17 +155,17 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
         setLoading(false);
 
         if (crmData) {
-            // takroriy ariza (server 10 daqiqa ichida bir xil telefon+kursni birlashtiradi) qayta sanalmaydi;
-            // karyera testi leadi bir sessiyada bir marta (avtomatik yuborish bilan ikkilanmasin)
-            if (!crmData.duplicate) {
-                const isCareer = sourceRefProp === 'Karyera_Testi';
-                trackLead({
-                    source: isCareer ? 'Karyera_Testi' : type,
-                    course: courseName,
-                    value,
-                    onceKey: isCareer ? 'Karyera_Testi' : undefined,
-                });
-            }
+            // Server `duplicate:true` qaytarsa ham, shu sessiyada Lead hali yuborilmagan bo'lsa yuboriladi
+            // (javob yo'qolib qayta urinish); yuborilgan bo'lsa trackLead qayta sanamaydi.
+            // Karyera testi leadi bir sessiyada bir marta (avtomatik yuborish bilan ikkilanmasin).
+            const isCareer = sourceRefProp === 'Karyera_Testi';
+            trackLead({
+                source: isCareer ? 'Karyera_Testi' : type,
+                course: courseName,
+                eventId: leadEventId,
+                duplicate: !!crmData.duplicate,
+                onceKey: isCareer ? 'Karyera_Testi' : undefined,
+            });
             toast.success('Arizangiz qabul qilindi! Tez orada siz bilan bog\'lanamiz.', v2Toast());
             setSent(true);
         } else {
@@ -272,7 +279,7 @@ export const EnrollModal: React.FC<EnrollModalProps> = ({ isOpen, onClose, cours
                             {failed && (
                                 <p role="alert" className="field-err !mt-0 text-center">
                                     Yuborilmadi. Internetni tekshirib, qayta urinib koʻring
-                                    {phoneHref ? <> yoki qoʻngʻiroq qiling: <a href={phoneHref} className="font-semibold underline underline-offset-4 inline-flex items-center min-h-[44px]">{siteContent.contactPhone}</a></> : '.'}
+                                    {phoneHref ? <> yoki qoʻngʻiroq qiling: <a href={phoneHref} className="font-semibold underline underline-offset-4 inline-flex items-center min-h-[44px]">{contactPhone}</a></> : '.'}
                                 </p>
                             )}
                             <p className="text-xs ink-3 text-center -mt-2">

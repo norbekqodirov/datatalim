@@ -128,21 +128,13 @@ export const uploadImageToAPIWithStats = async (base64OrFile: string | File): Pr
 };
 
 /**
- * Atribusiya (utm_* / fbclid / marketing_ref) ni `courseId` oxiriga qisqa satr qilib qo'shadi.
- * `sourceRef` ga qo'shilmaydi: server uni faqat [A-Za-z0-9_-] (<=40) qabul qiladi va u Sheets tabini belgilaydi.
- * Server courseId ni 300 belgigacha saqlaydi — kurs nomi kesilmasligi uchun tag sig'adigan joy qoldiriladi.
+ * Lead yuborish. Atribusiya (utm_* / fbclid / marketing_ref) `courseId` ga QO'SHILMAYDI: u alohida
+ * ixtiyoriy `utm` maydonida (<=160 belgi) ketadi va serverda `leads.utm` ustuniga saqlanadi.
  */
-const withAttribution = (courseId: string | undefined, sourceRef?: string): string | undefined => {
-    const tag = getAttributionTag(sourceRef);
-    if (!tag) return courseId;
-    const base = (courseId || '').trim();
-    if (!base) return tag;
-    return `${base.slice(0, 296 - tag.length)} | ${tag}`;
-};
-
 export const submitLeadToAPI = async (leadData: { name: string; phone: string; courseId?: string; sourceRef?: string }) => {
     try {
-        const payload = { ...leadData, courseId: withAttribution(leadData.courseId, leadData.sourceRef) };
+        const utm = getAttributionTag(leadData.sourceRef);
+        const payload = utm ? { ...leadData, utm } : { ...leadData };
         const response = await fetch(`${API_BASE}/leads`, {
             method: 'POST',
             headers: getAuthHeaders({
@@ -221,6 +213,8 @@ export interface Lead {
     phone: string;
     course_id: string | null;
     source_ref: string | null;
+    /** Atribusiya satri (utm / fbclid / ref), eski yozuvlarda null */
+    utm?: string | null;
     status: LeadStatus;
     notes: string;
     created_at: string;

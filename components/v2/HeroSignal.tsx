@@ -7,6 +7,16 @@ import { useLanguage } from '../../i18n';
 import { ParticleField } from './particleField';
 import { uz, useFontReady, useHtmlDark, useIsDesktop, useMotionReduced } from './utils';
 
+// Weak hardware and in-app browsers (Instagram/Facebook — most of the ad traffic) get a lighter scene:
+// ~900 particles at DPR 1. Everything else still adapts at runtime (ParticleField steps down on slow frames).
+function lightTier(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  const cores = nav.hardwareConcurrency || 8;
+  const mem = nav.deviceMemory || 8;
+  return cores <= 4 || mem <= 4 || /Instagram|FBAN|FBAV/i.test(nav.userAgent || '');
+}
+
 // scroll progress (0..1 over the pinned section) → station story progress
 // (0 far-away station, .5 approach — data pulses, 1 arrival — the brand star faces us)
 function formationAt(v: number) {
@@ -29,7 +39,7 @@ const Stage: React.FC<{ p: MotionValue<number>; range: [number, number, number, 
 };
 
 export const HeroSignal: React.FC = () => {
-  const { siteContent } = useStore();
+  const siteContent = useStore((s) => s.siteContent);
   const { tField } = useLanguage();
   const dark = useHtmlDark();
   const desktop = useIsDesktop();
@@ -58,6 +68,17 @@ export const HeroSignal: React.FC = () => {
     const phone = w < 1024 && h > w * 1.1;
     const v = vRef.current;
     const top = phone ? 58 : 76;
+    // desktop first screen: the station keeps a ≥64px gap to the headline and centres in the space to its right
+    f.bandX = null;
+    if (!phone && v < 0.14 && w >= 1024) {
+      const c = copyRef.current;
+      if (c) {
+        const cr = c.getBoundingClientRect();
+        const left = cr.right - canvas.getBoundingClientRect().left + 64;
+        const right = w - (cr.left - canvas.getBoundingClientRect().left) * 0.5;
+        if (right - left > 160) f.bandX = [left, right];
+      }
+    }
     let bottom = h - 80;
     if (v < 0.14) {
       if (phone) {
@@ -78,24 +99,41 @@ export const HeroSignal: React.FC = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let field: ParticleField;
+    const lite = lightTier();
     try {
-      field = new ParticleField(canvas, { count: desktop ? 4200 : 2000, dark });
+      field = new ParticleField(canvas, {
+        count: lite ? (desktop ? 1800 : 900) : desktop ? 4200 : 2000,
+        dark,
+        // phones: DPR ≤ 1.5 (the dust is fine-grained anyway); weak devices: 1
+        maxDpr: lite ? 1 : desktop ? 2 : 1.5,
+      });
     } catch {
       return;
     }
     fieldRef.current = field;
+    // fewer particles: slightly larger dust keeps the hull reading as solid
+    const liteK = lite ? 1.25 : 1;
     if (!reduced) requestAnimationFrame(measureBand);
     const portrait = () => window.innerHeight > window.innerWidth * 1.1;
-    field.anchorX = desktop ? 0.75 : 0.5;
+    field.anchorX = desktop ? 0.78 : 0.5;
     // phones: the station floats above the headline instead of hiding behind it
     field.anchorY = !desktop && portrait() ? 0.21 : 0.5;
-    field.sizeMul = desktop ? 1 : 0.7;
+    field.sizeMul = (desktop ? 1 : 0.7) * liteK;
     field.dim = desktop || portrait() ? 1 : 0.3;
 
+    // resize bursts (mobile URL bar, rotation) are folded into one rAF; nothing happens unless the size changed
+    let rz = 0;
     const onResize = () => {
-      field.resize();
-      measureBand();
-      if (reduced) field.renderStatic(1);
+      if (rz) return;
+      rz = requestAnimationFrame(() => {
+        rz = 0;
+        const changed = field.resize();
+        if (reduced) {
+          if (changed) field.renderStatic(1);
+        } else {
+          measureBand();
+        }
+      });
     };
     window.addEventListener('resize', onResize);
 
@@ -106,11 +144,17 @@ export const HeroSignal: React.FC = () => {
       // phones: the copy fills the screen, so the station becomes a quiet backdrop behind it
       if (!desktop) { field.anchorY = 0.42; field.dim = 0.3; }
       field.renderStatic(1);
-      return () => window.removeEventListener('resize', onResize);
+      return () => {
+        window.removeEventListener('resize', onResize);
+        if (rz) cancelAnimationFrame(rz);
+      };
     }
 
     // fonts swapping in re-wrap the headline: re-measure so the band follows the copy
     document.fonts?.ready.then(() => measureBand());
+    // headline text arriving from the API or a language switch re-wraps the copy: follow it
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measureBand()) : null;
+    if (copyRef.current) ro?.observe(copyRef.current);
 
     // only animate while the hero is on screen
     let onScreen = false;
@@ -131,6 +175,8 @@ export const HeroSignal: React.FC = () => {
 
     return () => {
       io.disconnect();
+      ro?.disconnect();
+      if (rz) cancelAnimationFrame(rz);
       field.stop();
       window.removeEventListener('resize', onResize);
       window.removeEventListener('pointermove', onMove);
@@ -156,7 +202,8 @@ export const HeroSignal: React.FC = () => {
       measureBand();
     }
     f.progress = formationAt(v);
-    f.anchorX = desktop && v < 0.14 ? 0.75 : 0.5;
+    // desktop first screen: bandX (set in measureBand) places the station; this is the fallback
+    f.anchorX = desktop && v < 0.14 ? 0.78 : 0.5;
     const phone = !desktop && window.innerHeight > window.innerWidth * 1.1;
     f.anchorY = phone && v < 0.14 ? 0.21 : 0.5;
     // short landscape screens: the station sits behind the headline, keep it quiet until the text leaves
@@ -167,7 +214,7 @@ export const HeroSignal: React.FC = () => {
   // soft edge only: the starfield and planets should reach the corners of the frame
   const vignette = dark
     ? 'radial-gradient(135% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.6) 100%)'
-    : 'radial-gradient(135% 100% at 50% 50%, transparent 58%, rgba(251,252,254,.7) 100%)';
+    : 'radial-gradient(135% 100% at 50% 50%, transparent 58%, rgba(251,252,254,.85) 100%)';
 
   const title = uz(tField(siteContent.heroTitle));
   const subtitle = uz(tField(siteContent.heroSubtitle));
@@ -176,7 +223,7 @@ export const HeroSignal: React.FC = () => {
   // Reduced motion: one static, un-pinned screen with the arrived station (brand star facing us).
   if (reduced) {
     return (
-      <section ref={sectionRef} className="relative min-h-[100svh] flex items-center overflow-hidden">
+      <section ref={sectionRef} data-hero className="relative min-h-[100svh] flex items-center overflow-hidden">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden="true" />
         <div className="wrap relative z-10 pt-32 pb-20" style={copyHide}>
           <HeroCopy title={title} subtitle={subtitle} description={description} fontReady={fontReady} />
@@ -186,20 +233,20 @@ export const HeroSignal: React.FC = () => {
   }
 
   return (
-    <section ref={sectionRef} className="relative" style={{ height: desktop ? '230vh' : '140svh' }} aria-label="DATA Taʼlim Stansiyasi">
+    <section ref={sectionRef} data-hero className="relative" style={{ height: desktop ? '230vh' : '140svh' }} aria-label="DATA Taʼlim Stansiyasi">
       <div className="sticky top-0 h-[100svh] overflow-hidden grain">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden="true" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: vignette }} />
 
         {/* Stage A — headline + CTAs (left), the space station far away (right) */}
-        <Stage p={scrollYProgress} range={[-1, 0, 0.08, 0.16]} className="absolute inset-0 flex items-end pb-[13svh] lg:items-center lg:pb-0">
+        <Stage p={scrollYProgress} range={[-1, 0, 0.08, 0.16]} className="absolute inset-0 flex items-end pb-[calc(13svh+2.25rem)] lg:items-center lg:pb-0">
           <div className="wrap pt-24" style={copyHide}>
             <HeroCopy title={title} subtitle={subtitle} description={description} copyRef={copyRef} fontReady={fontReady} />
           </div>
         </Stage>
 
         {/* Stage B — approach: data races round the station */}
-        <Stage p={scrollYProgress} range={[0.2, 0.3, 0.42, 0.5]} innerRef={capBRef} className="cap-stage absolute inset-x-0 text-center">
+        <Stage p={scrollYProgress} range={[0.18, 0.26, 0.44, 0.52]} innerRef={capBRef} className="cap-stage absolute inset-x-0 text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">01 — Maʼlumot</p>
             <h2 className="t-caption max-w-5xl mx-auto">Dunyo maʼlumotdan iborat.</h2>
@@ -207,13 +254,14 @@ export const HeroSignal: React.FC = () => {
         </Stage>
 
         {/* Stage C — arrival: the brand star in the station's hub */}
-        <Stage p={scrollYProgress} range={[0.62, 0.72, 0.9, 1.05]} innerRef={capCRef} className="cap-stage absolute inset-x-0 text-center">
+        <Stage p={scrollYProgress} range={[0.56, 0.64, 1.2, 1.3]} innerRef={capCRef} className="cap-stage absolute inset-x-0 text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">02 — Bilim</p>
             <h2 className="t-caption max-w-5xl mx-auto">
               Biz uni <span className="ink-grad">kasbga</span> aylantirishni oʻrgatamiz.
             </h2>
-            <p className="t-lead mt-5 max-w-2xl mx-auto">Dasturlash · Sunʼiy intellekt · Media · Dizayn · Moliya</p>
+            {/* " ·" ajratgich oldingi soʻzga yopishadi: qator nuqta bilan boshlanmaydi */}
+            <p className="t-lead mt-5 max-w-2xl mx-auto">{'Dasturlash\u00A0· Sunʼiy intellekt\u00A0· Media\u00A0· Dizayn\u00A0· Moliya'}</p>
           </div>
         </Stage>
 
@@ -239,8 +287,8 @@ export const HeroSignal: React.FC = () => {
 // three-step progress rail: makes the scroll story legible (world → data → profession)
 const STEPS: { label: string; at: [number, number, number, number] }[] = [
   { label: 'Dunyo', at: [-1, 0, 0.16, 0.24] },
-  { label: 'Maʼlumot', at: [0.16, 0.26, 0.5, 0.6] },
-  { label: 'Kasb', at: [0.5, 0.68, 1.1, 1.2] },
+  { label: 'Maʼlumot', at: [0.14, 0.24, 0.5, 0.58] },
+  { label: 'Kasb', at: [0.5, 0.62, 1.1, 1.2] },
 ];
 
 const RailStep: React.FC<{ p: MotionValue<number>; label: string; at: [number, number, number, number]; i: number }> = ({ p, label, at, i }) => {
@@ -272,6 +320,11 @@ const StoryRail: React.FC<{ p: MotionValue<number> }> = ({ p }) => {
 
 const HeroCopy: React.FC<{ title: string; subtitle: string; description: string; copyRef?: React.Ref<HTMLDivElement>; fontReady: boolean }> = ({ title, subtitle, description, copyRef, fontReady }) => {
   const go = (shown: object) => (fontReady ? shown : undefined);
+  // a line must never start with the dash: glue it to the previous word (same visible text)
+  const dashLead = /^[—–-]/.test(subtitle);
+  const dashTail = /\s[—–-]$/.test(title);
+  const head = dashTail ? title.replace(/\s([—–-])$/, '\u00A0$1') : title;
+  const glue = dashLead ? '\u00A0' : ' ';
   return (
   <div ref={copyRef} className="hero-copy max-w-[46rem]">
     <motion.p
@@ -289,7 +342,7 @@ const HeroCopy: React.FC<{ title: string; subtitle: string; description: string;
       animate={go({ opacity: 1, y: 0 })}
       transition={{ duration: 0.9, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
     >
-      {title} <span className="ink-grad">{subtitle}</span>
+      {head}{glue}<span className="ink-grad">{subtitle}</span>
     </motion.h1>
     <motion.p
       className="t-lead mt-5 lg:mt-7 max-w-[34rem]"

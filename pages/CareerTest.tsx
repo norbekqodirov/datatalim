@@ -17,7 +17,7 @@ import { SEO } from '../components/SEO';
 import { EnrollModal } from '../components/EnrollModal';
 import { trackSiteEvent } from '../utils/analytics';
 import { submitLeadToAPI, submitCareerTestResult } from '../utils/api';
-import { trackLead } from '../utils/pixel';
+import { trackLead, newEventId } from '../utils/pixel';
 import { uz, useMotionReduced, v2Toast } from '../components/v2/utils';
 import { useStore } from '../store/useStore';
 import '../components/v2/v2.css';
@@ -1394,6 +1394,7 @@ export default function CareerTest() {
     const jobs: Promise<unknown>[] = [];
 
     if (!sent.lead) {
+      const eventId = newEventId();
       jobs.push(submitLeadToAPI({
         name: userName.trim(),
         phone: fullPhone,
@@ -1402,7 +1403,7 @@ export default function CareerTest() {
       }).then((res) => {
         sent.lead = true;
         // Meta Pixel Lead: bir sessiyada bir marta (modal orqali yuborilsa ham ikkilanmaydi)
-        if (!res?.duplicate) trackLead({ source: 'Karyera_Testi', course: topCourseNames[0], onceKey: 'Karyera_Testi' });
+        trackLead({ source: 'Karyera_Testi', course: topCourseNames[0], onceKey: 'Karyera_Testi', eventId, duplicate: !!res?.duplicate });
       }));
     }
     if (!sent.result) {
@@ -1566,8 +1567,9 @@ export default function CareerTest() {
         {view === 'intro' && (
           <motion.section key="intro" {...fade} className="relative pt-28 pb-20 lg:pt-36 lg:pb-28" aria-labelledby="ct-title">
             <HexBackdrop reduced={reduced} />
-            <div className="wrap relative grid gap-12 lg:grid-cols-12 lg:gap-8 items-start">
-              <div className="lg:col-span-6">
+            <div className="wrap relative grid gap-9 lg:grid-cols-12 lg:gap-x-8 lg:gap-y-0 items-start">
+              {/* tartib: mobilda sarlavha -> forma -> tafsilotlar; desktopda chapda nusxa (7), o'ngda forma (5) */}
+              <div className="lg:col-span-7 lg:row-start-1">
                 <p className="t-kicker">Karyera laboratoriyasi · Holland RIASEC</p>
                 <h1 id="ct-title" className="t-hero mt-6">
                   Kasbingizni <span className="ink-grad">maʼlumot</span> bilan aniqlang.
@@ -1575,42 +1577,9 @@ export default function CareerTest() {
                 <p className="t-lead mt-6 max-w-[34rem]">
                   {TOTAL_Q} ta savol qiziqishlaringizni olti oʻlchovda baholaydi va sizga eng mos yoʻnalishni — dasturlash, media, dizayn yoki moliyani — koʻrsatadi.
                 </p>
-
-                <ul className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-px rounded-2xl overflow-hidden max-w-[36rem]" style={{ background: 'var(--line)' }}>
-                  {[
-                    ['≈12', 'daqiqa'],
-                    [String(TOTAL_Q), 'savol'],
-                    ['3', 'bosqich'],
-                    ['PDF', 'hisobot'],
-                  ].map(([n, l]) => (
-                    <li key={l} className="p-4" style={{ background: 'var(--bg)' }}>
-                      <span className="block mono text-2xl" style={{ fontWeight: 500 }}>{n}</span>
-                      <span className="block text-sm ink-3 mt-1">{l}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <ol className="mt-12 grid gap-0 max-w-[36rem]">
-                  {[
-                    ['01', STAGE_LABELS[0], `${FORCED_CHOICE.length} juftlik — ikkitadan sizga yaqinini tanlaysiz.`],
-                    ['02', STAGE_LABELS[1], `${LIKERT.length} ta fikrga 1 dan 5 gacha baho berasiz.`],
-                    ['03', STAGE_LABELS[2], `${MULTI_CHOICE.length} ta real vaziyatda qanday yoʻl tutishingizni tanlaysiz.`],
-                  ].map(([n, t, d]) => (
-                    <li key={n} className="hairline py-4 grid grid-cols-[3rem_1fr] gap-2">
-                      <span className="mono ink-blue text-sm pt-0.5">{n}</span>
-                      <span>
-                        <span className="block font-semibold">{t}</span>
-                        <span className="block text-[0.95rem] ink-2 mt-0.5">{d}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-                <p className="mt-6 text-sm ink-3 max-w-[36rem]">
-                  J. Holland (1997) nazariyasi asosida: barcha 15 ta tip juftligi taqqoslanadi, har bosqich teng vaznda, variantlar tasodifiy tartibda.
-                </p>
               </div>
 
-              <div className="lg:col-span-5 lg:col-start-8 lg:sticky lg:top-28">
+              <div className="order-none lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-28">
                 <form onSubmit={startTest} noValidate className="panel p-6 sm:p-9 backdrop-blur-xl" style={{ background: 'color-mix(in srgb, var(--bg-2) 88%, transparent)' }} aria-labelledby="ct-form-title">
                   <p id="ct-form-title" className="t-h3">Natijani kimga tayyorlaymiz?</p>
                   <p className="t-body mt-2 !text-[0.95rem]">Hisobot shaxsiy boʻladi, mos kurslar yoshingizga qarab saralanadi.</p>
@@ -1686,6 +1655,43 @@ export default function CareerTest() {
                   </p>
                 </form>
               </div>
+
+              <div className="lg:col-span-7 lg:row-start-2">
+                <ul className="lg:mt-10 grid grid-cols-2 sm:grid-cols-4 gap-px rounded-2xl overflow-hidden max-w-[36rem]" style={{ background: 'var(--line)' }}>
+                  {[
+                    ['≈12', 'daqiqa'],
+                    [String(TOTAL_Q), 'savol'],
+                    ['3', 'bosqich'],
+                    ['PDF', 'hisobot'],
+                  ].map(([n, l]) => (
+                    <li key={l} className="p-4" style={{ background: 'var(--bg)' }}>
+                      <span className="block mono text-2xl" style={{ fontWeight: 500 }}>{n}</span>
+                      <span className="block text-sm ink-3 mt-1">{l}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <ol className="mt-12 grid gap-0 max-w-[36rem]">
+                  {[
+                    ['01', STAGE_LABELS[0], `${FORCED_CHOICE.length} juftlik — ikkitadan sizga yaqinini tanlaysiz.`],
+                    ['02', STAGE_LABELS[1], `${LIKERT.length} ta fikrga 1 dan 5 gacha baho berasiz.`],
+                    ['03', STAGE_LABELS[2], `${MULTI_CHOICE.length} ta real vaziyatda qanday yoʻl tutishingizni tanlaysiz.`],
+                  ].map(([n, t, d]) => (
+                    <li key={n} className="hairline py-4 grid grid-cols-[3rem_1fr] gap-2">
+                      <span className="mono ink-blue text-sm pt-0.5">{n}</span>
+                      <span>
+                        <span className="block font-semibold">{t}</span>
+                        <span className="block text-[0.95rem] ink-2 mt-0.5">{d}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-6 text-sm ink-3 max-w-[36rem]">
+                  J. Holland (1997) nazariyasi asosida: barcha 15 ta tip juftligi taqqoslanadi, har bosqich teng vaznda, variantlar tasodifiy tartibda.
+                </p>
+              </div>
+
+
             </div>
           </motion.section>
         )}

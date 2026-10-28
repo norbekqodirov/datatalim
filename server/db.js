@@ -105,6 +105,11 @@ export function initDB() {
     db.exec("ALTER TABLE leads ADD COLUMN notes TEXT DEFAULT ''");
     console.log('  → Added notes column to leads');
   }
+  // Atribusiya (utm / fbclid / ref) alohida nullable ustunda — additive migratsiya, mavjud qatorlar o'zgarmaydi
+  if (!db.prepare("PRAGMA table_info(leads)").all().some((c) => c.name === 'utm')) {
+    db.exec("ALTER TABLE leads ADD COLUMN utm TEXT");
+    console.log('  → Added utm column to leads');
+  }
 
   // FAQs table
   db.exec(`

@@ -9,8 +9,9 @@ declare global {
 }
 
 const FB_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
-// Skript yuklanishining eng kech vaqti (load'dan keyin), agar foydalanuvchi hech narsa bosmasa
-const FB_LOAD_FALLBACK_MS = 3500;
+// Skript yuklanishining eng kech vaqti (load'dan keyin), agar foydalanuvchi hech narsa bosmasa.
+// Reklama trafigi (fbclid / utm_source) uchun kutilmaydi — skript darhol yuklanadi (initPixel).
+const FB_LOAD_FALLBACK_MS = 2000;
 
 let scriptRequested = false;
 
@@ -76,8 +77,21 @@ export const initPixel = () => {
     // Init the pixel with the ID (navbatga tushadi, skript yuklangach bajariladi)
     window.fbq('init', FB_PIXEL_ID);
 
-    scheduleLoad();
+    // Reklamadan kelgan tashrifchi tez chiqib ketishi mumkin — PageView yo'qolmasligi uchun darhol yuklaymiz
+    if (isAdTraffic()) loadPixelScript();
+    else scheduleLoad();
 };
+
+/** URL'da fbclid yoki utm_source bo'lsa — reklama/kampaniya trafigi. */
+const isAdTraffic = (): boolean => {
+    try {
+        const sp = new URLSearchParams(window.location.search);
+        return !!(sp.get('fbclid') || sp.get('utm_source'));
+    } catch { return false; }
+};
+
+const isAdminPath = (): boolean =>
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/paneladmindata');
 
 /**
  * Tracks a standard or custom event. Skript hali yuklanmagan bo'lsa ham hodisa navbatda
@@ -88,7 +102,11 @@ export const initPixel = () => {
  */
 export const trackEvent = (eventName: string, data?: any, eventId?: string) => {
     if (typeof window === 'undefined') return;
+    // Admin panelda Lead/Contact hodisalari Meta'ga yuborilmaydi (axlat ma'lumot bo'lmasin)
+    if ((eventName === 'Lead' || eventName === 'Contact') && isAdminPath()) return;
     if (!window.fbq) initPixel();
+    // SPA ichki navigatsiyada ham ?utm_ / fbclid ushlanadi (PageView har marshrutda chaqiriladi; birinchi tegish saqlanadi)
+    captureAttribution();
     if (eventId) window.fbq('track', eventName, data || {}, { eventID: eventId });
     else window.fbq('track', eventName, data);
 };
@@ -116,19 +134,23 @@ const safeSession = {
 };
 
 /**
- * Lead hodisasi: har chaqiruvga eventID, narx ma'lum bo'lsa value/currency.
- * onceKey berilsa, bir sessiyada shu kalit bilan faqat bir marta yuboriladi (masalan, karyera testi).
+ * Lead hodisasi: har chaqiruvga eventID. Lead'da value/currency YO'Q (value faqat ViewContent / InitiateCheckout'da).
+ * - eventId: submit OLDIN yaratilgan id berilsa o'shani ishlatadi (Meta dedup / kelajakdagi CAPI uchun).
+ * - onceKey: bir sessiyada shu kalit bilan faqat bir marta (masalan, karyera testi).
+ * - duplicate: server `duplicate:true` qaytargan bo'lsa — shu sessiyada shu manba+kurs uchun Lead hali
+ *   yuborilmagan bo'lsagina yuboriladi (javob yo'qolib qayta urinish holati). Yuborilgan bo'lsa qayta sanalmaydi.
  */
-export const trackLead = (opts: { source: string; course?: string; value?: number | null; currency?: string; onceKey?: string }) => {
-    if (opts.onceKey) {
-        const key = `tracked_lead_${opts.onceKey}`;
-        if (safeSession.get(key)) return;
-        safeSession.set(key, '1');
-    }
+export const trackLead = (opts: {
+    source: string; course?: string; onceKey?: string; eventId?: string; duplicate?: boolean;
+    /** @deprecated e'tiborga olinmaydi — Lead value'siz yuboriladi */
+    value?: number | null; currency?: string;
+}) => {
+    const flagKey = `tracked_lead_${opts.onceKey || `${opts.source}|${opts.course || ''}`}`;
+    if ((opts.onceKey || opts.duplicate) && safeSession.get(flagKey)) return;
+    safeSession.set(flagKey, '1');
     const data: Record<string, unknown> = { source: opts.source };
     if (opts.course) { data.course = opts.course; data.content_name = opts.course; }
-    if (opts.value && opts.value > 0) { data.value = opts.value; data.currency = opts.currency || 'UZS'; }
-    trackEvent('Lead', data, newEventId());
+    trackEvent('Lead', data, opts.eventId || newEventId());
 };
 
 // ---------------------------------------------------------------- Atribusiya (birinchi tegish)
@@ -137,7 +159,7 @@ const ATTR_KEY = 'dt_attribution';
 const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'] as const;
 type Attribution = Partial<Record<(typeof UTM_KEYS)[number] | 'fbclid', string>>;
 
-const cleanParam = (v: string) => v.replace(/[\u0000-\u001f<>|]/g, ' ').trim().slice(0, 40);
+const cleanParam = (v: string) => v.replace(/[\u0000-\u001f<>|]/g, ' ').trim().slice(0, 100);
 
 /**
  * Landingdagi utm_* va fbclid ni sessionStorage'ga yozadi. Faqat birinchi tegish saqlanadi:
@@ -165,10 +187,12 @@ const readAttribution = (): Attribution => {
     } catch { return {}; }
 };
 
+/** Serverdagi `leads.utm` chegarasi bilan bir xil. */
+export const UTM_MAX_LEN = 160;
+
 /**
- * Qisqa atribusiya satri, masalan "utm:instagram/cpc/kampaniya | fb" yoki "ref:abc123".
- * Server `sourceRef` ni faqat [A-Za-z0-9_-] (<=40) qabul qiladi va u Sheets tabini belgilaydi,
- * shuning uchun bu satr `courseId` oxiriga qo'shiladi (server uni 300 belgigacha saqlaydi).
+ * Qisqa atribusiya satri, masalan "utm:instagram/cpc/kampaniya/c=reklama/t=guruh | fb | ref:abc123".
+ * Alohida `utm` maydonida serverga yuboriladi (`courseId` ga QO'SHILMAYDI) va `leads.utm` ustunida saqlanadi.
  * `skipRef` — sourceRef allaqachon shu ref kod bo'lsa, qayta yozilmaydi.
  */
 export const getAttributionTag = (skipRef?: string): string => {
@@ -185,7 +209,7 @@ export const getAttributionTag = (skipRef?: string): string => {
         const ref = sessionStorage.getItem('marketing_ref');
         if (ref && ref !== skipRef) parts.push(`ref:${cleanParam(ref)}`);
     } catch { /* ignore */ }
-    return parts.join(' | ').slice(0, 110);
+    return parts.join(' | ').slice(0, UTM_MAX_LEN);
 };
 
 // ---------------------------------------------------------------- Contact (tel: / Telegram)
@@ -197,6 +221,7 @@ const installContactListener = () => {
     if (contactListenerInstalled || typeof document === 'undefined') return;
     contactListenerInstalled = true;
     document.addEventListener('click', (e) => {
+        if (isAdminPath()) return;
         const target = e.target as Element | null;
         const a = target?.closest?.('a[href]') as HTMLAnchorElement | null;
         if (!a) return;

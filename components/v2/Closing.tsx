@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { submitLeadToAPI } from '../../utils/api';
-import { trackLead, parsePriceUZS } from '../../utils/pixel';
+import { trackLead, newEventId } from '../../utils/pixel';
 import { uz, v2Toast } from './utils';
 import { StartSteps } from './Sales';
 import { Mask } from './fx';
@@ -56,7 +56,7 @@ export const FaqV2: React.FC = () => {
     <section className="relative sec" aria-labelledby="faq-title">
       <div className="wrap grid lg:grid-cols-12 gap-6 sm:gap-10">
         {/* mobilda `contents`: sarlavha tepada, yordam kartasi esa savollardan KEYIN (order-last); desktopda sticky ustun */}
-        <div className="contents lg:block lg:col-span-4 lg:sticky lg:top-28 self-start">
+        <div className="contents lg:block lg:col-span-5 lg:sticky lg:top-28 self-start">
           <div>
             <p className="t-kicker mb-6">09 — Savollar</p>
             <Mask><h2 id="faq-title" className="t-h2">Koʻp beriladigan savollar</h2></Mask>
@@ -76,7 +76,7 @@ export const FaqV2: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="lg:col-span-8">
+        <div className="lg:col-span-7">
           {faqs.map((f, i) => {
             const isOpen = open === i;
             const pid = `${baseId}-p${i}`;
@@ -166,6 +166,7 @@ export const ContactV2: React.FC = () => {
     const fullPhone = '+998' + digits;
     const courseTitle = course ? tField(courses.find((c) => c.id === course)?.title) : '';
     let crm: any = null;
+    const eventId = newEventId();
     try {
       crm = await submitLeadToAPI({ name: name.trim(), phone: fullPhone, courseId: courseTitle || course || 'Contact Form', sourceRef: 'Aloqa' });
     } catch (err) {
@@ -179,14 +180,7 @@ export const ContactV2: React.FC = () => {
     }
 
     // Menejerlarga Telegram xabarini server /api/leads ichida o'zi yuboradi
-    if (!crm.duplicate) {
-      const picked = course ? courses.find((c) => c.id === course) : undefined;
-      trackLead({
-        source: 'Contact',
-        course: courseTitle || undefined,
-        value: picked ? parsePriceUZS(tField(picked.monthlyPrice)) : null,
-      });
-    }
+    trackLead({ source: 'Contact', course: courseTitle || undefined, eventId, duplicate: !!crm.duplicate });
     setState('sent');
     setName('');
     setPhone('');

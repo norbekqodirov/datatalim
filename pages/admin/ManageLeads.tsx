@@ -218,9 +218,9 @@ export default function ManageLeads() {
                 off += res.items.length;
                 if (!res.items.length || off >= res.total) break;
             }
-            const head = ['ID', 'Ism', 'Telefon', 'Kurs', 'Manba', 'Holat', 'Izoh', 'Sana'];
+            const head = ['ID', 'Ism', 'Telefon', 'Kurs', 'Manba', 'UTM', 'Holat', 'Izoh', 'Sana'];
             const rows = all.map(l => [
-                csvCell(l.id), csvCell(l.name), csvCell(l.phone, true), csvCell(l.course_id), csvCell(l.source_ref),
+                csvCell(l.id), csvCell(l.name), csvCell(l.phone, true), csvCell(l.course_id), csvCell(l.source_ref), csvCell(l.utm),
                 csvCell(STATUS[l.status]?.label), csvCell(l.notes), csvCell(fmtDate(l.created_at)),
             ].join(','));
             const csv = '﻿' + [head.map(h => csvCell(h)).join(','), ...rows].join('\r\n');
@@ -355,7 +355,10 @@ export default function ManageLeads() {
                                             </div>
                                         </td>
                                         <td className="max-w-[180px]"><span className="block truncate" title={l.course_id ?? ''}>{l.course_id || '—'}</span></td>
-                                        <td>{l.source_ref ? <span className="a-badge">{pretty(l.source_ref)}</span> : <span className="a-muted">—</span>}</td>
+                                        <td className="max-w-[200px]">
+                                            {l.source_ref ? <span className="a-badge">{pretty(l.source_ref)}</span> : <span className="a-muted">—</span>}
+                                            {l.utm && <div className="a-muted a-num text-[11px] mt-1 truncate" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }} title={l.utm}>{l.utm}</div>}
+                                        </td>
                                         <td><StatusPill lead={l} onChange={s => changeStatus(l, s)} /></td>
                                         <td className="max-w-[220px]">
                                             <button type="button" className="a-btn a-btn-ghost w-full justify-start" style={{ minHeight: 36, padding: '0 .5rem', fontWeight: 500 }} onClick={() => setNoteFor(l)} aria-label={`${l.name} izohini tahrirlash`}>
@@ -388,6 +391,7 @@ export default function ManageLeads() {
                                     {l.course_id && <span className="a-badge is-blue">{l.course_id}</span>}
                                     {l.source_ref && <span className="a-badge">{pretty(l.source_ref)}</span>}
                                 </div>
+                                {l.utm && <div className="a-muted text-[11px] break-all" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{l.utm}</div>}
                                 <button type="button" className="a-btn w-full justify-start" onClick={() => setNoteFor(l)} style={{ minHeight: 44, fontWeight: 500 }}>
                                     <StickyNote size={15} className="shrink-0" style={{ color: l.notes ? 'var(--a-blue-ink)' : 'var(--a-fg-3)' }} />
                                     <span className="truncate" style={{ color: l.notes ? 'var(--a-fg)' : 'var(--a-fg-3)' }}>{l.notes || 'Izoh qoʻshish'}</span>

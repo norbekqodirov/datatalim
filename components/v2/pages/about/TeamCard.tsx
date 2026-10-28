@@ -15,14 +15,33 @@ const ACCENTS = [
   { fill: '#00b26b', ink: 'var(--green-ink)', alt: '#60efff' },
 ];
 
-export const TeamCard: React.FC<{ member: TeamMember; index: number }> = ({ member, index }) => {
+const hashName = (name: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 16777619);
+  return h >>> 0;
+};
+
+/** Rang ism hash'i bo'yicha; qo'shni (oldingi va 3 ustunli to'rdagi yuqoridagi) kartalar bilan bir xil bo'lmasin. */
+export function assignAccents(names: string[]): number[] {
+  const out: number[] = [];
+  names.forEach((n, i) => {
+    const avoid = new Set<number>([out[i - 1], out[i - 3]].filter((v) => v !== undefined));
+    let c = hashName(n) % ACCENTS.length;
+    for (let k = 0; k < ACCENTS.length && avoid.has(c); k++) c = (c + 1) % ACCENTS.length;
+    out.push(c);
+  });
+  return out;
+}
+
+export const TeamCard: React.FC<{ member: TeamMember; index: number; accent?: number }> = ({ member, index, accent }) => {
   const { tField } = useLanguage();
   const reduced = useMotionReduced();
 
-  const a = ACCENTS[index % ACCENTS.length];
+  const a = ACCENTS[(accent ?? index) % ACCENTS.length];
   const name = uz(tField(member.name));
   const role = uz(tField(member.role));
   const bio = uz(tField(member.bio));
+  const flip = hashName(uz(tField(member.name))) % 2 === 1; // ikkita bir xil monogramma yonma-yon farq qilsin
   const skills = (member.skills || []).map((s) => uz(tField(s))).filter(Boolean);
 
   return (
@@ -42,7 +61,7 @@ export const TeamCard: React.FC<{ member: TeamMember; index: number }> = ({ memb
               <div
                 aria-hidden="true"
                 className="tm-glow"
-                style={{ background: `radial-gradient(90% 80% at 85% 0%, ${a.fill}66 0%, transparent 70%), radial-gradient(70% 60% at 0% 100%, ${a.alt}30 0%, transparent 70%)` }}
+                style={{ background: `radial-gradient(90% 80% at ${flip ? 15 : 85}% 0%, ${a.fill}66 0%, transparent 70%), radial-gradient(70% 60% at ${flip ? 100 : 0}% 100%, ${a.alt}30 0%, transparent 70%)` }}
               />
               <span aria-hidden="true" className="tm-star" style={{ color: a.fill }}>
                 <StarGlyph size="100%" color="currentColor" style={{ opacity: 0.28 }} />
@@ -51,7 +70,7 @@ export const TeamCard: React.FC<{ member: TeamMember; index: number }> = ({ memb
                 aria-hidden="true"
                 className="tm-initials"
                 style={{
-                  backgroundImage: `linear-gradient(160deg, var(--fg) 25%, ${a.ink} 125%)`,
+                  backgroundImage: `linear-gradient(${flip ? 200 : 160}deg, var(--fg) 25%, ${a.ink} 125%)`,
                   WebkitBackgroundClip: 'text',
                   backgroundClip: 'text',
                   color: 'transparent',

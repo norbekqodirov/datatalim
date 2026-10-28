@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { submitLeadToAPI } from '../utils/api';
 import { trackSiteEventOncePerSession } from '../utils/analytics';
-import { trackLead } from '../utils/pixel';
+import { trackLead, newEventId } from '../utils/pixel';
 import { SEO } from '../components/SEO';
 import toast from 'react-hot-toast';
 import { Loader2, ArrowRight, Check, ChevronDown, Phone } from 'lucide-react';
@@ -123,6 +123,8 @@ export default function ApplyForm() {
         const selectedCourse = activeCourses.find(c => c.id === formData.courseId);
         const courseName = selectedCourse ? getTitle(selectedCourse) : 'Boshqa';
 
+        // eventID yuborishdan oldin: javob yo'qolib qayta urinilsa ham Lead bitta bo'lib qoladi
+        const eventId = newEventId();
         try {
             const res = await submitLeadToAPI({
                 name: formData.name,
@@ -131,8 +133,8 @@ export default function ApplyForm() {
                 sourceRef: refCode,
             });
 
-            // Meta Pixel: faqat server qabul qilgach (takroriy ariza qayta sanalmaydi)
-            if (!res?.duplicate) trackLead({ source: 'Ariza', course: courseName });
+            // Meta Pixel: server qabul qilgach; takroriy ariza shu sessiyada qayta sanalmaydi
+            trackLead({ source: 'Ariza', course: courseName, eventId, duplicate: !!res?.duplicate });
 
             // Menejerlarga Telegram xabarini server /api/leads ichida o'zi yuboradi (ref nomi bilan)
             setSent(true);

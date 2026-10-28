@@ -15,13 +15,16 @@ import {
 export interface FieldOptions {
   count: number;
   dark: boolean;
+  /** device-pixel-ratio cap (phones 1.5, weak devices 1) */
+  maxDpr?: number;
 }
 
 // fillStyle strings pre-built per hue × 21 alpha steps (no string allocation per particle)
 const buildStyles = (rgb: string[]) => rgb.map((c) => Array.from({ length: 21 }, (_, q) => `rgba(${c},${(q / 20).toFixed(2)})`));
 // order matches HUE_BLUE, HUE_CYAN, HUE_GREEN, HUE_WHITE
 const RGB_DARK = ['40,120,255', '96,239,255', '0,210,120', '236,244,255'];
-const RGB_LIGHT = ['0,82,217', '0,140,170', '0,150,90', '24,40,84'];
+// light theme: deep ink (#0052d9 / #0891b2 / #00995c) so the station keeps its shape on a pale sky
+const RGB_LIGHT = ['0,82,217', '8,145,178', '0,153,92', '24,40,84'];
 const STYLES_DARK = buildStyles(RGB_DARK);
 const STYLES_LIGHT = buildStyles(RGB_LIGHT);
 
@@ -39,9 +42,10 @@ const fsin = (a: number) => SIN[((a * LUT_K) | 0) & (LUT_N - 1)];
 // ---- 3×3 row-major matrices
 type M3 = Float64Array;
 const m3 = () => new Float64Array(9);
-function setRotX(m: M3, a: number) { const c = Math.cos(a), s = Math.sin(a); m.set([1, 0, 0, 0, c, -s, 0, s, c]); return m; }
-function setRotY(m: M3, a: number) { const c = Math.cos(a), s = Math.sin(a); m.set([c, 0, s, 0, 1, 0, -s, 0, c]); return m; }
-function setRotZ(m: M3, a: number) { const c = Math.cos(a), s = Math.sin(a); m.set([c, -s, 0, s, c, 0, 0, 0, 1]); return m; }
+// written in place (no temporary arrays per frame)
+function setRotX(m: M3, a: number) { const c = Math.cos(a), s = Math.sin(a); m[0] = 1; m[1] = 0; m[2] = 0; m[3] = 0; m[4] = c; m[5] = -s; m[6] = 0; m[7] = s; m[8] = c; return m; }
+function setRotY(m: M3, a: number) { const c = Math.cos(a), s = Math.sin(a); m[0] = c; m[1] = 0; m[2] = s; m[3] = 0; m[4] = 1; m[5] = 0; m[6] = -s; m[7] = 0; m[8] = c; return m; }
+function setRotZ(m: M3, a: number) { const c = Math.cos(a), s = Math.sin(a); m[0] = c; m[1] = -s; m[2] = 0; m[3] = s; m[4] = c; m[5] = 0; m[6] = 0; m[7] = 0; m[8] = 1; return m; }
 function mul(out: M3, a: M3, b: M3) {
   const r0 = a[0] * b[0] + a[1] * b[3] + a[2] * b[6], r1 = a[0] * b[1] + a[1] * b[4] + a[2] * b[7], r2 = a[0] * b[2] + a[1] * b[5] + a[2] * b[8];
   const r3 = a[3] * b[0] + a[4] * b[3] + a[5] * b[6], r4 = a[3] * b[1] + a[4] * b[4] + a[5] * b[7], r5 = a[3] * b[2] + a[4] * b[5] + a[5] * b[8];
@@ -68,13 +72,58 @@ function glowSprite(rgb: string, px: number) {
   return c;
 }
 
+/** The station's soft core glow, baked once: blue centre → faint cyan → transparent (drawn with globalAlpha). */
+function coreGlowSprite() {
+  const px = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = px;
+  const g = c.getContext('2d');
+  if (g) {
+    const r = px / 2;
+    const grd = g.createRadialGradient(r, r, 0, r, r, r);
+    grd.addColorStop(0, 'rgba(0,97,255,1)');
+    grd.addColorStop(0.45, 'rgba(96,239,255,0.28)');
+    grd.addColorStop(1, 'rgba(96,239,255,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, px, px);
+  }
+  return c;
+}
+
+// background planets [sprite 0=A|1=B, fx, fy, parallax, alpha] by orientation — constant, no per-frame arrays.
+// landscape: the big ringed planet sits low right, clear of the navbar and the headline
+const PLANETS_PORTRAIT: [0 | 1, number, number, number, number][] = [[0, 0.12, 0.2, 1, 1], [1, 0.9, 0.3, 0.6, 1]];
+const PLANETS_LANDSCAPE: [0 | 1, number, number, number, number][] = [[0, 0.93, 0.84, 1, 0.6], [1, 0.05, 0.93, 0.6, 0.8]];
+
+/** 99th percentile of a |offset| histogram (32 bins per unit) — a few stray particles may bleed past the band. */
+function pct99(hist: Uint16Array, counted: number) {
+  const target = counted * 0.99;
+  let acc = 0;
+  let b = 0;
+  for (; b < hist.length; b++) {
+    acc += hist[b];
+    if (acc >= target) break;
+  }
+  return Math.max(0.5, (b + 1) / 32);
+}
+
+// adaptive quality: this many consecutive slow frames (> SLOW_MS) step the quality down one notch
+const SLOW_MS = 24;
+const SLOW_RUN = 20;
+
 export class ParticleField {
   private ctx: CanvasRenderingContext2D;
   private scene: SceneData;
   private w = 0;
   private h = 0;
   private dpr = 1;
+  private maxDpr: number;
   private raf = 0;
+  // adaptive quality: draw every `step`-th station particle (1, 2, 3), each a touch larger to keep the density
+  private step = 1;
+  private slow = 0;
+  private warm = 0;
+  private lastTs = 0;
   private running = false;
   private t0 = performance.now();
   private dark: boolean;
@@ -108,11 +157,18 @@ export class ParticleField {
    * The starfield and planets always fill the whole canvas.
    */
   band: [number, number] | null = null;
+  /**
+   * Optional horizontal band [left, right] in canvas px: the station centres between them and shrinks so its
+   * hull never crosses `left` (desktop first screen: keeps a clear gap to the headline). Overrides anchorX.
+   */
+  bandX: [number, number] | null = null;
   private sTop = 0;
   private sBot = 0;
   private fit = 1;
   private extent = 1.1; // projected half-height of the station in "scale" units (measured)
+  private extentX = 1.1;
   private hist = new Uint16Array(96);
+  private histX = new Uint16Array(96);
   // per-frame group matrices + scratch
   private gm: M3[] = Array.from({ length: GROUPS }, m3);
   private ga = new Float32Array(GROUPS);
@@ -123,6 +179,7 @@ export class ParticleField {
   private spriteA: HTMLCanvasElement | null = null;
   private spriteB: HTMLCanvasElement | null = null;
   private glows: HTMLCanvasElement[] = [];
+  private coreGlow: HTMLCanvasElement | null = null;
   private spriteKey = '';
 
   constructor(private canvas: HTMLCanvasElement, opts: FieldOptions) {
@@ -131,7 +188,13 @@ export class ParticleField {
     this.ctx = ctx;
     this.scene = buildScene(opts.count);
     this.dark = opts.dark;
+    this.maxDpr = opts.maxDpr ?? 2;
     this.resize();
+  }
+
+  /** Current render quality, for QA: "dpr|step|particles" (also mirrored to canvas[data-q]). */
+  get quality() {
+    return `${this.dpr}|${this.step}|${this.scene.station.n}`;
   }
 
   setDark(dark: boolean) {
@@ -143,24 +206,55 @@ export class ParticleField {
     this.tmy = ny;
   }
 
-  resize() {
+  /** Re-reads the canvas size. Returns false (and touches nothing) when size and DPR are unchanged,
+   *  so mobile URL-bar resizes never reallocate the backing store. */
+  resize(): boolean {
     const rect = this.canvas.getBoundingClientRect();
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
+    if (rect.width === this.w && rect.height === this.h && dpr === this.dpr && this.canvas.width > 0) return false;
+    this.dpr = dpr;
     this.w = rect.width;
     this.h = rect.height;
     this.canvas.width = Math.round(this.w * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
+    this.canvas.dataset.q = this.quality;
+    return true;
   }
 
   start() {
     if (this.running) return;
     this.running = true;
-    const loop = () => {
+    this.warm = 0;
+    this.slow = 0;
+    const loop = (ts: number) => {
       if (!this.running) return;
+      this.watch(ts);
       this.frame();
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
+  }
+
+  /** Steps quality down after a run of slow frames: first DPR → 1, then 1/2 (desktop: 1/3) of the station particles. */
+  private watch(ts: number) {
+    const d = ts - this.lastTs;
+    this.lastTs = ts;
+    if (this.warm < 30) { this.warm++; return; } // start-up / tab-return frames are noisy
+    if (d > 250) return; // a one-off hitch (GC, tab switch) is not a trend
+    this.slow = d > SLOW_MS ? this.slow + 1 : 0;
+    if (this.slow < SLOW_RUN) return;
+    this.slow = 0;
+    this.warm = 0;
+    if (this.dpr > 1) {
+      this.maxDpr = 1;
+      this.resize();
+    } else if (this.step < (this.scene.station.n > 2500 ? 3 : 2)) {
+      // big (desktop) scenes may go to a third of the particles; phone scenes stop at half
+      this.step++;
+    } else {
+      return;
+    }
+    this.canvas.dataset.q = this.quality;
   }
 
   stop() {
@@ -214,6 +308,7 @@ export class ParticleField {
     this.spriteB = this.bakePlanet(this.scene.planetB, rb, styles);
     const rgb = this.dark ? RGB_DARK : RGB_LIGHT;
     this.glows = rgb.map((c) => glowSprite(c, Math.round(32 * this.dpr)));
+    if (!this.coreGlow) this.coreGlow = coreGlowSprite();
   }
 
   private frame(still = false) {
@@ -226,10 +321,12 @@ export class ParticleField {
     this.sp += (this.progress - this.sp) * (still ? 1 : 0.085);
     this.mx += (this.tmx - this.mx) * (still ? 1 : 0.05);
     this.my += (this.tmy - this.my) * (still ? 1 : 0.05);
-    this.sax += (this.anchorX - this.sax) * (still ? 1 : 0.06);
+    const bandX = this.bandX;
+    const ax = bandX ? (bandX[0] + bandX[1]) / 2 / w : this.anchorX;
+    this.sax += (ax - this.sax) * (still ? 1 : 0.06);
     this.say += (this.anchorY - this.say) * (still ? 1 : 0.06);
     this.sdim += (this.dim - this.sdim) * (still ? 1 : 0.06);
-    if (this.sax0 < 0) this.sax0 = this.anchorX;
+    if (this.sax0 < 0) this.sax0 = ax;
 
     const p = clamp01(this.sp);
     // far → approach over [0, .5], approach → arrival over [.5, 1]
@@ -245,16 +342,17 @@ export class ParticleField {
 
     // ---- camera keyframes
     const sway = still ? 0 : Math.sin(time * 0.23);
-    const pitch = lerp(lerp(0.95, 0.58, m1), 0.1, m2) + this.my * 0.18 + (still ? 0 : Math.sin(time * 0.31) * 0.04);
-    const yaw = lerp(lerp(-0.42, -0.24, m1), 0, m2) + sway * 0.22 * (1 - 0.6 * m2) + this.mx * 0.35;
-    const roll = lerp(lerp(-0.24, -0.1, m1), 0, m2);
+    // first screen: the rings read as a ~1:0.6 ellipse (a station, not a dust cloud) and the hub star is legible
+    const pitch = lerp(lerp(0.62, 0.5, m1), 0.1, m2) + this.my * 0.18 + (still ? 0 : Math.sin(time * 0.31) * 0.04);
+    const yaw = lerp(lerp(-0.3, -0.22, m1), 0, m2) + sway * 0.22 * (1 - 0.6 * m2) + this.mx * 0.35;
+    const roll = lerp(lerp(-0.12, -0.08, m1), 0, m2);
     const camD = lerp(lerp(6.5, 3.5, m1), 3.1, m2);
     const coreScale = lerp(lerp(1, 1.05, m1), 1.22, m2);
     const pulseAmt = clamp01(0.25 + 0.75 * m1 - 0.7 * m2);
 
     const minDim = Math.min(w, h);
     // phones: the station is the only visual above the headline, so it may take more of the width
-    const baseScale = minDim * lerp(lerp(0.24, 0.35, m1), 0.335, m2) * (portrait ? 1.18 : 1) * this.zoom * (1 + 0.1 * burst);
+    const baseScale = minDim * lerp(lerp(0.22, 0.35, m1), 0.335, m2) * (portrait ? 1.18 : 1) * this.zoom * (1 + 0.1 * burst);
     const ox = w * this.sax;
     let oy: number;
     if (this.band) {
@@ -265,7 +363,8 @@ export class ParticleField {
       this.sBot += (this.band[1] - this.sBot) * k;
       oy = (this.sTop + this.sBot) / 2;
       const half = Math.max(40, (this.sBot - this.sTop) / 2);
-      const want = Math.min(1, half / (this.extent * baseScale));
+      let want = Math.min(1, half / (this.extent * baseScale));
+      if (bandX) want = Math.min(want, Math.max(40, (bandX[1] - bandX[0]) / 2) / (this.extentX * baseScale));
       this.fit += (want - this.fit) * (still ? 1 : 0.12);
     } else {
       this.fit = 1;
@@ -310,19 +409,21 @@ export class ParticleField {
       }
     }
     if (streak > 0.04) {
-      ctx.strokeStyle = dark ? `rgba(200,235,255,${(0.32 * streak).toFixed(3)})` : `rgba(24,40,84,${(0.16 * streak).toFixed(3)})`;
+      ctx.strokeStyle = dark ? 'rgb(200,235,255)' : 'rgb(24,40,84)';
+      ctx.globalAlpha = (dark ? 0.32 : 0.16) * streak;
       ctx.lineWidth = 1;
       ctx.stroke();
+      ctx.globalAlpha = 1;
     }
 
     // =================== background: planets (pre-baked sprites) ===================
     // far away: they barely zoom; they mostly drift with the pan and rise with the scroll
     const pz = 1 + 0.07 * m1 + 0.05 * m2;
-    const pAlpha = (dark ? 0.95 : 0.8) * (1 - 0.3 * m2) * (0.5 + 0.5 * this.sdim);
-    const planets: [HTMLCanvasElement | null, number, number, number][] = portrait
-      ? [[this.spriteA, 0.12, 0.2, 1], [this.spriteB, 0.9, 0.3, 0.6]]
-      : [[this.spriteA, 0.5, 0.17, 1], [this.spriteB, 0.93, 0.84, 0.6]];
-    for (const [img, fx, fy, par] of planets) {
+    const pAlpha = (dark ? 0.95 : 0.85) * (1 - 0.3 * m2) * (0.5 + 0.5 * this.sdim);
+    const planets = portrait ? PLANETS_PORTRAIT : PLANETS_LANDSCAPE;
+    for (let k = 0; k < planets.length; k++) {
+      const [which, fx, fy, par, pa] = planets[k];
+      const img = which === 0 ? this.spriteA : this.spriteB;
       if (!img) continue;
       let cx = fx * w - this.mx * 24 * par + pan * 0.18 * par;
       let cy = fy * h - this.my * 14 * par - p * h * 0.4 * par;
@@ -330,7 +431,7 @@ export class ParticleField {
       cy = oy + (cy - oy) * pz;
       const size = (img.width / (dpr * 1.5)) * (1 + 0.08 * m1 + 0.05 * m2);
       if (cx + size < 0 || cx - size > w || cy + size < 0 || cy - size > h) continue;
-      ctx.globalAlpha = pAlpha;
+      ctx.globalAlpha = pAlpha * pa;
       ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
     }
     ctx.globalAlpha = 1;
@@ -338,25 +439,29 @@ export class ParticleField {
     // =================== station ===================
     // soft core glow behind the station (brightens as the star module lights up)
     ctx.globalCompositeOperation = 'source-over';
+    // pre-baked sprite drawn over its own box only (was: a new gradient + a full-screen fill every frame)
     const glowR = scale * (1.55 + 0.1 * m2);
-    const glow = ctx.createRadialGradient(ox, oy, 0, ox, oy, glowR);
-    const gA = (dark ? 0.22 : 0.1) * this.sdim * (1 + 0.35 * m1 + 0.5 * m2 + 0.6 * burst);
-    glow.addColorStop(0, `rgba(0,97,255,${gA.toFixed(3)})`);
-    glow.addColorStop(0.45, `rgba(96,239,255,${(gA * (0.18 + 0.2 * m2)).toFixed(3)})`);
-    glow.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, w, h);
+    const gA = (dark ? 0.22 : 0.16) * this.sdim * (1 + 0.35 * m1 + 0.5 * m2 + 0.6 * burst);
+    if (this.coreGlow) {
+      ctx.globalAlpha = clamp01(gA);
+      ctx.drawImage(this.coreGlow, ox - glowR, oy - glowR, glowR * 2, glowR * 2);
+      ctx.globalAlpha = 1;
+    }
     ctx.globalCompositeOperation = dark ? 'lighter' : 'source-over';
 
     // view matrix V = Rz(roll) · Rx(pitch) · Ry(yaw); group matrices = V · local motion
     const V = this.view, A = this.tA, B = this.tB, gm = this.gm, ga = this.ga;
     mul(V, setRotZ(A, roll), setRotX(B, pitch));
     mul(V, V, setRotY(A, yaw));
-    // core: partly counter-rotated so the brand star stays legible even while the station is tilted;
-    // it sways in 3D so the lens depth shows, then settles facing us and grows at arrival
-    mul(B, setRotX(A, -pitch * 0.6), setRotY(B, -yaw * 0.5 + (still ? 0 : Math.sin(time * 0.5) * 0.3 * (1 - 0.65 * m2))));
-    mul(gm[G_CORE], V, B);
-    for (let k = 0; k < 9; k++) gm[G_CORE][k] *= coreScale;
+    // core: counter-rotated against the camera (V⁻¹ = Ry(-yaw)·Rx(-pitch)·Rz(-roll)), so the brand star faces us
+    // from the very first frame while the rings stay tilted; a small 3D sway still shows the lens depth
+    const C = gm[G_CORE];
+    mul(B, setRotY(A, -yaw), setRotX(B, -pitch));
+    mul(B, B, setRotZ(A, -roll));
+    mul(C, V, B);
+    mul(B, setRotY(A, still ? 0 : Math.sin(time * 0.5) * 0.22 * (1 - 0.65 * m2)), setRotX(B, still ? 0 : Math.sin(time * 0.37) * 0.08));
+    mul(C, C, B);
+    for (let k = 0; k < 9; k++) C[k] *= coreScale;
     gm[G_HUB].set(V);
     mul(gm[G_RING], V, setRotZ(A, spin));
     mul(gm[G_INNER], V, setRotZ(A, -spin * 1.5));
@@ -368,17 +473,22 @@ export class ParticleField {
     ga[G_HUB] = 0.85 * (1 - 0.75 * m2);
     ga[G_RING] = 1;
     ga[G_INNER] = 1;
-    ga[G_ORBIT_A] = ga[G_ORBIT_B] = (0.35 + 0.65 * m1) * (1 - 0.4 * m2);
+    // light theme: the orbiting packets are halved so they don't read as noise around the hull
+    ga[G_ORBIT_A] = ga[G_ORBIT_B] = (0.35 + 0.65 * m1) * (1 - 0.4 * m2) * (dark ? 1 : 0.5);
 
     const S = this.scene.station;
-    const hist = this.hist;
+    const hist = this.hist, histX = this.histX;
     hist.fill(0);
+    if (bandX) histX.fill(0);
     let counted = 0;
-    // light theme: dark ink on a pale sky needs more weight; far away is a touch hazier
-    const dimAll = (dark ? 1.15 : 1.35) * this.sdim * (0.88 + 0.12 * m1);
-    const sizeK = this.sizeMul * (dark ? 1 : 1.12) * (1 + 0.35 * burst);
+    // light theme: dark ink on a pale sky needs more weight; far away is only a touch hazier
+    const step = this.step;
+    const dimAll = (dark ? 1.15 : 1.35) * this.sdim * (0.94 + 0.06 * m1) * (1 + 0.12 * (step - 1));
+    const sizeK = this.sizeMul * (dark ? 1 : 1.35) * (1 + 0.35 * burst) * (1 + 0.22 * (step - 1));
     const pulseT = still ? 0 : time * 2.6;
     for (let i = 0; i < S.n; i++) {
+      // reduced quality: keep pairs (i>>1), so alternating sets (e.g. the two data orbits) both stay visible
+      if (step > 1 && (i >> 1) % step !== 0) continue;
       const g = S.grp[i];
       const M = gm[g];
       const x = S.x[i], y = S.y[i], z = S.z[i];
@@ -394,6 +504,10 @@ export class ParticleField {
       if (g < G_ORBIT_A) {
         const bin = (Math.abs(y1 * persp) * 32) | 0;
         if (bin < 96) { hist[bin]++; counted++; }
+        if (bandX) {
+          const bxn = (Math.abs(x1 * persp) * 32) | 0;
+          if (bxn < 96) histX[bxn]++;
+        }
       }
       if (px < -10 || px > w + 10 || py < -10 || py > h + 10) continue;
 
@@ -428,7 +542,7 @@ export class ParticleField {
       } else {
         a = (0.35 + 0.65 * m2) * (still ? 1 : 0.8 + 0.2 * Math.sin(time * 1.3 + L.phase));
       }
-      a *= this.sdim * (dark ? 1 : 0.75);
+      a *= this.sdim * (dark ? 1 : 0.95);
       const r = (L.blink ? 9 : 12 + 8 * m2) * persp * (portrait ? 0.75 : 1) * this.fit;
       ctx.globalAlpha = clamp01(a);
       ctx.drawImage(this.glows[L.hue], ox + x1 * scale * persp - r, oy - y1 * scale * persp - r, r * 2, r * 2);
@@ -438,15 +552,9 @@ export class ParticleField {
 
     // measured extent = 99th percentile of |offset| (a few stray particles may bleed past the band)
     if (this.band && counted > 0) {
-      const target = counted * 0.99;
-      let acc = 0;
-      let b = 0;
-      for (; b < 96; b++) {
-        acc += hist[b];
-        if (acc >= target) break;
-      }
-      const u = (b + 1) / 32;
-      this.extent += (Math.max(0.5, u) - this.extent) * (still ? 1 : 0.1);
+      const k = still ? 1 : 0.1;
+      this.extent += (pct99(hist, counted) - this.extent) * k;
+      if (bandX) this.extentX += (pct99(histX, counted) - this.extentX) * k;
     }
   }
 }

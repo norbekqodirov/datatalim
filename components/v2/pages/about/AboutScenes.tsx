@@ -470,7 +470,7 @@ export const FacilitiesScene: React.FC = () => {
                 viewport={{ once: true, margin: '0px 0px -6% 0px' }}
                 transition={{ duration: 0.7, delay: (i % 3) * 0.07, ease: EASE }}
               >
-                <Icon3D name={f.art} size={64} className="ico w-14 h-14 sm:w-16 sm:h-16" />
+                <Icon3D name={f.art} size={64} sizes="(min-width: 640px) 64px, 56px" className="ico w-14 h-14 sm:w-16 sm:h-16" />
                 <h3 className="t-h3 mt-6">{uz(f.title)}</h3>
                 <p className="t-body mt-4 text-[0.98rem]">{uz(f.desc)}</p>
               </motion.li>
@@ -518,7 +518,7 @@ export const DirectionsScene: React.FC = () => {
                 <span aria-hidden="true" className="absolute -top-16 -right-16 w-52 h-52 rounded-full opacity-25 blur-3xl" style={{ background: d.color }} />
                 <span className="relative flex items-start justify-between">
                   <span className={`mono text-sm ${d.ink}`}>{String(i + 1).padStart(2, '0')}</span>
-                  <Icon3D name={d.art} size={96} className="dir-art w-[72px] h-[72px] sm:w-24 sm:h-24 -mt-2 -mr-1" />
+                  <Icon3D name={d.art} size={96} sizes="(min-width: 640px) 96px, 72px" className="dir-art w-[72px] h-[72px] sm:w-24 sm:h-24 -mt-2 -mr-1" />
                 </span>
                 <ArrowUpRight size={22} aria-hidden="true" className="arr ink-3 absolute right-7 bottom-7 sm:right-9 sm:bottom-9" />
                 <span className="relative block pr-10">
@@ -552,7 +552,7 @@ export const PlaceScene: React.FC = () => {
   ].filter((r) => r.v);
 
   return (
-    <section className="relative py-[14vh]" aria-labelledby="place-title">
+    <section className="relative pb-[7vh] pt-[14vh]" aria-labelledby="place-title">
       <div className="wrap grid lg:grid-cols-12 gap-x-14 gap-y-12 items-center [&>*]:min-w-0">
         <div className="lg:col-span-6">
           <p className="t-kicker mb-6">08 — Manzil</p>
@@ -622,7 +622,7 @@ export const AboutClosing: React.FC = () => {
   const [consult, setConsult] = useState(false);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   return (
-    <section ref={ref} data-hide-mcta className="relative py-[16vh] overflow-hidden" aria-labelledby="about-cta-title">
+    <section ref={ref} data-hide-mcta className="relative overflow-hidden pb-[16vh] pt-[8vh]" aria-labelledby="about-cta-title">
       <Star3D progress={scrollYProgress} spin={55} className="ab-star absolute right-[3vw] top-[8%] w-[min(26vw,360px)] aspect-square pointer-events-none opacity-[.35] hidden md:block" />
       <div className="wrap relative">
         <p className="t-kicker mb-6">09 — Boshlash</p>

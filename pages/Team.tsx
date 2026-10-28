@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
@@ -8,7 +8,7 @@ import { useStore } from '../store/useStore';
 import { Mask, Star3D, StarSeam } from '../components/v2/fx';
 import { uz, useMotionReduced } from '../components/v2/utils';
 import { Reveal, StarGlyph } from '../components/v2/pages/about/AboutScenes';
-import { TeamCard } from '../components/v2/pages/about/TeamCard';
+import { TeamCard, assignAccents } from '../components/v2/pages/about/TeamCard';
 import { Icon3D } from '../components/v2/pages/Icon3D';
 import '../components/v2/v2.css';
 
@@ -24,6 +24,7 @@ export default function Team() {
   const { team } = useStore();
   const navigate = useNavigate();
   const reduced = useMotionReduced();
+  const accents = useMemo(() => assignAccents(team.map((m) => uz(typeof m.name === 'string' ? m.name : (m.name as { uz?: string })?.uz || ''))), [team]);
   const [consult, setConsult] = useState(false);
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
@@ -114,7 +115,7 @@ export default function Team() {
           </div>
           <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 items-stretch">
             {team.map((m, i) => (
-              <TeamCard key={m.id} member={m} index={i} />
+              <TeamCard key={m.id} member={m} index={i} accent={accents[i]} />
             ))}
           </ul>
         </div>

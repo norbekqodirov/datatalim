@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Phone } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { openConsult } from './consult';
+import { afterHeroY, useIsDesktop } from './utils';
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -19,19 +20,21 @@ const HIDE_SEL = '[data-hide-mcta], #contact, footer';
 
 /** Mobil pastki CTA paneli — barcha ommaviy sahifalar uchun bitta (App.tsx › PublicLayout). */
 export const MobileCtaBar: React.FC = () => {
-  const { siteContent } = useStore();
+  const contactPhone = useStore((s) => s.siteContent.contactPhone);
   const { pathname } = useLocation();
-  const off = hiddenOn(pathname);
+  // lg+ ekranda panel umuman yo'q — scroll/resize listener va observer'lar ham ishlamaydi
+  const desktop = useIsDesktop();
+  const off = desktop || hiddenOn(pathname);
   const [past, setPast] = useState(false);
   const [blocked, setBlocked] = useState(false);
 
-  // birinchi ekrandan ~0.6 qismi o'tilgach chiqadi (bosh sahifada hero CTA'lari shu paytda yo'qoladi)
+  // ~0.6 ekrandan keyin chiqadi; bosh sahifada — hero sahnasi tugagach (afterHeroY)
   useEffect(() => {
     if (off) return;
     let raf = 0;
     const check = () => {
       raf = 0;
-      setPast(window.scrollY > window.innerHeight * 0.6);
+      setPast(window.scrollY > afterHeroY(window.innerHeight * 0.6));
     };
     const on = () => { if (!raf) raf = requestAnimationFrame(check); };
     check();
@@ -42,7 +45,7 @@ export const MobileCtaBar: React.FC = () => {
       window.removeEventListener('resize', on);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [off]);
+  }, [off, pathname]);
 
   // yashiruvchi bloklar IntersectionObserver bilan kuzatiladi (scroll kadrida layout o'qilmaydi);
   // lazy sahifa kontenti keyin paydo bo'lgani uchun DOM o'zgarsa qayta qidiriladi
@@ -81,7 +84,7 @@ export const MobileCtaBar: React.FC = () => {
 
   if (off) return null;
   const show = past && !blocked;
-  const tel = (siteContent.contactPhone || '').replace(/[^\d+]/g, '');
+  const tel = (contactPhone || '').replace(/[^\d+]/g, '');
 
   return (
     <div className="v2 mcta-host">
@@ -95,7 +98,7 @@ export const MobileCtaBar: React.FC = () => {
             transition={{ duration: 0.35, ease: EASE }}
           >
             {tel && (
-              <a href={`tel:${tel}`} className="mobile-cta-call" aria-label={`Qoʻngʻiroq qilish: ${siteContent.contactPhone}`}>
+              <a href={`tel:${tel}`} className="mobile-cta-call" aria-label={`Qoʻngʻiroq qilish: ${contactPhone}`}>
                 <Phone size={20} aria-hidden="true" />
               </a>
             )}

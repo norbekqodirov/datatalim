@@ -412,9 +412,10 @@ html .v2 .field[aria-invalid="true"],
   .v2 .hero-copy .hero-cta .btn { min-height: 44px; padding-inline: 1.1rem; }
 }
 
-/* hero captions sit above the floating back-to-top button on phones */
+/* hero captions: above the story rail (back-to-top and the mobile CTA bar only appear after the hero) */
 .v2 .cap-stage { bottom: 11vh; }
-@media (max-width: 639.98px) { .v2 .cap-stage { bottom: 9.75rem; } }
+.v2 .cap-stage .t-lead { text-wrap: balance; }
+@media (max-width: 639.98px) { .v2 .cap-stage { bottom: 5.5rem; } }
 
 /* directions (pinned horizontal track): scale type and rhythm with viewport HEIGHT so the
    longest course list always fits inside the panel */
@@ -507,8 +508,16 @@ html:not(.dark) .v2 .nf-dark { display: none; }
   border: 1px solid var(--line-2); color: var(--fg);
 }
 @media (min-width: 1024px) { .v2 .mobile-cta { display: none; } }
-/* telefonda hero joyi tor: ishonch qatori bentoda baribir bor */
-@media (max-width: 639px) { .v2 .hero-proof { display: none; } }
+/* telefonda ishonch qatori — bitta qator kichik chiplar (fold'da isbot qolsin) */
+@media (max-width: 639.98px) {
+  .v2 .hero-proof { margin-top: 1rem; gap: 5px; }
+  .v2 .hero-proof li {
+    font-size: 0.66rem !important; line-height: 1; white-space: nowrap; gap: 4px;
+    padding: 6px 8px 6px 5px; border: 1px solid var(--line-2); border-radius: 999px;
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
+  }
+  .v2 .hero-proof li svg { width: 12px; height: 12px; }
+}
 
 /* ---------- manifesto: o'lchovli matn + natijalar orbitasi ---------- */
 .v2 .manifesto-text {

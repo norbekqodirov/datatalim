@@ -37,6 +37,17 @@ export function useIsDesktop(query = '(min-width: 1024px)'): boolean {
   return ok;
 }
 
+/**
+ * Suzuvchi tugmalar (MobileCtaBar, BackToTop) chiqadigan scroll nuqtasi. Bosh sahifada — hero (`[data-hero]`, pinned sahna) tugagach, uning oxirgi
+ * ekranining yarmi o'tganda: hikoya ichida kontekstsiz tugma chiqmaydi. Boshqa sahifalarda `fallback`.
+ */
+export function afterHeroY(fallback: number): number {
+  const hero = document.querySelector<HTMLElement>('[data-hero]');
+  if (!hero) return fallback;
+  const top = hero.getBoundingClientRect().top + window.scrollY;
+  return Math.max(fallback, top + hero.offsetHeight - window.innerHeight * 0.5);
+}
+
 /** YouTube id from a full embed/watch URL or a bare id. */
 export function youtubeId(input: string | undefined): string {
   if (!input) return '';
@@ -61,7 +72,10 @@ const REDUCE_QUERY = '(prefers-reduced-motion: reduce)';
 
 export function setMotionReduced(reduced: boolean) {
   try {
-    localStorage.setItem(MOTION_KEY, reduced ? 'off' : 'on');
+    // choosing what the OS already says clears the override — the site follows the system setting again
+    const os = !!window.matchMedia?.(REDUCE_QUERY).matches;
+    if (reduced === os) localStorage.removeItem(MOTION_KEY);
+    else localStorage.setItem(MOTION_KEY, reduced ? 'off' : 'on');
   } catch {
     /* storage unavailable — the choice just won't persist */
   }

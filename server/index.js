@@ -84,6 +84,16 @@ const sanitize = (str) => {
 // sanitize() faqat satr uchun ishlaydi; satr bo'lmagan qiymat (obyekt, massiv) bo'sh satr bo'ladi
 const cleanText = (v) => (typeof v === 'string' ? sanitize(v) : '');
 
+// Atribusiya satri (utm / fbclid / ref): faqat xavfsiz belgilar (harf, raqam, bo'shliq va  _ - . : / = | , + @ ), <=160 belgi
+const UTM_MAX_LEN = 160;
+// eslint-disable-next-line no-control-regex
+const cleanUtm = (v) => (typeof v === 'string'
+    ? v.substring(0, 1000).normalize('NFC').replace(/[\s\u0000-\u001f\u007f]+/g, ' ').replace(/[^\p{L}\p{N} _.:/=|,+@-]/gu, '').replace(/ {2,}/g, ' ').trim().substring(0, UTM_MAX_LEN)
+    : '');
+
+// Statistikada eski qatorlar ("Kurs | utm:instagram/...") ham kurs bo'yicha birlashishi uchun ' | ' dan oldingi qism
+const COURSE_BASE_SQL = "substr(course_id, 1, CASE WHEN instr(course_id, ' | ') > 0 THEN instr(course_id, ' | ') - 1 ELSE length(course_id) END)";
+
 // Ichki xatoni logga yozib, mijozga umumiy javob qaytaradi (err.message mijozga chiqmaydi)
 const serverError = (res, err, ctx = '') => {
     console.error(`[API xato]${ctx ? ' ' + ctx + ':' : ''}`, err);
@@ -461,6 +471,7 @@ function scoreLead(lead) {
 app.post('/api/leads', leadsLimiter, (req, res) => {
     const name = cleanText(req.body.name);
     const courseId = cleanText(req.body.courseId).slice(0, 300); // karyera testida 3 ta kurs nomi birga keladi
+    const utm = cleanUtm(req.body.utm);
     const rawSourceRef = cleanText(req.body.sourceRef);
     const sourceRef = SOURCE_REF_RE.test(rawSourceRef) ? rawSourceRef : '';
     if (!name || !req.body.phone) return res.status(400).json({ error: 'Name and phone are required' });
@@ -496,7 +507,7 @@ app.post('/api/leads', leadsLimiter, (req, res) => {
             db.prepare('UPDATE marketing_links SET leads_count = leads_count + 1 WHERE ref_code = ?').run(sourceRef);
         }
 
-        const info = db.prepare('INSERT INTO leads (name, phone, course_id, source_ref) VALUES (?, ?, ?, ?)').run(name, phone, courseId || null, actualSourceRef);
+        const info = db.prepare('INSERT INTO leads (name, phone, course_id, source_ref, utm) VALUES (?, ?, ?, ?, ?)').run(name, phone, courseId || null, actualSourceRef, utm || null);
         const newLead = db.prepare('SELECT * FROM leads WHERE id = ?').get(info.lastInsertRowid);
 
         // Auto-score lead
@@ -604,8 +615,8 @@ app.get('/api/leads', authenticateToken, (req, res) => {
         const q = cleanText(String(req.query.q ?? '')).slice(0, 100);
         if (q) {
             const like = `%${q.replace(/[\\%_]/g, (c) => '\\' + c)}%`;
-            where.push("(name LIKE ? ESCAPE '\\' OR phone LIKE ? ESCAPE '\\' OR course_id LIKE ? ESCAPE '\\')");
-            params.push(like, like, like);
+            where.push("(name LIKE ? ESCAPE '\\' OR phone LIKE ? ESCAPE '\\' OR course_id LIKE ? ESCAPE '\\' OR utm LIKE ? ESCAPE '\\')");
+            params.push(like, like, like, like);
         }
         const source = cleanText(String(req.query.source ?? ''));
         if (source) { where.push('source_ref = ?'); params.push(source); }
@@ -636,7 +647,7 @@ app.get('/api/leads', authenticateToken, (req, res) => {
 
         const total = db.prepare(`SELECT COUNT(*) AS count FROM leads ${fullWhere}`).get(...listParams).count;
         const items = db.prepare(
-            `SELECT id, name, phone, course_id, source_ref, COALESCE(status, 'new') AS status, COALESCE(notes, '') AS notes, created_at
+            `SELECT id, name, phone, course_id, source_ref, utm, COALESCE(status, 'new') AS status, COALESCE(notes, '') AS notes, created_at
              FROM leads ${fullWhere} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
         ).all(...listParams, limit, offset);
 
@@ -663,7 +674,7 @@ app.patch('/api/leads/:id', authenticateToken, (req, res) => {
         if (hasNotes) db.prepare('UPDATE leads SET notes = ? WHERE id = ?').run(cleanNotes(body.notes), id);
 
         const row = db.prepare(
-            "SELECT id, name, phone, course_id, source_ref, COALESCE(status, 'new') AS status, COALESCE(notes, '') AS notes, created_at FROM leads WHERE id = ?"
+            "SELECT id, name, phone, course_id, source_ref, utm, COALESCE(status, 'new') AS status, COALESCE(notes, '') AS notes, created_at FROM leads WHERE id = ?"
         ).get(id);
         res.json(row);
     } catch (err) {
@@ -696,10 +707,10 @@ app.get('/api/stats', authenticateToken, (req, res) => {
 
         // Leads by course
         const leadsByCourse = db.prepare(`
-            SELECT course_id, COUNT(*) as count
+            SELECT ${COURSE_BASE_SQL} AS course_id, COUNT(*) as count
             FROM leads
-            WHERE course_id IS NOT NULL AND course_id != ''
-            GROUP BY course_id
+            WHERE course_id IS NOT NULL AND course_id != '' AND ${COURSE_BASE_SQL} != ''
+            GROUP BY ${COURSE_BASE_SQL}
             ORDER BY count DESC
         `).all();
 
@@ -1135,7 +1146,10 @@ const notifyNewLead = (lead) => {
         `📚 <b>Kurs:</b> ${escapeHtml(lead.course_id || '—')}
 ` +
         `🔗 <b>Manba (ref):</b> ${escapeHtml(ref)}
-
+` +
+        (lead.utm ? `📊 <b>Manba:</b> ${escapeHtml(lead.utm)}
+` : '') +
+        `
 ` +
         `🕐 <b>Vaqt:</b> ${new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}
 ` +

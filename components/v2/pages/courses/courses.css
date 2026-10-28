@@ -92,11 +92,11 @@
   background: linear-gradient(to top, rgba(0, 0, 0, 0.45), transparent);
 }
 .v2 .cc-main { display: flex; flex-direction: column; padding: 1.15rem 1.25rem 0; }
-.v2 .cc-cat { display: none; align-items: center; gap: 0.4rem; font-size: 0.6875rem; margin-bottom: 0.3rem; }
+.v2 .cc-cat { display: none; align-items: center; gap: 0.4rem; font-size: 0.6875rem; margin-bottom: 0.3rem; color: var(--fg-2); }
 .v2 .cc-title { font-size: 1.1875rem; line-height: 1.18; letter-spacing: -0.025em; font-weight: 600; }
 .v2 .cc-desc { margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.5; color: var(--fg-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .v2 .cc-meta { margin: auto 1.25rem 0; padding-top: 0.9rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-.v2 .cc-meta .t-kicker { font-size: 0.625rem; }
+.v2 .cc-meta .t-kicker { font-size: 0.6875rem; color: var(--fg-2); letter-spacing: 0.08em; }
 .v2 .cc-meta dd { margin-top: 0.25rem; font-size: 0.9375rem; color: var(--fg); white-space: nowrap; }
 .v2 .cc-foot { padding: 0.9rem 1.25rem 1.25rem; }
 .v2 .cc-foot .cc-cta { min-height: 44px; }
@@ -110,11 +110,16 @@
   .v2 .cc-cat { display: flex; }
   .v2 .cc-title { font-size: 1.0625rem; }
   .v2 .cc-desc { margin-top: 0.3rem; font-size: 0.8125rem; line-height: 1.45; }
-  .v2 .cc-meta { grid-column: 2; margin: 0.6rem 0 0; padding: 0; grid-template-columns: auto minmax(0, 1fr); gap: 0.9rem; }
+  .v2 .cc-meta { grid-column: 2; margin: 0.6rem 0 0; padding: 0; grid-template-columns: auto minmax(0, 1fr); gap: 0.6rem; }
   .v2 .cc-meta dd { font-size: 0.875rem; }
   .v2 .cx-ghost { display: none; }
   .v2 .cc-foot { grid-column: 1 / -1; padding: 0.75rem 0 0; }
   .v2 .cc-foot .cc-cta { min-height: 44px; }
+}
+/* juda tor telefon (<390px): davomiylik/narx qatori kartaning butun kengligida (narx kesilmasin) */
+@media (max-width: 389px) {
+  .v2 .cc-media { grid-row: 1; }
+  .v2 .cc-meta { grid-column: 1 / -1; margin-top: 0.7rem; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 }
 .v2 .cc-pill {
   display: inline-flex;
@@ -271,3 +276,32 @@
 .v2 .out-card:hover { border-color: color-mix(in srgb, var(--cat) 55%, var(--line-2)); }
 .v2 .out-n { display: inline-block; font-size: 2.1rem; line-height: 1; font-weight: 500; letter-spacing: -0.04em; color: transparent; -webkit-text-stroke: 1px var(--cat-ink); }
 .v2 .out-ico { display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; border: 1px solid var(--line-2); color: var(--cat-ink); background: var(--bg); }
+
+/* ---------- kurs sahifasi: ikkinchi darajali tugma, hero chiplari, ustoz kartasi ---------- */
+/* "Bepul konsultatsiya" — asosiy tugma yonidagi matnli havola (48px emas, 44px teginish maydoni) */
+.v2 .btn-quiet {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 0 0.75rem;
+  font-weight: 600; font-size: 0.95rem; letter-spacing: -0.01em; color: var(--fg);
+  background: none; border: 0; cursor: pointer; touch-action: manipulation; white-space: nowrap;
+  text-decoration: underline; text-decoration-color: var(--fg-3); text-underline-offset: 5px; text-decoration-thickness: 1px;
+  transition: text-decoration-color 0.25s var(--ease), color 0.25s var(--ease);
+}
+.v2 .btn-quiet:hover { text-decoration-color: var(--fg); }
+
+/* davomiylik + oylik narx chiplari (mobil/planshet birinchi ekranda; desktopda "fact" qatori ko'rinadi) */
+.v2 .cd-chip {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  min-height: 36px; padding: 0 0.85rem; border-radius: 999px;
+  border: 1px solid var(--line-2); background: var(--bg-2);
+  font-size: 0.9375rem; color: var(--fg);
+}
+.v2 .cd-chip-k { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-2); }
+
+/* ustoz: 1–2 ta bo'lsa desktopda vertikal karta */
+@media (min-width: 1024px) {
+  .v2 .mentor-v > li { flex-direction: column; align-items: flex-start; gap: 1.25rem; padding: 1.75rem; }
+  .v2 .mentor-v .mentor-av { width: 96px; height: 96px; }
+  .v2 .mentor-v .mentor-av.is-mono { width: 96px; height: 96px; }
+  .v2 .mentor-v .mentor-av.is-mono span { font-size: 1.9rem; }
+}

@@ -55,10 +55,13 @@ const ScrollWord: React.FC<{ p: MotionValue<number>; start: number; end: number;
   );
 };
 
-/** A real 3D object: the DATA 4-point star as a stack of extruded layers that turns with scroll. */
-export const Star3D: React.FC<{ progress: MotionValue<number>; className?: string; layers?: number; spin?: number; drift?: number }> = ({ progress, className, layers = 9, spin = 80, drift = 70 }) => {
-  const rotateY = useTransform(progress, [0, 0.5, 1], [-spin, 0, spin]);
-  const rotateX = useTransform(progress, [0, 0.5, 1], [18, -6, 14]);
+/** A real 3D object: the DATA 4-point star as a stack of extruded layers that turns with scroll.
+ *  The turn is capped at 28° (and the tilt at 10°): past that the thin layers collapse into a "spike" seen edge-on. */
+const STAR_MAX_SPIN = 28;
+export const Star3D: React.FC<{ progress: MotionValue<number>; className?: string; layers?: number; spin?: number; drift?: number }> = ({ progress, className, layers = 9, spin = STAR_MAX_SPIN, drift = 70 }) => {
+  const turn = Math.min(Math.abs(spin), STAR_MAX_SPIN);
+  const rotateY = useTransform(progress, [0, 0.5, 1], [-turn, 0, turn]);
+  const rotateX = useTransform(progress, [0, 0.5, 1], [10, -4, 8]);
   const y = useTransform(progress, [0, 1], [drift, -drift]);
   const mid = (layers - 1) / 2;
   return (

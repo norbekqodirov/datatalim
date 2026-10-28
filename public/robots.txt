@@ -1,9 +1,8 @@
 User-agent: *
 Allow: /
 Disallow: /paneladmindata
-# Reklama landing sahifalari (Meta/Instagram havolalari) — qidiruvdan chiqariladi (SEO komponenti ham noindex beradi)
-Disallow: /ariza
-Disallow: /apply
+# /ariza va /apply (reklama landinglari) Disallow QILINMAGAN: Google noindex metasini o'qishi uchun sahifaga kira olishi kerak
+# (robots bilan yopilgan sahifaning noindex'i o'qilmaydi). Qidiruvdan chiqarish SEO komponentidagi noindex orqali.
 
 # Meta reklama/havola tekshiruvchisi landingni o'qiy olishi shart (aks holda reklama rad etilishi mumkin)
 User-agent: facebookexternalhit
