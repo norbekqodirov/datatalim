@@ -1,0 +1,18 @@
+{
+  "id": "ai-agent",
+  "title": { "uz": "AI Agent", "ru": "AI Agent", "en": "AI Agent" },
+  "category": "programming",
+  "duration": { "uz": "3 oy", "ru": "3 oy", "en": "3 oy" },
+  "monthlyPrice": { "uz": "2 500 000 so‘m", "ru": "2 500 000 so‘m", "en": "2 500 000 so‘m" },
+  "totalPrice": { "uz": "7 500 000 so‘m", "ru": "7 500 000 so‘m", "en": "7 500 000 so‘m" },
+  "description": {
+    "uz": "3 oylik oflayn kurs: ChatGPT va Claude bilan ishlashdan Telegramʼdagi shaxsiy AI yordamchi — Jarvisʼgacha. 36 dars, guruhda 10–15 kishi, 1-dars bepul.",
+    "ru": "3 oylik oflayn kurs: ChatGPT va Claude bilan ishlashdan Telegramʼdagi shaxsiy AI yordamchi — Jarvisʼgacha. 36 dars, guruhda 10–15 kishi, 1-dars bepul.",
+    "en": "3 oylik oflayn kurs: ChatGPT va Claude bilan ishlashdan Telegramʼdagi shaxsiy AI yordamchi — Jarvisʼgacha. 36 dars, guruhda 10–15 kishi, 1-dars bepul."
+  },
+  "coverImage": "/images/courses/ai-agent.png",
+  "externalUrl": "https://ai.datatalim.uz/",
+  "technologies": ["ChatGPT", "Claude", "Telegram"],
+  "mentors": [],
+  "modules": []
+}
