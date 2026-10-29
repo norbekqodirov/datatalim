@@ -109,12 +109,13 @@ async function main() {
         await new Promise((resolve, reject) => sftp.fastPut(tarball, `/tmp/${DOMAIN}.tar.gz`, (e) => e ? reject(e) : resolve()));
 
         log('\n=== 2/4 Backup current site & swap in new one ===');
+        const hadSite = (await exec(conn, `test -d ${ROOT} && echo yes || echo no`)).trim() === 'yes';
         await exec(conn,
             `mkdir -p ${BACKUPS} && (test -d ${ROOT} && mv ${ROOT} ${BACKUPS}/site-${stamp} || true) && ` +
             `mkdir -p ${ROOT} && tar -xzf /tmp/${DOMAIN}.tar.gz -C ${ROOT} && rm /tmp/${DOMAIN}.tar.gz && ` +
             `chmod -R a+rX ${ROOT} && test -f ${ROOT}/index.html && echo SITE_OK && ` +
             // faqat oxirgi 5 ta zaxira qoladi
-            `(ls -1d ${BACKUPS}/site-2* | head -n -5 | xargs -r rm -rf)`);
+            `(ls -1d ${BACKUPS}/site-2* 2>/dev/null | head -n -5 | xargs -r rm -rf)`);
 
         log('\n=== 3/4 Nginx (faqat birinchi marta) ===');
         const hasConf = (await exec(conn, `test -f ${CONF} && echo yes || echo no`)).trim() === 'yes';
@@ -136,7 +137,7 @@ async function main() {
             console.log('sertifikat bor');
         }
 
-        ok(`\nTayyor: https://${DOMAIN} (zaxira: ${BACKUPS}/site-${stamp})`);
+        ok(`\nTayyor: https://${DOMAIN}` + (hadSite ? ` (oldingi versiya zaxirasi: ${BACKUPS}/site-${stamp})` : ' (birinchi deploy — zaxira yo\'q)'));
         ok(`Muammo bo'lsa: node scripts/deploy/deploy-sub.mjs ${sub} --rollback`);
     } finally {
         conn.end();
