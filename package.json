@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "seed": "node server/seed.js",
     "predeploy": "vite build",
-    "deploy": "node scripts/deploy/deploy.mjs"
+    "deploy": "node scripts/deploy/deploy.mjs",
+    "rollback": "node scripts/deploy/rollback.mjs"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

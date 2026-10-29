@@ -49,6 +49,8 @@ async function main() {
     }
 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    let commit = 'unknown';
+    try { commit = execSync('git rev-parse --short HEAD').toString().trim(); } catch { /* git yo'q (CI arxiv) */ }
 
     log('Packing frontend build...');
     execSync('tar -czf update.tar.gz -C dist .', { stdio: 'inherit' });
@@ -64,6 +66,15 @@ async function main() {
     });
 
     try {
+        // Ma'lumotlar bazasi zaxirasi — hech narsa o'zgarishidan OLDIN. Online backup (better-sqlite3) ishlayotgan
+        // server bilan ham izchil nusxa beradi. Zaxira olinmasa deploy to'xtaydi.
+        log('\n=== 0/6 Database: backup ===');
+        await exec(conn,
+            `cd ${REMOTE} && mkdir -p db_backups && ` +
+            `node -e "const D=require('better-sqlite3');const db=new D('server/data.db',{readonly:true,fileMustExist:true});` +
+            `db.backup('db_backups/data-${stamp}.db').then(()=>{db.close();console.log('DB_BACKUP_OK')}).catch(e=>{console.error(e.message);process.exit(1)})"`
+        );
+
         log('\n=== 1/6 Frontend: upload build ===');
         await uploadFile(sftp, 'update.tar.gz', `${REMOTE}/update.tar.gz`);
 
@@ -103,11 +114,13 @@ async function main() {
             `if(p.pm2_env.status!=='online')process.exit(1)` +
             `})"`;
         await exec(conn, statusCheck);
+        await exec(conn, `echo "${stamp} ${commit}" >> ${REMOTE}/deploy_log.txt`);
 
-        ok(`\nDeploy complete. Backups saved as *-${stamp} on the VPS (dist_backups/, server_backups/).`);
+        ok(`\nDeploy complete (${commit}). Backups saved as *-${stamp} on the VPS (dist_backups/, server_backups/, db_backups/).`);
+        ok('Muammo bo\'lsa oldingi holatga qaytarish: npm run rollback');
     } catch (e) {
         fail(`\nDEPLOY FAILED: ${e.message}`);
-        fail('Production may be in a partially-updated state — check `pm2 logs data-talim-api` on the VPS and roll back from dist_backups/ or server_backups/ if needed.');
+        fail('Production may be in a partially-updated state — check `pm2 logs data-talim-api` on the VPS and run `npm run rollback` if needed.');
         process.exitCode = 1;
     } finally {
         if (fs.existsSync('update.tar.gz')) fs.unlinkSync('update.tar.gz');
