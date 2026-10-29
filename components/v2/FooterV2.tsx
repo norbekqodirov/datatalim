@@ -5,6 +5,7 @@ import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import { Logo } from '../BrandElements';
 import { uz, useMotionReduced, setMotionReduced } from './utils';
+import { CourseLink } from './CourseLink';
 import './v2.css';
 
 const SOCIAL = [
@@ -119,7 +120,7 @@ export const FooterV2: React.FC = () => {
             <ul className="grid">
               {courses.slice(0, 7).map((c, i) => (
                 <li key={c.id} className={i > 4 ? 'hidden sm:block' : undefined}>
-                  <Link to={`/kurslar/${c.id}`} className={`${linkCls} leading-snug py-1`}>{uz(tField(c.title))}</Link>
+                  <CourseLink course={c} className={`${linkCls} leading-snug py-1`}>{uz(tField(c.title))}</CourseLink>
                 </li>
               ))}
               <li>

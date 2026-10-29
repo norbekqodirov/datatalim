@@ -1,11 +1,11 @@
 import React, { useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import type { Course } from '../../../../data/courses';
 import { useLanguage } from '../../../../i18n';
 import { uz, useMotionReduced } from '../../utils';
 import { CAT_LABEL, Cover, splitDuration, splitPrice } from './shared';
+import { CourseLink } from '../../CourseLink';
 
 /**
  * Katalog kartasi. Skroll bilan: karta pastdan ko'tarilib, kattalashib ochiladi (skrollga bog'liq),
@@ -54,9 +54,9 @@ export const CourseCard: React.FC<{ course: Course; index: number }> = ({ course
             {uz(CAT_LABEL[course.category])}
           </p>
           <h3 className="cc-title text-balance">
-            <Link to={`/kurslar/${course.id}`} className="cc-link">
+            <CourseLink course={course} className="cc-link">
               {title}
-            </Link>
+            </CourseLink>
           </h3>
           <p className="cc-desc">{uz(tField(course.description))}</p>
         </div>

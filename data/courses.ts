@@ -11,6 +11,8 @@ export interface Course {
   discountPrice?: LocalizedString;
   description: LocalizedString;
   coverImage?: string;
+  /** Kursning alohida landing sahifasi (masalan https://ai.datatalim.uz). Bo'lsa, kartalar to'g'ridan-to'g'ri unga olib boradi */
+  externalUrl?: string;
   technologies: string[];
   mentors: {
     name: LocalizedString;

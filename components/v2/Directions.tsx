@@ -1,5 +1,4 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { motion, useMotionValueEvent, useScroll, useTransform, type MotionValue } from 'framer-motion';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { openConsult } from './consult';
@@ -7,6 +6,7 @@ import { useStore } from '../../store/useStore';
 import { useLanguage } from '../../i18n';
 import type { Course } from '../../data/courses';
 import { uz, useIsDesktop, optimizedCover, useMotionReduced, syncPinnedFocus } from './utils';
+import { CourseLink } from './CourseLink';
 
 const CATS: { id: Course['category']; title: string; blurb: string; color: string; ink: string }[] = [
   {
@@ -221,12 +221,12 @@ const Chapter: React.FC<{ cat: (typeof CATS)[number]; i: number; x: MotionValue<
       <ol className="mt-line">
         {list.map((c, k) => (
           <li key={c.id} className="mt-stop">
-            <Link to={`/kurslar/${c.id}`} className="mt-stop-link group">
+            <CourseLink course={c} className="mt-stop-link group">
               <span className="mt-stop-dot" aria-hidden="true" />
               <span className="mono mt-stop-n">{String(k + 1).padStart(2, '0')}</span>
               <span className="mt-stop-t group-hover:underline underline-offset-4">{uz(tField(c.title))}</span>
               <span className="mono mt-stop-d">{uz(tField(c.duration)).split(/[.(]/)[0].trim()}</span>
-            </Link>
+            </CourseLink>
           </li>
         ))}
       </ol>
@@ -298,10 +298,10 @@ const StackedList: React.FC = () => {
                   <ul className="mt-3 md:mt-5">
                     {list.map((c) => (
                       <li key={c.id} className="hairline">
-                        <Link to={`/kurslar/${c.id}`} className="flex items-center gap-3 py-2.5 md:py-3 min-h-[44px]">
+                        <CourseLink course={c} className="flex items-center gap-3 py-2.5 md:py-3 min-h-[44px]">
                           <span className="flex-1 font-semibold max-md:text-[0.95rem]">{uz(tField(c.title))}</span>
                           <ArrowUpRight size={18} className="ink-3" aria-hidden="true" />
-                        </Link>
+                        </CourseLink>
                       </li>
                     ))}
                   </ul>

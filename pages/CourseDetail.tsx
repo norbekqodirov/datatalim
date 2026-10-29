@@ -7,6 +7,7 @@ import { useLanguage } from '../i18n';
 import { SEO, SITE_URL, courseSchema, breadcrumbSchema } from '../components/SEO';
 import { trackEvent, parsePriceUZS } from '../utils/pixel';
 import { CourseDetailView } from '../components/v2/pages/courses/Detail';
+import { courseExternalUrl } from '../components/v2/CourseLink';
 import '../components/v2/v2.css';
 
 // v2 dizayn: /kurslar/:id. Ma'lumot (useStore.courses) admin paneldan tahrirlanadi.
@@ -23,10 +24,16 @@ export default function CourseDetail() {
     window.scrollTo(0, 0);
   }, [id]);
 
+  // alohida landingi bor kurs (qidiruv, eski havola): /kurslar/:id o'sha subdomenga yo'naltiradi
+  const ext = course ? courseExternalUrl(course) : null;
+  useEffect(() => {
+    if (ext) window.location.replace(ext);
+  }, [ext]);
+
   // Meta Pixel ViewContent: kurs ma'lumoti yuklangach (store async) bir marta, kurs almashganda qayta
   const viewedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!course || viewedRef.current === course.id) return; // StrictMode / qayta chizishda ikkilanmasin
+    if (!course || ext || viewedRef.current === course.id) return; // StrictMode / qayta chizishda ikkilanmasin
     viewedRef.current = course.id;
     const monthly = parsePriceUZS(tField(course.monthlyPrice));
     trackEvent('ViewContent', {
@@ -51,6 +58,19 @@ export default function CourseDetail() {
               Kurslar roʻyxatiga qaytish <ArrowRight size={18} aria-hidden="true" />
             </Link>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (ext) {
+    return (
+      <div className="v2 flex min-h-[100svh] items-center">
+        <SEO title={tField(course.title)} noindex />
+        <div className="wrap pb-20 pt-28">
+          <a href={ext} className="btn btn-primary">
+            {tField(course.title)} sahifasiga oʻtish <ArrowRight size={18} aria-hidden="true" />
+          </a>
         </div>
       </div>
     );

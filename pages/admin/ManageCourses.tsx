@@ -8,6 +8,7 @@ import { AdminLangTabs, Lang } from '../../components/admin/AdminLangTabs';
 import { uploadImageToAPIWithStats } from '../../utils/api';
 import { useLanguage } from '../../i18n';
 import { PageHeader, Section, Field, ImageField, ConfirmDialog, SaveBar, useBeforeUnload } from '../../components/admin/ui/kit';
+import { courseExternalUrl } from '../../components/v2/CourseLink';
 
 const CATEGORIES: { value: Course['category']; label: string; tone: string }[] = [
   { value: 'programming', label: 'Dasturlash', tone: 'is-blue' },
@@ -105,6 +106,10 @@ export default function ManageCourses() {
       setTitleError('O\'zbek tilida kurs nomi kiritilishi shart');
       setActiveLang('uz');
       toast.error('O\'zbek tilida Sarlavha kiritilishi shart!');
+      return;
+    }
+    if (formData.externalUrl?.trim() && !courseExternalUrl({ externalUrl: formData.externalUrl })) {
+      toast.error("Alohida sahifa havolasi https://….datatalim.uz ko'rinishida bo'lsin");
       return;
     }
     setSaving(true);
@@ -260,6 +265,14 @@ export default function ManageCourses() {
                 )}
               </Field>
               <ImageField className="a-span2" label="Muqova rasmi" value={formData.coverImage} onChange={handleImageUpload} savings={webpSavings} help="Rasm avtomatik WebP formatga o'tkaziladi va siqiladi." />
+              <Field
+                className="a-span2"
+                label="Alohida sahifa havolasi (ixtiyoriy)"
+                help="Masalan https://ai.datatalim.uz. To'ldirilsa, kurs kartasi shu sahifaga olib boradi. Faqat https va datatalim.uz subdomenlari."
+                error={formData.externalUrl && !courseExternalUrl({ externalUrl: formData.externalUrl }) ? "Havola https://….datatalim.uz ko'rinishida bo'lsin" : ''}
+              >
+                {id => <input id={id} type="url" name="externalUrl" value={formData.externalUrl || ''} onChange={handleStringChange} className="a-input" placeholder="https://ai.datatalim.uz" inputMode="url" />}
+              </Field>
             </div>
           </Section>
 
