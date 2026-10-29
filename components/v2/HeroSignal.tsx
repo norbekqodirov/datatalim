@@ -101,8 +101,10 @@ export const HeroSignal: React.FC = () => {
     const w = canvas.getBoundingClientRect().width;
     const phone = w < 1024 && h > w * 1.1;
     const v = vRef.current;
-    // phones: ≥20px under the navbar (bar ends at 64px; pin tips, star points and the bob need a few px more)
-    const top = phone ? 88 : 76;
+    // phones: ≥20px under the navbar (bar ends at 64px; pin tips, star points and the bob need a few px more).
+    // The test-mode strip (--tbar) pushes the navbar down; at the very top the canvas is pushed down with it.
+    const tbar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tbar')) || 0;
+    const top = (phone ? 88 : 76) + Math.max(0, tbar - canvas.getBoundingClientRect().top);
     // desktop first screen: the hologram keeps a ≥64px gap to the headline and centres in the space to its right
     f.bandX = null;
     if (!phone && v < 0.14 && w >= 1024) {

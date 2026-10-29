@@ -27,6 +27,7 @@ import { useStore } from './store/useStore';
 import { useTracking } from './hooks/useTracking';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollProgress } from './components/ScrollProgress';
+import { TestModeBar } from './components/TestModeBar';
 import { BackToTop } from './components/BackToTop';
 import { GlobalSearch } from './components/GlobalSearch';
 import { ConsultHost } from './components/v2/consult';
@@ -150,6 +151,7 @@ function App() {
       <ErrorBoundary fullScreen>
       <Router>
         <PixelTracker />
+        <TestModeBar />
         <ScrollProgress />
         <Toaster position="top-right" toastOptions={{ className: 'app-toast' }} />
         <BackToTop />

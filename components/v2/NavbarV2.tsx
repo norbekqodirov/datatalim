@@ -172,7 +172,7 @@ export const NavbarV2: React.FC = () => {
   const phone = siteContent.contactPhone;
 
   return (
-    <header ref={headerRef} className="v2 !bg-transparent fixed top-0 inset-x-0 z-50" style={{ overflow: 'visible' }} onFocusCapture={() => setHidden(false)}>
+    <header ref={headerRef} className="v2 !bg-transparent fixed inset-x-0 z-50" style={{ overflow: 'visible', top: 'var(--tbar, 0px)' }} onFocusCapture={() => setHidden(false)}>
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 btn btn-primary z-[60]">
         Asosiy mazmunga oʻtish
       </a>
@@ -322,7 +322,7 @@ export const NavbarV2: React.FC = () => {
             exit={{ opacity: 0, clipPath: 'inset(0 0 100% 0)' }}
             transition={{ duration: 0.42, ease: EASE }}
             className="lg:hidden fixed inset-x-0 bottom-0 overflow-y-auto"
-            style={{ top: navH, background: isDark ? '#000' : '#fbfcfe' }}
+            style={{ top: `calc(${navH}px + var(--tbar, 0px))`, background: isDark ? '#000' : '#fbfcfe' }}
           >
             {/* a faint 4-point star as a backdrop */}
             <svg aria-hidden="true" viewBox="0 0 53.82 53.82" className="pointer-events-none absolute -right-16 top-10 w-[18rem] opacity-[.07]" style={{ color: 'var(--blue-ink)' }}>

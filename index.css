@@ -525,3 +525,18 @@ html.dark ::-webkit-scrollbar-thumb {
   border-color: rgba(255, 255, 255, .16);
   box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .9) !important;
 }
+
+/* ---------- test rejimi tasmasi (TestModeBar) ---------- */
+/* --tbar: tasma balandligi; navbar, scroll progress va hero shu qiymatga suriladi. Tasmani olib tashlash: has-tbar klassi qo'yilmasin */
+:root { --tbar: 0px; }
+html.has-tbar { --tbar: 26px; }
+html.has-tbar body { padding-top: var(--tbar); }
+/* snap nuqtalari va #anchor'lar tasma ostida qolmasin (hero A nuqtasi = sahifa boshi, 26px pastga sakramaydi) */
+html.has-tbar { scroll-padding-top: var(--tbar); }
+.test-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 80; height: var(--tbar);
+  display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px;
+  background: #ffc21a; color: #1a1300; font: 600 12px/1 'Poppins', system-ui, sans-serif; letter-spacing: .01em;
+  white-space: nowrap; overflow: hidden;
+}
+.test-bar svg { flex-shrink: 0; }
