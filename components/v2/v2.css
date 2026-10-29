@@ -845,3 +845,10 @@ html:not(.dark) .v2 .nf-dark { display: none; }
   /* pastki CTA paneli: yon chetga yaqinroq */
   .v2 .mobile-cta { left: 10px; right: 10px; }
 }
+
+/* bosh sahifa: "Yo'nalishlar"dan keyingi bo'limlar ekranga yaqinlashgandagina hisoblanadi (yuklanishdagi
+   uzun Layout ~1/3 ga qisqaradi). Pinned (Campus, Gallery) istisno: ular ichki kenglikni o'lchaydi, Gallery'da fixed lightbox bor */
+.v2 #yonalishlar ~ section:not([aria-labelledby="campus-title"]):not([aria-labelledby="gallery-title"]) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 800px;
+}

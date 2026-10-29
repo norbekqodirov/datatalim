@@ -102,9 +102,11 @@ Baholar 1→3-tekshiruv: mijoz 6.5→7.5, biznes 6.5→7.5, marketolog 6→8, da
 - **Deploydan oldin:** `server/data.db` zaxirasi; deploydan keyin bitta qo'lda sinov ariza (manba admin/Telegram/Sheets'da ko'rinsinmi).
 
 ### Ma'lum kichik muammolar
+- Prod nginx `/images/*` ga `max-age=1 yil, immutable` beradi (fayl nomida hash yo'q). Rasmni **shu nom bilan** almashtirsangiz, foydalanuvchilarda 1 yil eski rasm qoladi — yangi nom bering yoki nginx'da `/images` uchun qisqaroq kesh (masalan 7 kun) qo'ying.
 - Admin'da muqovasi yo'q kurs kartalari qorong'i rejimda deyarli ko'rinmaydi.
 
 ## 6. Jurnal (eng yangisi tepada, har yozuv 1–3 qator)
+- **2026-10-29 · Performance audit** — Production build o'lchandi (CDP, mobil 4x CPU): scroll 60 FPS, scroll paytida long task yo'q, CLS 0, xotira oqishi yo'q (8 marta sahifa aylanish), 22 sahifa/holatda JS xato va 404 yo'q. Yagona muammo — bosh sahifa yuklanishidagi birinchi Layout (mobil ~920 ms): `#yonalishlar ~ section` ga `content-visibility:auto` (Campus/Gallery istisno) → mobil 920→620 ms, TBT ~1150→900; desktop 185→138 ms. Skriptlar: scratchpad `perf/`.
 - **2026-10-28 · Sikl 3 (yakuniy)** — Buzuq `/kurslar/%` URL endi saytni qulatmaydi; Pixel: in-app/ref/igshid reklama deb aniqlanadi, skript ≤1s kechiktirib yuklanadi, `disablePushState`, Lead dedup telefon bo'yicha 10 daq, atribusiya localStorage 7 kun (`ref | fb | utm`), `CareerTestStart/Complete`; Sheets "Kurs" = `kurs | utm`; admin "Manba / UTM" + Dashboard "Reklama manbasi".
 - Hero: kicker halqadan ajraldi, chiqishdagi chok yo'q, H1 tezroq so'nadi, rail grid'da, 30Hz qurilma sekin hisoblanmaydi; Star3D 5 qatlam shisha; `-sm` srcSet; `useScrolledPastHero` keshi; MobileCtaBar `/kurslar` da yashirin. Kurs sahifasi: dars rejasi accordion, "Natija" mobil 2 ustun (mobil −1760px, desktop −1258px); til tadbirlari shisha kafel; Icon3D fallback.
 - **2026-10-28 · Sikl 2** — UTM endi `leads.utm` ustunida (additive migratsiya, Sheets o'zgarmagan, admin Leads'da ko'rinadi); Lead value'siz, eventID submitdan oldin, InitiateCheckout faqat enroll. Hero stansiya o'qiladi (kamera, bandX ≥64px H1 dan, light siyoh), perf: glow sprite, adaptiv sifat, zaif qurilma 900 zarracha, mobil FPS ~2x. MobileCtaBar/BackToTop hero'dan keyin. Kurs hero'da narx chip, primary 'Kursga yozilish', test formasi mobil 1-ekranda, `-sm.webp` rasmlar.
