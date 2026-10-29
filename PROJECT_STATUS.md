@@ -74,12 +74,11 @@
 - **Arizalar (Leads)** sahifasi: `pages/admin/ManageLeads.tsx`. API: `GET /api/leads` (q, source, status, from, to, limit, offset) va `PATCH /api/leads/:id` (status, notes).
 
 ### Commit holati
-Hammasi `redesign-v2` branchida commit qilingan. GitHub'ga oxirgi push: `a18e3cf` (2026-10-27); undan keyingi commitlar faqat lokal (`git log origin/redesign-v2..` bilan ko'ring). `main` ga hali merge qilinmagan.
+`redesign-v2` → `main` fast-forward merge qilindi va ikkalasi GitHub'ga push qilindi (`8ffe021`, 2026-10-29). **v2 jonli saytda (datatalim.uz).** VPS zaxiralari: `*-2026-10-29T15-08-52-591Z` (dist, server, db). Muammo bo'lsa: `npm run rollback` (`--list`, `--with-db`).
 
 ### Keyingi ishlar (backlog)
-- [ ] Egasi landingni ko'rib, fikr bersin. Qaysi bo'lim hali yoqmasa, o'shandan davom etiladi.
-- [ ] Deploydan oldin `/claude-security` tekshiruvi.
-- [ ] `redesign-v2` → `main` merge (PR) va deploy — faqat egasi tasdiqlagach.
+- [ ] Egasi jonli saytda bitta qo'lda sinov ariza yuborsin (admin, Telegram, Sheets'da ko'rinsin).
+- [ ] Egasi jonli saytni desktop va mobilda ko'rib, fikr bersin.
 
 ### Egasi qilishi kerak (kod emas)
 - `.env.local` faylida `JWT_SECRET` ni **32+ belgili** qilib qo'ying. Hozir u yo'q yoki qisqa, shuning uchun har restartdan keyin admin qayta login qiladi.
@@ -106,6 +105,7 @@ Baholar 1→3-tekshiruv: mijoz 6.5→7.5, biznes 6.5→7.5, marketolog 6→8, da
 - Admin'da muqovasi yo'q kurs kartalari qorong'i rejimda deyarli ko'rinmaydi.
 
 ## 6. Jurnal (eng yangisi tepada, har yozuv 1–3 qator)
+- **2026-10-29 · Deploy v2** — `/claude-security` diff tekshiruvi (`low`, 180 fayl): 0 topilma. `tsc` va build toza. `main`ga merge, push, `npm run deploy` (oldin DB zaxira) muvaffaqiyatli; PM2 online. Jonli GET tekshiruv: sahifalar, assetlar va API 200, yangi bundle hash turibdi.
 - **2026-10-29 · Hero gologramma** — Stansiya o'rniga 7 ta 3D zarracha shakli (`shapeScene.ts`: yulduz, AI chip, noutbuk `</>`, kamera, pero, grafik, bitiruv shapkasi), 3 s turadi + 1.35 s morph. Scroll: A shakllar → B "Ma'lumot" butun ekranga tarqoq bulut → C "Bilim" DATA yulduziga yig'iladi (orqaga ham). Shakllar idle'da quriladi; perf avvalgidek (mobil 4x: 58 FPS). Deploy: `deploy.mjs` DB zaxirasi + `deploy_log.txt`, `npm run rollback`.
 - **2026-10-29 · Performance audit** — Production build o'lchandi (CDP, mobil 4x CPU): scroll 60 FPS, scroll paytida long task yo'q, CLS 0, xotira oqishi yo'q (8 marta sahifa aylanish), 22 sahifa/holatda JS xato va 404 yo'q. Yagona muammo — bosh sahifa yuklanishidagi birinchi Layout (mobil ~920 ms): `#yonalishlar ~ section` ga `content-visibility:auto` (Campus/Gallery istisno) → mobil 920→620 ms, TBT ~1150→900; desktop 185→138 ms. Skriptlar: scratchpad `perf/`.
 - **2026-10-28 · Sikl 3 (yakuniy)** — Buzuq `/kurslar/%` URL endi saytni qulatmaydi; Pixel: in-app/ref/igshid reklama deb aniqlanadi, skript ≤1s kechiktirib yuklanadi, `disablePushState`, Lead dedup telefon bo'yicha 10 daq, atribusiya localStorage 7 kun (`ref | fb | utm`), `CareerTestStart/Complete`; Sheets "Kurs" = `kurs | utm`; admin "Manba / UTM" + Dashboard "Reklama manbasi".
