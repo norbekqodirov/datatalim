@@ -1,16 +1,20 @@
 // Lightweight 3D particle engine (Canvas 2D, no WebGL/three.js dependency).
-// Hero story "Fazodagi stansiya", driven by a 0..1 "progress" value:
-//   0.00 → far away: a ringed space station drifts in deep space, seen at a steep angle
-//   0.50 → approach: the camera flies in, data packets race round the station, pulses run along the rings
-//   1.00 → arrival: the station turns to face us — the DATA 4-point star glows in its hub
+// Hero: a particle "hologram" that keeps re-forming into the seven things DATA teaches —
+//   brand star → AI chip → laptop </> → movie camera → pen nib → bar chart ↗ → graduation cap → (star …)
+// Each shape holds ~3 s, then the particles flow to the next one in ~1.35 s: particle i of one shape goes to
+// particle i of the next (both stored in the same angular/radial order), with a per-particle stagger that sweeps
+// round the shape and a mid-flight swirl about the vertical axis. The hologram sways ±35° (never edge-on).
+// Scroll story (0..1 "progress", a pure function of scroll, so it runs backwards too):
+//   0 A — the shapes cycle beside the headline (above it on phones)
+//   .5 B — the particles scatter into a full-screen, slowly drifting data cloud (thinned over the caption)
+//   1 C — the cloud streams into the centre and forms the DATA brand star (inside the band, clear of the caption)
 // Background: twinkling starfield and two particle planets (baked into sprites) with mouse/scroll parallax.
-// Shapes live in stationScene.ts; this file only animates and draws them.
+// Geometry lives in shapeScene.ts; this file only animates and draws it.
 
 import {
-  buildScene, GROUPS, G_CORE, G_HUB, G_RING, G_INNER, G_ORBIT_A, G_ORBIT_B,
-  TAU,
-  type SceneData, type PlanetData,
-} from './stationScene';
+  buildScene, buildShape, mulberry32, SHAPES, TAU, HUE_BLUE, HUE_CYAN, HUE_GREEN, HUE_WHITE,
+  type SceneData, type PlanetData, type ShapeData,
+} from './shapeScene';
 
 export interface FieldOptions {
   count: number;
@@ -23,7 +27,7 @@ export interface FieldOptions {
 const buildStyles = (rgb: string[]) => rgb.map((c) => Array.from({ length: 21 }, (_, q) => `rgba(${c},${(q / 20).toFixed(2)})`));
 // order matches HUE_BLUE, HUE_CYAN, HUE_GREEN, HUE_WHITE
 const RGB_DARK = ['40,120,255', '96,239,255', '0,210,120', '236,244,255'];
-// light theme: deep ink (#0052d9 / #0891b2 / #00995c) so the station keeps its shape on a pale sky
+// light theme: deep ink (#0052d9 / #0891b2 / #00995c) so the hologram keeps its shape on a pale sky
 const RGB_LIGHT = ['0,82,217', '8,145,178', '0,153,92', '24,40,84'];
 const STYLES_DARK = buildStyles(RGB_DARK);
 const STYLES_LIGHT = buildStyles(RGB_LIGHT);
@@ -32,7 +36,7 @@ const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-// sine lookup (ring pulses + twinkle run per particle per frame)
+// sine lookup (morph swirl + twinkle run per particle per frame)
 const LUT_N = 1024;
 const LUT_K = LUT_N / TAU;
 const SIN = new Float32Array(LUT_N);
@@ -72,7 +76,7 @@ function glowSprite(rgb: string, px: number) {
   return c;
 }
 
-/** The station's soft core glow, baked once: blue centre → faint cyan → transparent (drawn with globalAlpha). */
+/** The hologram's soft glow, baked once: blue centre → faint cyan → transparent (drawn with globalAlpha). */
 function coreGlowSprite() {
   const px = 256;
   const c = document.createElement('canvas');
@@ -95,17 +99,6 @@ function coreGlowSprite() {
 const PLANETS_PORTRAIT: [0 | 1, number, number, number, number][] = [[0, 0.12, 0.2, 1, 1], [1, 0.9, 0.3, 0.6, 1]];
 const PLANETS_LANDSCAPE: [0 | 1, number, number, number, number][] = [[0, 0.93, 0.84, 1, 0.6], [1, 0.05, 0.93, 0.6, 0.8]];
 
-/** 99th percentile of a |offset| histogram (32 bins per unit) — a few stray particles may bleed past the band. */
-function pct99(hist: Uint16Array, counted: number) {
-  const target = counted * 0.99;
-  let acc = 0;
-  let b = 0;
-  for (; b < hist.length; b++) {
-    acc += hist[b];
-    if (acc >= target) break;
-  }
-  return Math.max(0.5, (b + 1) / 32);
-}
 
 // adaptive quality: this many consecutive slow frames step the quality down one notch.
 // A frame is slow when the interval is > SLOW_MS AND our own draw cost is heavy (> BUSY_MS), or the interval is
@@ -115,6 +108,19 @@ const BUSY_MS = 12;
 const HARD_MS = 40;
 const SLOW_RUN = 20;
 
+// morph rhythm (seconds): each shape holds, then flows into the next one
+const HOLD = 3;
+const MORPH = 1.35;
+// per-particle start delay spans this share of the morph; each particle travels for the rest
+const STAGGER = 0.34;
+// shape <-> data cloud <-> star (scroll-driven): per-particle delay spans this share of the scroll transition
+const CLOUD_STAGGER = 0.4;
+const HALF_PI = Math.PI / 2;
+// smootherstep: zero velocity and acceleration at both ends
+const smooth = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+
+type IdleWin = Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+
 export class ParticleField {
   private ctx: CanvasRenderingContext2D;
   private scene: SceneData;
@@ -123,7 +129,7 @@ export class ParticleField {
   private dpr = 1;
   private maxDpr: number;
   private raf = 0;
-  // adaptive quality: draw every `step`-th station particle (1, 2, 3), each a touch larger to keep the density
+  // adaptive quality: draw every `step`-th hologram particle (1, 2, 3), each a touch larger to keep the density
   private step = 1;
   private slow = 0;
   private cost = 0;
@@ -139,47 +145,63 @@ export class ParticleField {
   private my = 0;
   private tmx = 0;
   private tmy = 0;
-  /** horizontal anchor of the station (0..1 of width) */
+  /** horizontal anchor of the hologram (0..1 of width) */
   anchorX = 0.5;
   private sax = 0.5;
   private sax0 = -1; // anchor at first frame: background parallax is measured from here
-  /** vertical anchor (0..1 of height); phones park the station above the headline */
+  /** vertical anchor (0..1 of height); phones park the hologram above the headline */
   anchorY = 0.5;
   /** particle size multiplier (phones use finer dust) */
   sizeMul = 1;
-  /** station size multiplier for band-less (static) layouts */
+  /** hologram size multiplier for band-less (static) layouts */
   zoom = 1;
   private say = 0.5;
-  private spinAcc = 0;
+  private swayT = 0;
   private lastT = 0;
   /** overall brightness (0..1), e.g. lowered behind text on small screens */
   dim = 1;
   private sdim = 1;
   /**
-   * Vertical band [top, bottom] in canvas px that the station must stay inside (below the navbar,
-   * above the caption / headline). When set, the station centres itself in the band and shrinks to fit,
-   * measured from the particles' own projected extent. null = free placement (anchorY, no fit).
+   * Vertical band [top, bottom] in canvas px that the hologram must stay inside (below the navbar,
+   * above the caption / headline). When set, the hologram centres itself in the band and shrinks to fit,
+   * using each shape's precomputed projected extent. null = free placement (anchorY, no fit).
    * The starfield and planets always fill the whole canvas.
    */
   band: [number, number] | null = null;
   /**
-   * Optional horizontal band [left, right] in canvas px: the station centres between them and shrinks so its
-   * hull never crosses `left` (desktop first screen: keeps a clear gap to the headline). Overrides anchorX.
+   * Optional horizontal band [left, right] in canvas px: the hologram centres between them and shrinks so it
+   * never crosses `left` (desktop first screen: keeps a clear gap to the headline). Overrides anchorX.
    */
   bandX: [number, number] | null = null;
+  /** Caption box [x0, y0, x1, y1] in canvas px: the scattered data cloud thins out over it so the text stays legible. */
+  quiet: [number, number, number, number] | null = null;
   private sTop = 0;
   private sBot = 0;
   private fit = 1;
-  private extent = 1.1; // projected half-height of the station in "scale" units (measured)
-  private extentX = 1.1;
-  private hist = new Uint16Array(96);
-  private histX = new Uint16Array(96);
-  // per-frame group matrices + scratch
-  private gm: M3[] = Array.from({ length: GROUPS }, m3);
-  private ga = new Float32Array(GROUPS);
+  // ---- hologram shapes: built lazily (shape 0 now, the rest one per idle slot after the first start)
+  private shapes: (ShapeData | null)[] = new Array(SHAPES).fill(null);
+  private built = 1;
+  private idle = 0;
+  private idleIsTimer = false;
+  private cur = 0; // shape on show (morph source)
+  private clock = 0; // seconds into the current hold + morph
+  /** QA only: pin the cycle to shape `shape` with morph progress `t` (0 = holding, 0..1 = flowing to the next). */
+  qa: { shape: number; t: number } | null = null;
+  // per-particle morph constants (index-aligned with every shape)
+  private del: Float32Array;
+  private sw: Float32Array;
+  private zj: Float32Array;
+  // scroll story B: per-particle place in the full-screen data cloud (index-aligned too)
+  private cx: Float32Array; // -1..1 of the half width; angle follows the index, so the shape bursts outwards radially
+  private cy: Float32Array;
+  private cd: Float32Array; // depth 0 far .. 1 near → size, brightness, drift, parallax
+  private cph: Float32Array;
+  private csp: Float32Array;
+  private chue: Uint8Array;
+  private cdel: Float32Array; // stagger for shape ⇄ cloud ⇄ star
+  private view = m3();
   private tA = m3();
   private tB = m3();
-  private view = m3();
   // baked sprites (rebuilt on resize / theme change)
   private spriteA: HTMLCanvasElement | null = null;
   private spriteB: HTMLCanvasElement | null = null;
@@ -192,14 +214,49 @@ export class ParticleField {
     if (!ctx) throw new Error('2D canvas unsupported');
     this.ctx = ctx;
     this.scene = buildScene(opts.count);
+    const n = this.scene.n;
+    this.shapes[0] = buildShape(0, n);
+    // stagger: a sweep round the shape (indices are in angular order) plus a little noise
+    const rnd = mulberry32(77);
+    this.del = new Float32Array(n);
+    this.sw = new Float32Array(n);
+    this.zj = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      this.del[i] = STAGGER * (0.7 * (i / n) + 0.3 * rnd());
+      this.sw[i] = 0.55 + 0.45 * rnd();
+      this.zj[i] = 0.3 + 0.7 * rnd();
+    }
+    this.cx = new Float32Array(n);
+    this.cy = new Float32Array(n);
+    this.cd = new Float32Array(n);
+    this.cph = new Float32Array(n);
+    this.csp = new Float32Array(n);
+    this.chue = new Uint8Array(n);
+    this.cdel = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      // angle from the (angularly sorted) index, area-uniform radius stretched to fill the whole rectangle
+      const a = (i / n) * TAU - Math.PI + (rnd() - 0.5) * 0.5;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      // a little denser towards the middle, still reaching every edge
+      const r = (0.1 + 0.9 * Math.pow(rnd(), 0.62)) / Math.max(Math.abs(ca), Math.abs(sa));
+      this.cx[i] = ca * r;
+      this.cy[i] = sa * r;
+      this.cd[i] = Math.pow(rnd(), 1.6);
+      this.cph[i] = rnd() * TAU;
+      this.csp[i] = 0.25 + rnd() * 0.45;
+      const hq = rnd();
+      this.chue[i] = hq < 0.5 ? HUE_BLUE : hq < 0.86 ? HUE_CYAN : hq < 0.95 ? HUE_GREEN : HUE_WHITE;
+      this.cdel[i] = CLOUD_STAGGER * rnd();
+    }
     this.dark = opts.dark;
     this.maxDpr = opts.maxDpr ?? 2;
+    this.canvas.dataset.shape = '0';
     this.resize();
   }
 
   /** Current render quality, for QA: "dpr|step|particles" (also mirrored to canvas[data-q]). */
   get quality() {
-    return `${this.dpr}|${this.step}|${this.scene.station.n}`;
+    return `${this.dpr}|${this.step}|${this.scene.n}`;
   }
 
   setDark(dark: boolean) {
@@ -232,6 +289,7 @@ export class ParticleField {
     this.warm = 0;
     this.slow = 0;
     this.cost = 0;
+    this.scheduleBuild();
     const loop = (ts: number) => {
       if (!this.running) return;
       this.watch(ts);
@@ -244,7 +302,36 @@ export class ParticleField {
     this.raf = requestAnimationFrame(loop);
   }
 
-  /** Steps quality down after a run of slow frames: first DPR → 1, then 1/2 (desktop: 1/3) of the station particles. */
+  /** Builds the remaining shapes one per idle slot (a few ms each), so loading never gets a new long task. */
+  private scheduleBuild() {
+    if (this.built >= SHAPES || this.idle) return;
+    const win = window as IdleWin;
+    const run = () => {
+      this.idle = 0;
+      if (this.built < SHAPES) {
+        this.shapes[this.built] = buildShape(this.built, this.scene.n);
+        this.built++;
+      }
+      if (this.running) this.scheduleBuild();
+    };
+    if (win.requestIdleCallback) {
+      this.idleIsTimer = false;
+      this.idle = win.requestIdleCallback(run, { timeout: 1500 });
+    } else {
+      this.idleIsTimer = true;
+      this.idle = window.setTimeout(run, 60);
+    }
+  }
+
+  private ensureShape(k: number): ShapeData {
+    while (this.built <= k) {
+      this.shapes[this.built] = buildShape(this.built, this.scene.n);
+      this.built++;
+    }
+    return this.shapes[k] as ShapeData;
+  }
+
+  /** Steps quality down after a run of slow frames: first DPR → 1, then 1/2 (desktop: 1/3) of the hologram particles. */
   private watch(ts: number) {
     const d = ts - this.lastTs;
     this.lastTs = ts;
@@ -257,7 +344,7 @@ export class ParticleField {
     if (this.dpr > 1) {
       this.maxDpr = 1;
       this.resize();
-    } else if (this.step < (this.scene.station.n > 2500 ? 3 : 2)) {
+    } else if (this.step < (this.scene.n > 2500 ? 3 : 2)) {
       // big (desktop) scenes may go to a third of the particles; phone scenes stop at half
       this.step++;
     } else {
@@ -269,9 +356,15 @@ export class ParticleField {
   stop() {
     this.running = false;
     cancelAnimationFrame(this.raf);
+    if (this.idle) {
+      const win = window as IdleWin;
+      if (this.idleIsTimer) clearTimeout(this.idle);
+      else win.cancelIdleCallback?.(this.idle);
+      this.idle = 0;
+    }
   }
 
-  /** Render a single frame (used for reduced-motion static rendering). */
+  /** Render a single frame (used for reduced-motion static rendering: the brand star, no motion). */
   renderStatic(progress: number) {
     this.progress = progress;
     this.sp = progress;
@@ -338,30 +431,60 @@ export class ParticleField {
     if (this.sax0 < 0) this.sax0 = ax;
 
     const p = clamp01(this.sp);
-    // far → approach over [0, .5], approach → arrival over [.5, 1]
+    // beside the copy → into the centre over [0, .5], settle above the closing caption over [.5, 1]
     const m1 = ease(clamp01(p / 0.5));
     const m2 = ease(clamp01((p - 0.5) / 0.5));
-    // "burst": peaks mid-transition — the camera surges forward, stars streak, the station spins up
+    // "burst": peaks mid-transition — the camera surges forward, stars streak, the sway speeds up
     const burst = Math.sin(Math.PI * m1) * (1 - m2) + Math.sin(Math.PI * m2);
-    this.spinAcc += dt * (0.16 + 0.9 * burst);
-    const spin = still ? 0 : this.spinAcc;
     const dark = this.dark;
     const styles = dark ? STYLES_DARK : STYLES_LIGHT;
     const portrait = this.portrait;
 
-    // ---- camera keyframes
-    const sway = still ? 0 : Math.sin(time * 0.23);
-    // first screen: the rings read as a ~1:0.6 ellipse (a station, not a dust cloud) and the hub star is legible
-    const pitch = lerp(lerp(0.62, 0.5, m1), 0.1, m2) + this.my * 0.18 + (still ? 0 : Math.sin(time * 0.31) * 0.04);
-    const yaw = lerp(lerp(-0.3, -0.22, m1), 0, m2) + sway * 0.22 * (1 - 0.6 * m2) + this.mx * 0.35;
-    const roll = lerp(lerp(-0.12, -0.08, m1), 0, m2);
-    const camD = lerp(lerp(6.5, 3.5, m1), 3.1, m2);
-    const coreScale = lerp(lerp(1, 1.05, m1), 1.22, m2);
-    const pulseAmt = clamp01(0.25 + 0.75 * m1 - 0.7 * m2);
+    // ---- morph schedule: hold → flow → hold … (stays on a hold if the next shape isn't built yet)
+    let cur = this.cur;
+    let T = 0;
+    if (this.qa) {
+      cur = this.cur = ((this.qa.shape % SHAPES) + SHAPES) % SHAPES;
+      this.ensureShape(SHAPES - 1);
+      T = clamp01(this.qa.t);
+    } else if (!still) {
+      this.clock += dt;
+      if (this.clock > HOLD) {
+        if (!this.shapes[(cur + 1) % SHAPES]) this.clock = HOLD;
+        else if (this.clock >= HOLD + MORPH) {
+          this.clock -= HOLD + MORPH;
+          cur = this.cur = (cur + 1) % SHAPES;
+          this.canvas.dataset.shape = String(cur);
+        } else T = (this.clock - HOLD) / MORPH;
+      }
+    }
+    // scroll story: A shapes ⇄ (m1) B data cloud ⇄ (m2) C brand star. Past B the solid end is the star.
+    // the scatter is done by p .3 (before the B caption is fully in), the star forms over p .5 → .75 (before C's)
+    const toStar = p > 0.5;
+    const cloudT = toStar ? clamp01((p - 0.5) / 0.25) : clamp01(p / 0.3);
+    if (toStar) T = 0;
+    const A = toStar ? (this.shapes[0] as ShapeData) : (this.shapes[cur] as ShapeData);
+    const B = T > 0 ? (this.shapes[(cur + 1) % SHAPES] as ShapeData) : A;
+    const eG = smooth(T);
+    const sG = Math.sin(Math.PI * T); // 0 → 1 → 0 over the flow
+    // alternate the swirl direction per transition
+    const swirl = (cur & 1 ? -1 : 1) * 1.15;
+
+    // ---- camera: a slow sway (±35°, never edge-on) + slight nod and roll, pointer parallax on top
+    this.swayT += dt * (1 + 1.4 * burst);
+    const st = this.swayT;
+    const yaw = (still ? 0 : 0.6 * Math.sin(st * 0.42)) + this.mx * 0.28;
+    const pitch = (still ? 0 : 0.09 * Math.sin(st * 0.31 + 1)) + this.my * 0.14;
+    const roll = still ? 0 : 0.045 * Math.sin(st * 0.23 + 2);
+    const camD = lerp(lerp(5.2, 4.7, m1), 4.6, m2);
 
     const minDim = Math.min(w, h);
-    // phones: the station is the only visual above the headline, so it may take more of the width
-    const baseScale = minDim * lerp(lerp(0.22, 0.35, m1), 0.335, m2) * (portrait ? 1.18 : 1) * this.zoom * (1 + 0.1 * burst);
+    // phones: the hologram is the only visual above the headline, so it may take more of the width
+    const baseScale = minDim * lerp(lerp(0.3, 0.36, m1), 0.35, m2) * (portrait ? 1.15 : 1) * this.zoom * (1 + 0.06 * burst);
+    // the flow arcs towards the viewer: allow for it so the swirl never touches the copy
+    const pad = 1 + 0.09 * sG;
+    const ex = lerp(A.ex, B.ex, eG) * pad;
+    const ey = lerp(A.ey, B.ey, eG) * pad;
     const ox = w * this.sax;
     let oy: number;
     if (this.band) {
@@ -372,8 +495,10 @@ export class ParticleField {
       this.sBot += (this.band[1] - this.sBot) * k;
       oy = (this.sTop + this.sBot) / 2;
       const half = Math.max(40, (this.sBot - this.sTop) / 2);
-      let want = Math.min(1, half / (this.extent * baseScale));
-      if (bandX) want = Math.min(want, Math.max(40, (bandX[1] - bandX[0]) / 2) / (this.extentX * baseScale));
+      let want = Math.min(1, half / (ey * baseScale));
+      if (bandX) want = Math.min(want, Math.max(40, (bandX[1] - bandX[0]) / 2) / (ex * baseScale));
+      // wide shapes (laptop, chart) on narrow screens: keep a side gutter
+      else want = Math.min(want, Math.max(40, Math.min(ox, w - ox) - (portrait ? 22 : 40)) / (ex * baseScale));
       this.fit += (want - this.fit) * (still ? 1 : 0.12);
     } else {
       this.fit = 1;
@@ -388,28 +513,28 @@ export class ParticleField {
     ctx.globalCompositeOperation = dark ? 'lighter' : 'source-over';
 
     // =================== background: starfield ===================
-    // stars zoom out from the station (the vanishing point) as we fly in; mouse + scroll parallax
-    const st = this.scene.stars;
+    // stars zoom out from the hologram (the vanishing point) as we fly in; mouse + scroll parallax
+    const stars = this.scene.stars;
     const hw = w * 0.5, hh = h * 0.5;
-    const pan = (this.sax - this.sax0) * w; // the camera panning to centre the station
+    const pan = (this.sax - this.sax0) * w; // the camera panning to centre the hologram
     const starAlpha = (dark ? 0.95 : 0.5) * (0.55 + 0.45 * this.sdim);
     const streak = burst * (still ? 0 : 1);
     if (streak > 0.04) {
       ctx.beginPath();
     }
-    for (let i = 0; i < st.n; i++) {
-      const d = st.d[i];
+    for (let i = 0; i < stars.n; i++) {
+      const d = stars.d[i];
       const par = 0.25 + d;
-      let bx = hw + st.x[i] * hw - this.mx * 14 * par + pan * 0.08 * par;
-      let by = hh + st.y[i] * hh - this.my * 9 * par - p * h * 0.07 * par;
+      let bx = hw + stars.x[i] * hw - this.mx * 14 * par + pan * 0.08 * par;
+      let by = hh + stars.y[i] * hh - this.my * 9 * par - p * h * 0.07 * par;
       const zoom = 1 + (0.16 * m1 + 0.12 * m2) * (0.35 + d);
       bx = ox + (bx - ox) * zoom;
       by = oy + (by - oy) * zoom;
       if (bx < -4 || bx > w + 4 || by < -4 || by > h + 4) continue;
-      const tw = still ? 0.8 : 0.55 + 0.45 * fsin(time * st.speed[i] + st.phase[i]);
+      const tw = still ? 0.8 : 0.55 + 0.45 * fsin(time * stars.speed[i] + stars.phase[i]);
       const a = clamp01((0.18 + 0.82 * d) * tw * starAlpha);
       const s = (0.7 + d * 1.5) * (portrait ? 0.85 : 1);
-      ctx.fillStyle = styles[st.hue[i]][(a * 20 + 0.5) | 0];
+      ctx.fillStyle = styles[stars.hue[i]][(a * 20 + 0.5) | 0];
       ctx.fillRect(bx - s / 2, by - s / 2, s, s);
       if (streak > 0.04) {
         const l = streak * 0.09 * (0.3 + d);
@@ -445,125 +570,153 @@ export class ParticleField {
     }
     ctx.globalAlpha = 1;
 
-    // =================== station ===================
-    // soft core glow behind the station (brightens as the star module lights up)
+    // =================== hologram ===================
+    // how solid the scene is: 1 = a shape, 0 = the scattered data cloud (scroll stage B)
+    const solid = toStar ? cloudT : 1 - cloudT;
+    // soft glow behind the shape (pre-baked sprite, own box only); pulses a little while the particles flow
     ctx.globalCompositeOperation = 'source-over';
-    // pre-baked sprite drawn over its own box only (was: a new gradient + a full-screen fill every frame)
-    const glowR = scale * (1.55 + 0.1 * m2);
-    const gA = (dark ? 0.22 : 0.16) * this.sdim * (1 + 0.35 * m1 + 0.5 * m2 + 0.6 * burst);
-    if (this.coreGlow) {
+    const glowR = scale * Math.max(ex, ey) * 1.5;
+    const gA = (dark ? 0.2 : 0.13) * this.sdim * (1 + 0.5 * m2 + 0.35 * sG) * solid * solid;
+    if (this.coreGlow && gA > 0.004) {
       ctx.globalAlpha = clamp01(gA);
       ctx.drawImage(this.coreGlow, ox - glowR, oy - glowR, glowR * 2, glowR * 2);
       ctx.globalAlpha = 1;
     }
     ctx.globalCompositeOperation = dark ? 'lighter' : 'source-over';
 
-    // view matrix V = Rz(roll) · Rx(pitch) · Ry(yaw); group matrices = V · local motion
-    const V = this.view, A = this.tA, B = this.tB, gm = this.gm, ga = this.ga;
-    mul(V, setRotZ(A, roll), setRotX(B, pitch));
-    mul(V, V, setRotY(A, yaw));
-    // core: counter-rotated against the camera (V⁻¹ = Ry(-yaw)·Rx(-pitch)·Rz(-roll)), so the brand star faces us
-    // from the very first frame while the rings stay tilted; a small 3D sway still shows the lens depth
-    const C = gm[G_CORE];
-    mul(B, setRotY(A, -yaw), setRotX(B, -pitch));
-    mul(B, B, setRotZ(A, -roll));
-    mul(C, V, B);
-    mul(B, setRotY(A, still ? 0 : Math.sin(time * 0.5) * 0.22 * (1 - 0.65 * m2)), setRotX(B, still ? 0 : Math.sin(time * 0.37) * 0.08));
-    mul(C, C, B);
-    for (let k = 0; k < 9; k++) C[k] *= coreScale;
-    gm[G_HUB].set(V);
-    mul(gm[G_RING], V, setRotZ(A, spin));
-    mul(gm[G_INNER], V, setRotZ(A, -spin * 1.5));
-    mul(B, setRotX(A, 1.12), setRotY(B, 0.32));
-    mul(gm[G_ORBIT_A], V, mul(B, B, setRotZ(A, still ? 0.6 : time * 0.55)));
-    mul(B, setRotY(A, 1.18), setRotX(B, 0.42));
-    mul(gm[G_ORBIT_B], V, mul(B, B, setRotZ(A, still ? 2.2 : 1 - time * 0.42)));
-    ga[G_CORE] = 0.78 + 0.22 * m2;
-    ga[G_HUB] = 0.85 * (1 - 0.75 * m2);
-    ga[G_RING] = 1;
-    ga[G_INNER] = 1;
-    // light theme: the orbiting packets are halved so they don't read as noise around the hull
-    ga[G_ORBIT_A] = ga[G_ORBIT_B] = (0.35 + 0.65 * m1) * (1 - 0.4 * m2) * (dark ? 1 : 0.5);
+    // view matrix V = Rz(roll) · Rx(pitch) · Ry(yaw)
+    const V = this.view;
+    mul(V, setRotZ(this.tA, roll), setRotX(this.tB, pitch));
+    mul(V, V, setRotY(this.tA, yaw));
+    const v0 = V[0], v1 = V[1], v2 = V[2], v3 = V[3], v4 = V[4], v5 = V[5], v6 = V[6], v7 = V[7], v8 = V[8];
 
-    const S = this.scene.station;
-    const hist = this.hist, histX = this.histX;
-    hist.fill(0);
-    if (bandX) histX.fill(0);
-    let counted = 0;
-    // light theme: dark ink on a pale sky needs more weight; far away is only a touch hazier
     const step = this.step;
-    const dimAll = (dark ? 1.15 : 1.35) * this.sdim * (0.94 + 0.06 * m1) * (1 + 0.12 * (step - 1));
-    const sizeK = this.sizeMul * (dark ? 1 : 1.35) * (1 + 0.35 * burst) * (1 + 0.22 * (step - 1));
-    const pulseT = still ? 0 : time * 2.6;
-    for (let i = 0; i < S.n; i++) {
-      // reduced quality: keep pairs (i>>1), so alternating sets (e.g. the two data orbits) both stay visible
+    // light theme: dark ink on a pale sky needs more weight
+    const dimAll = (dark ? 1.15 : 1.35) * this.sdim * (1 + 0.12 * (step - 1));
+    const sizeK = this.sizeMul * (dark ? 1 : 1.35) * (1 + 0.22 * (step - 1)) * (1 + 0.15 * burst);
+    // hologram scan: a bright band sweeping down the shape every ~6.8 s
+    const scanY = still ? 9 : 1.35 - ((time * 0.5) % 3.4);
+    const scanAmt = dark ? 0.85 : 0.5;
+    const n = this.scene.n;
+    const del = this.del, sw = this.sw, zj = this.zj;
+    const axs = A.x, ays = A.y, azs = A.z, aba = A.ba, asz = A.size, ahu = A.hue;
+    const bxs = B.x, bys = B.y, bzs = B.z, bba = B.ba, bsz = B.size, bhu = B.hue;
+    const invSpan = 1 / (1 - STAGGER);
+    const flowing = T > 0;
+    // data cloud: spread over the whole frame, drifting slowly; nearer motes are bigger, brighter and float more
+    const cxs = this.cx, cys = this.cy, cds = this.cd, cph = this.cph, csp = this.csp, chu = this.chue, cdel = this.cdel;
+    const invC = 1 / (1 - CLOUD_STAGGER);
+    const anyCloud = solid < 0.9995;
+    const chw = w * 0.53, chh = h * 0.53;
+    const cSizeK = this.sizeMul * (dark ? 1 : 1.25) * (portrait ? 0.85 : 1) * (1 + 0.22 * (step - 1));
+    const cDim = (dark ? 0.95 : 0.85) * (0.55 + 0.45 * this.sdim);
+    const q = this.quiet;
+    const qx0 = q ? q[0] : 0, qy0 = q ? q[1] : 0, qx1 = q ? q[2] : 0, qy1 = q ? q[3] : 0;
+    const ctime = still ? 0 : time;
+    for (let i = 0; i < n; i++) {
+      // reduced quality: keep pairs (i>>1) — indices are in angular order, so the thinning stays even
       if (step > 1 && (i >> 1) % step !== 0) continue;
-      const g = S.grp[i];
-      const M = gm[g];
-      const x = S.x[i], y = S.y[i], z = S.z[i];
-      const x1 = M[0] * x + M[1] * y + M[2] * z;
-      const y1 = M[3] * x + M[4] * y + M[5] * z;
-      const z1 = M[6] * x + M[7] * y + M[8] * z;
-      const zc = camD + z1;
-      if (zc < 0.4) continue;
-      const persp = camD / zc;
-      const px = ox + x1 * scale * persp;
-      const py = oy - y1 * scale * persp;
-      // fit measures the hull only — faint orbiting packets may cross the band edge
-      if (g < G_ORBIT_A) {
-        const bin = (Math.abs(y1 * persp) * 32) | 0;
-        if (bin < 96) { hist[bin]++; counted++; }
-        if (bandX) {
-          const bxn = (Math.abs(x1 * persp) * 32) | 0;
-          if (bxn < 96) histX[bxn]++;
-        }
+      // k = how far particle i is into the cloud (staggered); 0 = on the shape, 1 = in the cloud
+      let k = 0;
+      if (anyCloud) {
+        const kt = (cloudT - cdel[i]) * invC;
+        k = kt <= 0 ? 0 : kt >= 1 ? 1 : smooth(kt);
+        if (toStar) k = 1 - k;
       }
-      if (px < -10 || px > w + 10 || py < -10 || py > h + 10) continue;
-
-      const depth = clamp01((z1 + 1.3) / 2.6); // 0 near → 1 far
-      let a = S.ba[i] * ga[g] * (1 - 0.5 * depth) * dimAll;
-      const an = S.ang[i];
-      if (an === an && pulseAmt > 0.01) {
-        // data pulses travelling along the rings
-        const wv = 0.5 + 0.5 * fsin(an * 5 - pulseT);
-        a *= 1 - 0.45 * pulseAmt + pulseAmt * 0.9 * wv * wv * wv;
+      let px = 0, py = 0, a = 0, sz = 0, hue = 0;
+      if (k < 1) {
+        let x: number, y: number, z: number, size: number;
+        const t = flowing ? (T - del[i]) * invSpan : 0;
+        if (t <= 0) {
+          x = axs[i]; y = ays[i]; z = azs[i]; a = aba[i]; size = asz[i]; hue = ahu[i];
+        } else if (t >= 1) {
+          x = bxs[i]; y = bys[i]; z = bzs[i]; a = bba[i]; size = bsz[i]; hue = bhu[i];
+        } else {
+          const e = smooth(t);
+          x = axs[i] + (bxs[i] - axs[i]) * e;
+          y = ays[i] + (bys[i] - ays[i]) * e;
+          z = azs[i] + (bzs[i] - azs[i]) * e;
+          // mid-flight: swirl about the vertical axis and arc towards the viewer (a curved path, not a straight line)
+          const s = fsin(t * Math.PI);
+          const phi = swirl * sw[i] * s;
+          const c = fsin(phi + HALF_PI), sn = fsin(phi);
+          const xr = x * c + z * sn;
+          z = z * c - x * sn - 0.32 * zj[i] * s;
+          x = xr;
+          a = (aba[i] + (bba[i] - aba[i]) * e) * (1 + 0.3 * s);
+          size = asz[i] + (bsz[i] - asz[i]) * e;
+          hue = e < 0.5 ? ahu[i] : bhu[i];
+        }
+        const ds = y - scanY;
+        if (ds > -0.14 && ds < 0.14) a *= 1 + scanAmt * (1 - (ds < 0 ? -ds : ds) * 7.1);
+        const x1 = v0 * x + v1 * y + v2 * z;
+        const y1 = v3 * x + v4 * y + v5 * z;
+        const z1 = v6 * x + v7 * y + v8 * z;
+        const zc = camD + z1;
+        if (zc < 0.4 && k === 0) continue;
+        const persp = camD / (zc < 0.4 ? 0.4 : zc);
+        px = ox + x1 * scale * persp;
+        py = oy - y1 * scale * persp;
+        if (k === 0 && (px < -10 || px > w + 10 || py < -10 || py > h + 10)) continue;
+        const depth = clamp01((z1 + 1.2) / 2.4); // 0 near → 1 far
+        a *= (1 - 0.45 * depth) * dimAll;
+        sz = size * persp * sizeK;
+      }
+      if (k > 0) {
+        const d = cds[i];
+        const ph = ctime * csp[i] + cph[i];
+        const qx = w * 0.5 + cxs[i] * chw + fsin(ph) * (5 + 22 * d) - this.mx * (4 + 34 * d);
+        const qy = h * 0.5 + cys[i] * chh + fsin(ph * 0.83 + 1.7) * (4 + 16 * d) - this.my * (3 + 22 * d);
+        let qa = (0.3 + 0.7 * d) * cDim;
+        if (q) {
+          // thin the cloud over the caption so the text stays legible
+          const dx = qx < qx0 ? qx0 - qx : qx > qx1 ? qx - qx1 : 0;
+          const dy = qy < qy0 ? qy0 - qy : qy > qy1 ? qy - qy1 : 0;
+          const dd = dx > dy ? dx : dy;
+          if (dd < 48) qa *= 0.1 + 0.9 * (dd / 48);
+        }
+        const qs = (1 + 2.6 * d * d) * cSizeK;
+        if (k >= 1) {
+          px = qx; py = qy; a = qa; sz = qs; hue = chu[i];
+        } else {
+          // curved path: a sideways bow that peaks mid-way (the scatter swirls out, the gather swirls in)
+          const dx = qx - px, dy = qy - py;
+          const bow = 0.2 * k * (1 - k) * (toStar ? -1 : 1);
+          px += dx * k - dy * bow;
+          py += dy * k + dx * bow;
+          a += (qa - a) * k;
+          sz += (qs - sz) * k;
+          if (k > 0.5) hue = chu[i];
+        }
+        if (px < -10 || px > w + 10 || py < -10 || py > h + 10) continue;
       }
       if (a > 1) a = 1;
-      const size = S.size[i] * persp * sizeK;
-      ctx.fillStyle = styles[S.hue[i]][(a * 20 + 0.5) | 0];
-      ctx.fillRect(px - size / 2, py - size / 2, size, size);
+      ctx.fillStyle = styles[hue][(a * 20 + 0.5) | 0];
+      // every 4th mote stretches into a short dash in the cloud: reads as bits of data, not stars
+      const sw2 = (i & 3) === 0 && k > 0 ? sz * (1 + 1.8 * k) : sz;
+      ctx.fillRect(px - sw2 / 2, py - sz / 2, sw2, sz);
     }
 
-    // running lights (blinking) and star-tip beacons
-    for (const L of S.lights) {
-      const M = gm[L.g];
-      const x1 = M[0] * L.x + M[1] * L.y + M[2] * L.z;
-      const y1 = M[3] * L.x + M[4] * L.y + M[5] * L.z;
-      const z1 = M[6] * L.x + M[7] * L.y + M[8] * L.z;
-      const zc = camD + z1;
-      if (zc < 0.4) continue;
-      const persp = camD / zc;
-      const depth = clamp01((z1 + 1.3) / 2.6);
-      let a: number;
-      if (L.blink) {
-        const b = still ? 0.5 : 0.5 + 0.5 * Math.sin(time * 1.9 + L.phase);
-        a = (0.25 + 0.75 * b * b * b * b) * (1 - 0.55 * depth);
-      } else {
-        a = (0.35 + 0.65 * m2) * (still ? 1 : 0.8 + 0.2 * Math.sin(time * 1.3 + L.phase));
+    // accent glows (star tips, arrow head, lens…): fade out with the old shape, in with the new one
+    const lr = Math.max(4, scale * 0.06) * (portrait ? 0.8 : 1);
+    for (let s = 0; s < 2 && solid > 0.02; s++) {
+      if (s === 1 && !flowing) break;
+      const S = s === 0 ? A : B;
+      const wgt = (flowing ? (s === 0 ? 1 - eG : eG) : 1) * solid;
+      for (const L of S.lights) {
+        const x1 = v0 * L.x + v1 * L.y + v2 * L.z;
+        const y1 = v3 * L.x + v4 * L.y + v5 * L.z;
+        const z1 = v6 * L.x + v7 * L.y + v8 * L.z;
+        const zc = camD + z1;
+        if (zc < 0.4) continue;
+        const persp = camD / zc;
+        const a = wgt * wgt * (still ? 0.9 : 0.75 + 0.25 * Math.sin(time * 1.3 + L.x * 3)) * this.sdim * (dark ? 1 : 0.9);
+        const r = lr * L.r * persp;
+        ctx.globalAlpha = clamp01(a);
+        ctx.drawImage(this.glows[L.hue], ox + x1 * scale * persp - r, oy - y1 * scale * persp - r, r * 2, r * 2);
       }
-      a *= this.sdim * (dark ? 1 : 0.95);
-      const r = (L.blink ? 9 : 12 + 8 * m2) * persp * (portrait ? 0.75 : 1) * this.fit;
-      ctx.globalAlpha = clamp01(a);
-      ctx.drawImage(this.glows[L.hue], ox + x1 * scale * persp - r, oy - y1 * scale * persp - r, r * 2, r * 2);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-
-    // measured extent = 99th percentile of |offset| (a few stray particles may bleed past the band)
-    if (this.band && counted > 0) {
-      const k = still ? 1 : 0.1;
-      this.extent += (pct99(hist, counted) - this.extent) * k;
-      if (bandX) this.extentX += (pct99(histX, counted) - this.extentX) * k;
-    }
   }
 }

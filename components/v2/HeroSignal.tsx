@@ -28,8 +28,22 @@ function textRight(el: HTMLElement, fallback: number): number {
   return r > 0 ? Math.min(r, fallback) : fallback;
 }
 
-// scroll progress (0..1 over the pinned section) → station story progress
-// (0 far-away station, .5 approach — data pulses, 1 arrival — the brand star faces us)
+// union of the caption's text lines (not the full-width stage box) in canvas px, padded a little
+function textBox(el: HTMLElement, cv: DOMRect): [number, number, number, number] | null {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const range = document.createRange();
+  for (const t of Array.from(el.querySelectorAll('p, h2'))) {
+    range.selectNodeContents(t);
+    const r = range.getBoundingClientRect();
+    if (r.width === 0) continue;
+    x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top); x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom);
+  }
+  return x1 > x0 ? [x0 - cv.left - 12, y0 - cv.top - 12, x1 - cv.left + 12, y1 - cv.top + 12] : null;
+}
+
+// scroll progress (0..1 over the pinned section) → hologram story progress:
+// 0 A — shapes cycle beside the headline · .5 B — they scatter into a full-screen data cloud ·
+// 1 C — the cloud streams into the centre and forms the DATA brand star (reversible: it is a pure function of scroll)
 function formationAt(v: number) {
   if (v < 0.12) return 0;
   if (v < 0.42) return ((v - 0.12) / 0.3) * 0.5;
@@ -78,22 +92,28 @@ export const HeroSignal: React.FC = () => {
     const w = canvas.getBoundingClientRect().width;
     const phone = w < 1024 && h > w * 1.1;
     const v = vRef.current;
-    // phones: ≥20px under the navbar (bar ends at 64px; the hull's dust and bob need a few px more)
-    const top = phone ? 80 : 76;
-    // desktop first screen: the station keeps a ≥64px gap to the headline and centres in the space to its right
+    // phones: ≥20px under the navbar (bar ends at 64px; pin tips, star points and the bob need a few px more)
+    const top = phone ? 88 : 76;
+    // desktop first screen: the hologram keeps a ≥64px gap to the headline and centres in the space to its right
     f.bandX = null;
     if (!phone && v < 0.14 && w >= 1024) {
       const c = copyRef.current;
       if (c) {
         const cv = canvas.getBoundingClientRect();
         const cr = c.getBoundingClientRect();
-        // the copy box is a fixed max-width; the station keys off the real text edge (narrow 1024–1100px screens)
+        // the copy box is a fixed max-width; the hologram keys off the real text edge (narrow 1024–1100px screens)
         const left = textRight(c, cr.right) - cv.left + 64;
         const right = w - (cr.left - cv.left) * 0.5;
         if (right - left > 120) f.bandX = [left, right];
       }
     }
     let bottom = h - 80;
+    // stages B/C: the scattered data cloud thins out over the caption text
+    f.quiet = null;
+    if (v >= 0.14) {
+      const cap = v < 0.56 ? capBRef.current : capCRef.current;
+      if (cap) f.quiet = textBox(cap, canvas.getBoundingClientRect());
+    }
     if (v < 0.14) {
       if (phone) {
         const c = copyRef.current;
@@ -101,7 +121,7 @@ export const HeroSignal: React.FC = () => {
       }
     } else {
       const cap = v < 0.56 ? capBRef.current : capCRef.current;
-      // the ring's dust and glow reach past the fitted hull: keep a clear gap above the caption kicker
+      // accent glows and stray dust reach past the fitted shape: keep a clear gap above the caption kicker
       if (cap) bottom = cap.offsetTop - (phone ? 28 : 48);
     }
     f.band = [top, Math.max(top + 120, bottom)];
@@ -126,12 +146,14 @@ export const HeroSignal: React.FC = () => {
       return;
     }
     fieldRef.current = field;
+    // QA (dev server only): window.__heroField.qa = { shape, t } pins a shape / morph frame for screenshots
+    if (import.meta.env.DEV) (window as unknown as { __heroField?: ParticleField }).__heroField = field;
     // fewer particles: slightly larger dust keeps the hull reading as solid
     const liteK = lite ? 1.25 : 1;
     if (!reduced) requestAnimationFrame(measureBand);
     const portrait = () => window.innerHeight > window.innerWidth * 1.1;
     field.anchorX = desktop ? 0.78 : 0.5;
-    // phones: the station floats above the headline instead of hiding behind it
+    // phones: the hologram floats above the headline instead of hiding behind it
     field.anchorY = !desktop && portrait() ? 0.21 : 0.5;
     field.sizeMul = (desktop ? 1 : 0.7) * liteK;
     field.dim = desktop || portrait() ? 1 : 0.3;
@@ -153,10 +175,10 @@ export const HeroSignal: React.FC = () => {
     window.addEventListener('resize', onResize);
 
     if (reduced) {
-      // no band in the static layout: keep the station clear of the headline
+      // no band in the static layout: keep the (static) brand star clear of the headline
       field.anchorX = desktop ? 0.76 : 0.5;
-      field.zoom = desktop ? 0.66 : 0.72;
-      // phones: the copy fills the screen, so the station becomes a quiet backdrop behind it
+      field.zoom = desktop ? 0.6 : 0.72;
+      // phones: the copy fills the screen, so the star becomes a quiet backdrop behind it
       if (!desktop) { field.anchorY = 0.42; field.dim = 0.3; }
       field.renderStatic(1);
       return () => {
@@ -217,11 +239,11 @@ export const HeroSignal: React.FC = () => {
       measureBand();
     }
     f.progress = formationAt(v);
-    // desktop first screen: bandX (set in measureBand) places the station; this is the fallback
+    // desktop first screen: bandX (set in measureBand) places the hologram; this is the fallback
     f.anchorX = desktop && v < 0.14 ? 0.78 : 0.5;
     const phone = !desktop && window.innerHeight > window.innerWidth * 1.1;
     f.anchorY = phone && v < 0.14 ? 0.21 : 0.5;
-    // short landscape screens: the station sits behind the headline, keep it quiet until the text leaves
+    // short landscape screens: the hologram sits behind the headline, keep it quiet until the text leaves
     f.dim = !desktop && !phone && v < 0.14 ? 0.3 : 1;
   });
 
@@ -235,7 +257,7 @@ export const HeroSignal: React.FC = () => {
   const subtitle = uz(tField(siteContent.heroSubtitle));
   const description = uz(tField(siteContent.heroDescription));
 
-  // Reduced motion: one static, un-pinned screen with the arrived station (brand star facing us).
+  // Reduced motion: one static, un-pinned screen with the brand star (no morph, no sway).
   if (reduced) {
     return (
       <section ref={sectionRef} data-hero className="relative min-h-[100svh] flex items-center overflow-hidden">
@@ -255,14 +277,14 @@ export const HeroSignal: React.FC = () => {
         {/* exit seam: the pinned frame melts into the page background instead of ending on a hard edge */}
         <div className="hero-fade absolute inset-x-0 bottom-0 pointer-events-none" aria-hidden="true" />
 
-        {/* Stage A — headline + CTAs (left), the space station far away (right) */}
+        {/* Stage A — headline + CTAs (left), the morphing hologram (right; above the headline on phones) */}
         <Stage p={scrollYProgress} range={[-1, 0, 0.06, 0.12]} className="absolute inset-0 flex items-end pb-[calc(13svh+2.25rem)] lg:items-center lg:pb-0">
           <div className="wrap pt-24" style={copyHide}>
             <HeroCopy title={title} subtitle={subtitle} description={description} copyRef={copyRef} fontReady={fontReady} />
           </div>
         </Stage>
 
-        {/* Stage B — approach: data races round the station */}
+        {/* Stage B — the hologram scatters into a full-screen data cloud */}
         <Stage p={scrollYProgress} range={[0.18, 0.26, 0.44, 0.52]} innerRef={capBRef} className="cap-stage absolute inset-x-0 text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">01 — Maʼlumot</p>
@@ -270,7 +292,7 @@ export const HeroSignal: React.FC = () => {
           </div>
         </Stage>
 
-        {/* Stage C — arrival: the brand star in the station's hub */}
+        {/* Stage C — the cloud streams together into the DATA brand star */}
         <Stage p={scrollYProgress} range={[0.56, 0.64, 1.2, 1.3]} innerRef={capCRef} className="cap-stage absolute inset-x-0 text-center">
           <div className="wrap">
             <p className="t-kicker mb-4">02 — Bilim</p>
