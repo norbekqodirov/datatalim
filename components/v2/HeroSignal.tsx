@@ -52,6 +52,13 @@ function formationAt(v: number) {
   return 1;
 }
 
+// phones: scroll distance of the pinned story (svh). A swipe covers ~a screen, so each step needs most of one.
+const PHONE_TRAVEL = 220;
+// story progress where each step is fully on screen: A headline · B cloud scattered (caption up) · C star formed
+const SNAP_AT = [0, 0.43, 0.86];
+// phones: below this much room (px) between navbar and headline the hologram becomes a dim backdrop instead
+const MIN_PHONE_BAND = 96;
+
 const Stage: React.FC<{ p: MotionValue<number>; range: [number, number, number, number]; className?: string; children: React.ReactNode; innerRef?: React.Ref<HTMLDivElement> }> = ({ p, range, className, children, innerRef }) => {
   const opacity = useTransform(p, range, [0, 1, 1, 0]);
   const y = useTransform(p, range, [40, 0, 0, -40]);
@@ -81,6 +88,8 @@ export const HeroSignal: React.FC = () => {
   const vRef = useRef(0);
   // band faqat bosqich almashganda (A → B → C), resize va shrift yuklanganda qayta o'lchanadi — har scroll kadrida emas
   const phaseRef = useRef(-1);
+  // phone first screen too short for the hologram above the headline (set in measureBand)
+  const tightRef = useRef(false);
 
   // The formation lives in a vertical band: below the navbar, above whatever text is on screen
   // (headline on phones, captions otherwise). The field centres itself in it and shrinks to fit.
@@ -114,20 +123,35 @@ export const HeroSignal: React.FC = () => {
       const cap = v < 0.56 ? capBRef.current : capCRef.current;
       if (cap) f.quiet = textBox(cap, canvas.getBoundingClientRect());
     }
+    tightRef.current = false;
     if (v < 0.14) {
       if (phone) {
         const c = copyRef.current;
         if (c) bottom = c.getBoundingClientRect().top - canvas.getBoundingClientRect().top - 16;
+        // short phone screens: no room above the headline — sit behind it as a dim backdrop, never on top of the text
+        if (bottom - top < MIN_PHONE_BAND) {
+          tightRef.current = true;
+          bottom = h - 80;
+        }
       }
     } else {
       const cap = v < 0.56 ? capBRef.current : capCRef.current;
       // accent glows and stray dust reach past the fitted shape: keep a clear gap above the caption kicker
       if (cap) bottom = cap.offsetTop - (phone ? 28 : 48);
     }
-    f.band = [top, Math.max(top + 120, bottom)];
+    f.band = [top, Math.max(top + (phone && v < 0.14 ? MIN_PHONE_BAND : 120), bottom)];
+    f.dim = tightRef.current || (!phone && w < 1024 && v < 0.14) ? 0.3 : 1;
   }, []);
 
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ['start start', 'end end'] });
+
+  // phones: proximity snapping on the page while the hero is mounted (its only snap points are the story steps)
+  useEffect(() => {
+    if (desktop || reduced) return;
+    const root = document.documentElement;
+    root.classList.add('hero-snap');
+    return () => root.classList.remove('hero-snap');
+  }, [desktop, reduced]);
 
   // ---- particle field lifecycle ----
   useEffect(() => {
@@ -244,7 +268,8 @@ export const HeroSignal: React.FC = () => {
     const phone = !desktop && window.innerHeight > window.innerWidth * 1.1;
     f.anchorY = phone && v < 0.14 ? 0.21 : 0.5;
     // short landscape screens: the hologram sits behind the headline, keep it quiet until the text leaves
-    f.dim = !desktop && !phone && v < 0.14 ? 0.3 : 1;
+    // (short phones: measureBand set tightRef — the hologram stays a dim backdrop behind the headline)
+    f.dim = tightRef.current || (!desktop && !phone && v < 0.14) ? 0.3 : 1;
   });
 
   const hintOpacity = useTransform(scrollYProgress, [0, 0.06], [1, 0]);
@@ -270,7 +295,11 @@ export const HeroSignal: React.FC = () => {
   }
 
   return (
-    <section ref={sectionRef} data-hero className="relative" style={{ height: desktop ? '230vh' : '140svh' }} aria-label="DATA Taʼlim Stansiyasi">
+    <section ref={sectionRef} data-hero className="relative" style={{ height: desktop ? '230vh' : `${100 + PHONE_TRAVEL}svh` }} aria-label="DATA Taʼlim Stansiyasi">
+      {/* phones: one snap point per story step (A headline · B data cloud · C brand star) so a fast swipe stops on each */}
+      {!desktop && SNAP_AT.map((p) => (
+        <div key={p} className="hero-snap-pt" style={{ top: `${p * PHONE_TRAVEL}svh` }} aria-hidden="true" />
+      ))}
       <div className="sticky top-0 h-[100svh] overflow-hidden grain">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" aria-hidden="true" />
         <div className="absolute inset-0 pointer-events-none" style={{ background: vignette }} />
@@ -278,7 +307,7 @@ export const HeroSignal: React.FC = () => {
         <div className="hero-fade absolute inset-x-0 bottom-0 pointer-events-none" aria-hidden="true" />
 
         {/* Stage A — headline + CTAs (left), the morphing hologram (right; above the headline on phones) */}
-        <Stage p={scrollYProgress} range={[-1, 0, 0.06, 0.12]} className="absolute inset-0 flex items-end pb-[calc(13svh+2.25rem)] lg:items-center lg:pb-0">
+        <Stage p={scrollYProgress} range={[-1, 0, 0.06, 0.12]} className="hero-stage-a absolute inset-0 flex items-end pb-[calc(13svh+2.25rem)] lg:items-center lg:pb-0">
           <div className="wrap pt-24" style={copyHide}>
             <HeroCopy title={title} subtitle={subtitle} description={description} copyRef={copyRef} fontReady={fontReady} />
           </div>
